@@ -1,3 +1,4 @@
+import Link from "next/link"
 import "material-symbols/outlined.css"
 import "./notebook-home.scss"
 
@@ -14,26 +15,28 @@ export default function NotebookLMHome() {
           </button>
 
           <div className="nlm-toggle" role="group" aria-label="Ansicht">
-            <button className="nlm-toggle-btn" aria-label="Auswählen">
-              <span className="material-symbols-outlined">check</span>
-            </button>
-            <button className="nlm-toggle-btn active" aria-label="Rasteransicht" aria-pressed="true">
-              <span className="material-symbols-outlined">grid_view</span>
-            </button>
+            <div className="nlm-toggle-group">
+              <button className="nlm-toggle-btn active" aria-label="Auswählen" aria-pressed="true">
+                <span className="material-symbols-outlined">check</span>
+              </button>
+              <button className="nlm-toggle-btn active" aria-label="Rasteransicht" aria-pressed="true">
+                <span className="material-symbols-outlined">grid_view</span>
+              </button>
+            </div>
             <button className="nlm-toggle-btn" aria-label="Listenansicht">
-              <span className="material-symbols-outlined">list</span>
+              <span className="material-symbols-outlined">view_headline</span>
             </button>
           </div>
 
           <button className="nlm-dropdown">
             Neueste Projekte
-            <span className="material-symbols-outlined">expand_more</span>
+            <span className="material-symbols-outlined">arrow_drop_down</span>
           </button>
 
-          <button className="nlm-create-btn">
+          <Link href="/notebook" className="nlm-create-btn">
             <span className="material-symbols-outlined">add</span>
             Neu erstellen
-          </button>
+          </Link>
         </div>
       </header>
 
@@ -41,12 +44,12 @@ export default function NotebookLMHome() {
       <h2 className="nlm-heading">Zuletzt geöffnete Notebooks</h2>
       <div className="nlm-grid">
         {/* Neues Notebook */}
-        <button className="nlm-card create">
+        <Link href="/notebook" className="nlm-card create">
           <div className="nlm-create-circle">
             <span className="material-symbols-outlined">add</span>
           </div>
           <span className="nlm-create-label">Neues Notebook erstellen</span>
-        </button>
+        </Link>
 
         {/* Test 1 */}
         <div className="nlm-card nb test1">

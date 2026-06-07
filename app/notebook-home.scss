@@ -69,7 +69,6 @@ $transition: 0.15s ease;
 .nlm-icon-btn {
   width: 42px;
   height: 42px;
-  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -86,17 +85,27 @@ $transition: 0.15s ease;
 
 .nlm-toggle {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  align-items: stretch;
+  gap: 0;
   background: var(--toggle);
-  border-radius: $radius-pill;
-  padding: 5px 7px;
+  border-radius: 16px;
+  overflow: hidden;
+  height: 44px;
+}
+
+.nlm-toggle-group {
+  display: flex;
+  gap: 0;
+
+  .nlm-toggle-btn {
+    width: 38px;
+  }
 }
 
 .nlm-toggle-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
+  width: 48px;
+  height: 100%;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;

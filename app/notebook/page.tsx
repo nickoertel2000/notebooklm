@@ -1,5 +1,9 @@
+"use client"
+
+import { useState } from "react"
 import styles from "./notebook.module.scss"
 import "material-symbols/outlined.css"
+import AddSourceModal from "@/components/popup/AddSourceModal"
 
 type StudioTool = {
   label: string
@@ -23,6 +27,8 @@ const studioTools: StudioTool[] = [
 const chatSuggestions = ["Informationen zu einem neuen Thema", "Etwas Neues erstellen", "Ein Projekt voranbringen"]
 
 export default function NotebookPage() {
+  const [modalOpen, setModalOpen] = useState(false)
+
   return (
     <div className={styles.shell}>
       <div className={styles.columns}>
@@ -36,7 +42,7 @@ export default function NotebookPage() {
           </header>
 
           <div className={styles.sourcesBody}>
-            <button className={styles.addSource}>
+            <button className={styles.addSource} onClick={() => setModalOpen(true)}>
               <span className="material-symbols-outlined">add</span>
               Quellen hinzufügen
             </button>
@@ -149,6 +155,8 @@ export default function NotebookPage() {
       </div>
 
       <p className={styles.disclaimer}>NotebookLM kann Fehler machen, überprüfen Sie daher die Antworten.</p>
+
+      {modalOpen && <AddSourceModal onClose={() => setModalOpen(false)} />}
     </div>
   )
 }
