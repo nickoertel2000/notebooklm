@@ -1,0 +1,367 @@
+// AddSourceModal.module.scss
+
+// ---- Theme-Variablen (NotebookLM Dark) ----
+$modal-bg: #1d1e20;
+$modal-radius: 16px;
+$border-subtle: rgba(255, 255, 255, 0.1);
+
+$text-primary: #e3e3e3;
+$text-secondary: #9aa0a6;
+$text-muted: #c4c7c5;
+
+$accent-blue: #5b8dff;
+$accent-green: #62c98a;
+$search-border: #6b8cff;
+
+$pill-bg: #2a2b2d;
+$pill-border: rgba(255, 255, 255, 0.12);
+
+// Dauer der Textwechsel-Animation (exit muss zu EXIT_DURATION in der TSX passen)
+$exit-duration: 0.28s;
+$enter-duration: 0.35s;
+
+// ---- Material Symbols ----
+// Liegt auf demselben <span> wie die globale Klasse .material-symbols-outlined,
+// daher greifen font-size und font-variation-settings hier direkt.
+.icon {
+  font-size: 20px;
+  line-height: 1;
+  vertical-align: middle;
+  flex-shrink: 0;
+  // FILL 0 = outlined; opsz an Pixelgröße angelehnt
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 20;
+}
+
+.iconClose {
+  font-size: 22px;
+}
+
+.iconChevron {
+  font-size: 18px;
+  margin-left: -2px;
+}
+
+// Websites-Button: link-Symbol + YouTube-SVG nebeneinander, gleiche Höhe
+.websitesIcon {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.youtubeImg {
+  // gleiche Höhe wie das link-Symbol (.icon = 20px)
+  height: 20px;
+  width: auto;
+  display: block;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 1000;
+  padding: 24px;
+}
+
+.modal {
+  position: relative;
+  width: 100%;
+  max-width: 740px;
+  background: $modal-bg;
+  border-radius: $modal-radius;
+  padding: 56px 40px 40px;
+  color: $text-primary;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+
+  // Blau/Grüner Lichtschein oben (links blau, rechts grün)
+  &::before {
+    content: "";
+    position: absolute;
+    top: -120px;
+    left: 0;
+    right: 0;
+    height: 240px;
+    pointer-events: none;
+    background: radial-gradient(60% 80% at 22% 60%, rgba(70, 110, 255, 0.45) 0%, rgba(70, 110, 255, 0) 70%), radial-gradient(55% 80% at 82% 55%, rgba(60, 200, 130, 0.4) 0%, rgba(60, 200, 130, 0) 70%);
+    filter: blur(8px);
+  }
+}
+
+.close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: $text-secondary;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+  z-index: 2;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: $text-primary;
+  }
+}
+
+.title {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 28px;
+  text-align: center;
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: $text-primary;
+}
+
+// Wechselnder Verlaufstext (blau -> grün)
+.rotating {
+  // inline-block ist nötig, damit transform (translateY) greift
+  display: inline-block;
+  background: linear-gradient(90deg, $accent-blue 0%, $accent-green 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  white-space: nowrap;
+  will-change: transform, opacity;
+  vertical-align: baseline;
+}
+
+// Phase 1: alter Text fliegt nach oben weg und blendet aus
+.exit {
+  animation: rotateWordOut $exit-duration cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+// Phase 2: neuer Text wird von leicht unten hochgeschoben und eingeblendet
+.enter {
+  animation: rotateWordIn $enter-duration cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes rotateWordOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-0.62em);
+  }
+}
+
+@keyframes rotateWordIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.55em);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Barrierefreiheit: bei reduzierter Bewegung nur sanftes Ein-/Ausblenden
+@media (prefers-reduced-motion: reduce) {
+  .exit,
+  .enter {
+    animation-name: rotateWordFade;
+  }
+
+  @keyframes rotateWordFade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+// ---- Suchfeld ----
+.searchBox {
+  position: relative;
+  z-index: 1;
+  border: 1.5px solid $search-border;
+  border-radius: 14px;
+  padding: 14px 18px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  box-shadow: 0 0 0 3px rgba(107, 140, 255, 0.12);
+}
+
+.searchInput {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: $text-primary;
+  font-size: 15px;
+  outline: none;
+  margin-bottom: 12px;
+
+  &::placeholder {
+    color: $text-secondary;
+  }
+}
+
+.searchControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pillGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid $pill-border;
+  border-radius: 999px;
+  background: $pill-bg;
+  color: $text-primary;
+  font-size: 13.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: lighten($pill-bg, 5%);
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+}
+
+.searchSubmit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: $text-secondary;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: $text-primary;
+  }
+}
+
+// ---- Upload-Bereich ----
+.uploadZone {
+  position: relative;
+  z-index: 1;
+  margin-top: 24px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  padding: 48px 24px 36px;
+  text-align: center;
+}
+
+.uploadHeadline {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 500;
+  color: $text-primary;
+}
+
+.uploadHint {
+  margin: 0 0 32px;
+  font-size: 14px;
+  color: $text-secondary;
+}
+
+.moreLink {
+  color: $text-secondary;
+  text-decoration: underline;
+
+  &:hover {
+    color: $text-primary;
+  }
+}
+
+.buttonRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.sourceButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  height: 42px;
+  padding: 0 18px;
+  border: 1px solid $pill-border;
+  border-radius: 999px;
+  background: transparent;
+  color: $text-primary;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.22);
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+}
+
+// ---- Responsive ----
+@media (max-width: 640px) {
+  .modal {
+    padding: 48px 20px 28px;
+  }
+
+  .title {
+    font-size: 22px;
+  }
+
+  .pillGroup {
+    flex-wrap: wrap;
+  }
+
+  .uploadZone {
+    padding: 32px 16px 24px;
+  }
+}

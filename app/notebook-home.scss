@@ -1,0 +1,313 @@
+$radius-pill: 999px;
+$radius-card: 16px;
+$transition: 0.15s ease;
+
+.nlm {
+  // Theme
+  --bg: #1e1f22;
+  --card: #2b2c30;
+  --card-create: #202124;
+  --card-test1: #38282b;
+  --chip: #2f3033;
+  --toggle: #2d2e31;
+  --indigo: #3b4274;
+  --indigo-hi: #4a508c;
+  --text: #e8eaed;
+  --text-dim: #9aa0a6;
+  --border: rgba(255, 255, 255, 0.14);
+
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  width: 100%;
+  font-size: 15px;
+  padding: 26px 40px 64px clamp(20px, 10vw, 248px);
+
+  .material-symbols-outlined {
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    direction: ltr;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+// ---------- Topbar ----------
+.nlm-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.nlm-chip {
+  background: var(--chip);
+  color: var(--text);
+  border: none;
+  border-radius: $radius-pill;
+  padding: 9px 22px;
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background $transition;
+
+  &:hover {
+    background: #3a3b3f;
+  }
+}
+
+.nlm-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nlm-icon-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  transition: background $transition;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.nlm-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--toggle);
+  border-radius: $radius-pill;
+  padding: 5px 7px;
+}
+
+.nlm-toggle-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  transition: background $transition;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  &.active {
+    background: var(--indigo-hi);
+
+    &:hover {
+      background: #555ba0;
+    }
+  }
+}
+
+.nlm-dropdown {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--chip);
+  color: var(--text);
+  border: none;
+  border-radius: $radius-pill;
+  padding: 10px 14px 10px 18px;
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background $transition;
+
+  &:hover {
+    background: #3a3b3f;
+  }
+}
+
+.nlm-create-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  color: #1f1f1f;
+  border: none;
+  border-radius: $radius-pill;
+  padding: 11px 22px 11px 18px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    box-shadow $transition,
+    background $transition;
+
+  &:hover {
+    background: #f1f1f1;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  }
+}
+
+// ---------- Inhalt ----------
+.nlm-heading {
+  font-size: 24px;
+  font-weight: 400;
+  margin: 40px 0 22px;
+  color: var(--text);
+}
+
+.nlm-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 372px));
+  gap: 20px;
+  justify-content: start;
+}
+
+.nlm-card {
+  height: 282px;
+  border-radius: $radius-card;
+  padding: 22px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition:
+    background $transition,
+    border-color $transition,
+    filter $transition;
+
+  // Neues Notebook erstellen
+  &.create {
+    background: var(--card-create);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    color: var(--text);
+
+    &:hover {
+      border-color: rgba(255, 255, 255, 0.32);
+      background: #25262a;
+    }
+  }
+
+  // Notebook Karten
+  &.nb {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+
+    &:hover {
+      filter: brightness(1.08);
+    }
+  }
+
+  &.test1 {
+    background: var(--card-test1);
+  }
+
+  &.default {
+    background: var(--card);
+  }
+}
+
+.nlm-create-circle {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: var(--indigo);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .material-symbols-outlined {
+    font-size: 40px;
+    color: #fff;
+  }
+}
+
+.nlm-create-label {
+  font-size: 21px;
+  color: var(--text);
+}
+
+.nlm-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.nlm-emoji {
+  font-size: 44px;
+  line-height: 1;
+}
+
+.nlm-menu {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  margin: -4px -6px 0 0;
+  transition: background $transition;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .material-symbols-outlined {
+    font-size: 22px;
+  }
+}
+
+.nlm-card-title {
+  font-size: 23px;
+  font-weight: 400;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+
+.nlm-card-meta {
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+// ---------- Responsiv ----------
+@media (max-width: 820px) {
+  .nlm-grid {
+    grid-template-columns: repeat(2, minmax(0, 372px));
+  }
+}
+
+@media (max-width: 560px) {
+  .nlm {
+    padding: 20px;
+  }
+
+  .nlm-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .nlm-topbar {
+    flex-wrap: wrap;
+  }
+}

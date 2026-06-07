@@ -1,0 +1,458 @@
+.shell {
+  // Theme-Tokens
+  --bg: #1b1c1d;
+  --panel-bg: #1e1f20;
+  --panel-border: #2d2e30;
+  --surface: #2a2b2d;
+  --surface-hover: #323335;
+  --chip-bg: #2a2b2d;
+
+  --text: #e3e3e3;
+  --text-muted: #9aa0a6;
+  --text-faint: #80868b;
+  --accent: #a8c7fa;
+
+  --radius-panel: 16px;
+  --radius-md: 12px;
+  --radius-pill: 999px;
+
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 10px;
+  background: var(--bg);
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+/* ---------- Spaltenraster ----------------------------------------------- */
+.columns {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 10px;
+}
+
+/* ---------- Panels ------------------------------------------------------- */
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+
+.sources {
+  min-width: 0; // Breite kommt aus dem Spaltenraster (.columns)
+}
+.chat {
+  position: relative;
+}
+.studio {
+  position: relative;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+
+  h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text);
+  }
+}
+
+.iconButton {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: var(--surface-hover);
+  }
+}
+
+/* ---------- Quellen ------------------------------------------------------ */
+.sourcesBody {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 0 16px 16px;
+}
+
+.addSource {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 16px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.searchCard {
+  padding: 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.searchCardLabel {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-pill);
+  background: var(--chip-bg);
+  color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: var(--surface-hover);
+  }
+
+  .material-symbols-outlined {
+    font-size: 18px;
+    color: var(--text-muted);
+  }
+}
+
+.searchSubmit {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  flex-shrink: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 50%;
+  background: var(--chip-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: var(--surface-hover);
+  }
+}
+
+/* ---------- Empty States (Quellen + Studio) ------------------------------ */
+.emptyState {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.emptyIcon {
+  font-size: 30px !important;
+  color: var(--text-faint);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.emptyText {
+  margin: 0;
+  max-width: 320px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+/* ---------- Chat --------------------------------------------------------- */
+.chatBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 32px;
+  text-align: center;
+  overflow-y: auto;
+}
+
+.wave {
+  font-size: 40px;
+  margin-bottom: 18px;
+}
+
+.chatTitle {
+  margin: 0 0 16px;
+  font-size: 30px;
+  font-weight: 400;
+  letter-spacing: -0.2px;
+  color: var(--text);
+}
+
+.chatLead {
+  margin: 0 0 28px;
+  max-width: 600px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.chatPrompt {
+  margin: 0 0 16px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.suggestions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.suggestion {
+  padding: 10px 18px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover {
+    background: var(--surface);
+    border-color: var(--surface-hover);
+  }
+}
+
+.chatFooter {
+  padding: 12px 24px 16px;
+}
+
+.composer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 10px 20px;
+  border: 1px solid var(--panel-border);
+  border-radius: 28px;
+  background: var(--surface);
+}
+
+.composerInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  outline: none;
+
+  &::placeholder {
+    color: var(--text-muted);
+  }
+}
+
+.sourceCount {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.sendButton {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--surface-hover);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+
+  &:hover {
+    background: var(--accent);
+    color: #062e6f;
+  }
+}
+
+.disclaimer {
+  margin: 0;
+  padding: 10px 0 4px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+/* ---------- Studio ------------------------------------------------------- */
+.studioBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 16px;
+  overflow-y: auto;
+}
+
+.studioGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.studioCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  min-height: 64px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--tint) 7%, var(--surface));
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover {
+    background: color-mix(in srgb, var(--tint) 14%, var(--surface));
+    border-color: color-mix(in srgb, var(--tint) 30%, var(--panel-border));
+  }
+}
+
+.studioCardIcon {
+  font-size: 20px !important;
+  color: var(--tint);
+}
+
+.studioCardLabel {
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.studioCardChevron {
+  position: absolute;
+  top: 10px;
+  right: 8px;
+  font-size: 18px !important;
+  color: var(--text-faint);
+}
+
+.beta {
+  position: absolute;
+  top: 10px;
+  left: 38px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-hover);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+}
+
+.addNote {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: var(--surface-hover);
+  }
+}
+
+/* ---------- Responsive --------------------------------------------------- */
+@media (max-width: 1100px) {
+  .shell {
+    height: auto;
+    min-height: 100vh;
+  }
+  .columns {
+    grid-template-columns: 1fr;
+  }
+  .panel {
+    min-height: 70vh;
+  }
+  .addNote {
+    position: static;
+    transform: none;
+    margin: 16px;
+  }
+}
