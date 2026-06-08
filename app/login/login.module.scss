@@ -1,0 +1,82 @@
+.page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: #1e1f22;
+  padding: 24px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+  max-width: 400px;
+  padding: 40px 32px;
+  background-color: #2b2c30;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+}
+
+.logo {
+  height: 26px;
+  width: auto;
+}
+
+.tagline {
+  margin: 0;
+  font-size: 14px;
+  color: #9aa0a6;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.googleBtn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 24px;
+  background-color: #ffffff;
+  color: #1f1f1f;
+  border: none;
+  border-radius: 999px;
+  font-family: var(--font-google-sans), sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &:hover {
+    background-color: #f1f1f1;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  }
+}
+
+.googleLogo {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.disclaimer {
+  margin: 0;
+  font-size: 12px;
+  color: #9aa0a6;
+  text-align: center;
+  line-height: 1.6;
+
+  a {
+    color: #5b8dff;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}

@@ -1,12 +1,13 @@
+import "@/styles/globals.scss"
 import type { Metadata } from "next"
 import { Google_Sans } from "next/font/google"
-import "@/styles/globals.scss"
-import Header from "@/components/Header/Header"
 
 const googleSans = Google_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
-  variable: "--font-google-sans"
+  variable: "--font-google-sans",
+  fallback: ["Google Sans Fallback", "Arial", "sans-serif"],
+  adjustFontFallback: false
 })
 
 export const metadata: Metadata = {
@@ -31,10 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="de" className={googleSans.variable}>
-      <body>
-        <Header />
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   )
 }

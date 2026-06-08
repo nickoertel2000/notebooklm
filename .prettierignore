@@ -1,0 +1,17 @@
+.next
+node_modules
+pnpm-lock.yaml
+public
+coverage
+dist
+build
+*.min.js
+*.min.css
+.env*
+
+# Cloudflare
+worker-configuration.d.ts
+cloudflare-env.d.ts
+
+# Drizzle ORM – auto-generierte Migrations-Metadaten
+server/db/migrations/meta/

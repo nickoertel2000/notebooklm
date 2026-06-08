@@ -70,7 +70,8 @@ export default function NotebookPage() {
               <span className={`material-symbols-outlined ${styles.emptyIcon}`}>description</span>
               <p className={styles.emptyTitle}>Gespeicherte Quellen werden hier angezeigt</p>
               <p className={styles.emptyText}>
-                Klicken Sie oben auf „Quelle hinzufügen“, um PDFs, Websites, Text, Videos oder Audiodateien hinzuzufügen. Sie können auch eine Datei direkt aus Google Drive importieren.
+                Klicken Sie oben auf „Quelle hinzufügen“, um PDFs, Websites, Text, Videos oder Audiodateien hinzuzufügen. Sie können auch eine Datei direkt aus
+                Google Drive importieren.
               </p>
             </div>
           </div>
@@ -91,8 +92,8 @@ export default function NotebookPage() {
             </span>
             <h1 className={styles.chatTitle}>Lass uns dein Notebook einrichten…</h1>
             <p className={styles.chatLead}>
-              Dies ist ein leerer Canvas, auf dem du Neues lernen, Inhalte erstellen und deine Projekte voranbringen kannst. Gerne helfe ich dir beim Einstieg, du kannst aber auch direkt deine eigenen
-              Quellen hinzufügen.
+              Dies ist ein leerer Canvas, auf dem du Neues lernen, Inhalte erstellen und deine Projekte voranbringen kannst. Gerne helfe ich dir beim Einstieg, du
+              kannst aber auch direkt deine eigenen Quellen hinzufügen.
             </p>
 
             <p className={styles.chatPrompt}>Was ist der Zweck dieses Notebooks?</p>
@@ -143,7 +144,9 @@ export default function NotebookPage() {
             <div className={styles.emptyState}>
               <span className={`material-symbols-outlined ${styles.emptyIcon}`}>auto_awesome</span>
               <p className={styles.emptyTitle}>Hier wird die Ausgabe von Studio gespeichert.</p>
-              <p className={styles.emptyText}>Nachdem Sie Quellen hinzufügen, klicken Sie, um Audio-Zusammenfassungen, Arbeitshilfen, Mindmaps und mehr hinzuzufügen.</p>
+              <p className={styles.emptyText}>
+                Nachdem Sie Quellen hinzufügen, klicken Sie, um Audio-Zusammenfassungen, Arbeitshilfen, Mindmaps und mehr hinzuzufügen.
+              </p>
             </div>
           </div>
 

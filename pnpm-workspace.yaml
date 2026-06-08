@@ -1,6 +1,6 @@
 allowBuilds:
-  '@parcel/watcher': true
-  esbuild: set this to true or false
+  "@parcel/watcher": true
+  esbuild: true
   sharp: true
   unrs-resolver: true
 ignoredBuiltDependencies:

@@ -68,19 +68,4 @@
       background-color: rgba(255, 255, 255, 0.08);
     }
   }
-
-  &__avatar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border: none;
-    border-radius: 50%;
-    background-color: #8a3ffc;
-    color: #fff;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-  }
 }

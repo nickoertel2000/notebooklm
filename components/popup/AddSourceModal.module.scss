@@ -91,7 +91,9 @@ $enter-duration: 0.35s;
     right: 0;
     height: 240px;
     pointer-events: none;
-    background: radial-gradient(60% 80% at 22% 60%, rgba(70, 110, 255, 0.45) 0%, rgba(70, 110, 255, 0) 70%), radial-gradient(55% 80% at 82% 55%, rgba(60, 200, 130, 0.4) 0%, rgba(60, 200, 130, 0) 70%);
+    background:
+      radial-gradient(60% 80% at 22% 60%, rgba(70, 110, 255, 0.45) 0%, rgba(70, 110, 255, 0) 70%),
+      radial-gradient(55% 80% at 82% 55%, rgba(60, 200, 130, 0.4) 0%, rgba(60, 200, 130, 0) 70%);
     filter: blur(8px);
   }
 }
