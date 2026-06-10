@@ -16,8 +16,9 @@ frontend:
       commands:
         # Runtime-Env-Variablen fürs Next.js-SSR-Runtime verfügbar machen.
         # Amplify-Hosting-Env-Variablen stehen sonst nur im Build, nicht zur Laufzeit.
-        - env | grep -e DATABASE_URL -e BETTER_AUTH_SECRET -e GOOGLE_CLIENT_ID -e GOOGLE_CLIENT_SECRET -e ANTHROPIC_API_KEY -e VOYAGE_API_KEY -e S3_BUCKET_NAME >> .env.production
-        - env | grep -e NEXT_PUBLIC_ >> .env.production
+        # `|| true`: grep liefert Exit-Code 1 ohne Treffer — das würde den Build sonst abbrechen.
+        - env | grep -e DATABASE_URL -e BETTER_AUTH_SECRET -e GOOGLE_CLIENT_ID -e GOOGLE_CLIENT_SECRET -e ANTHROPIC_API_KEY -e VOYAGE_API_KEY -e S3_BUCKET_NAME >> .env.production || true
+        - env | grep -e NEXT_PUBLIC_ >> .env.production || true
         - pnpm run build
   artifacts:
     baseDirectory: .next
