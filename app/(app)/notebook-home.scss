@@ -219,18 +219,13 @@ $transition: 0.15s ease;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    background: var(--card);
+    color: var(--text);
+    text-decoration: none;
 
     &:hover {
       filter: brightness(1.08);
     }
-  }
-
-  &.test1 {
-    background: var(--card-test1);
-  }
-
-  &.default {
-    background: var(--card);
   }
 }
 

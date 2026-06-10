@@ -14,4 +14,8 @@ worker-configuration.d.ts
 cloudflare-env.d.ts
 
 # Drizzle ORM – auto-generierte Migrations-Metadaten
-server/db/migrations/meta/
+db/migrations/meta/
+
+# Amplify – auto-generierte Build-Artefakte & Env-Typen
+.amplify
+amplify_outputs.json

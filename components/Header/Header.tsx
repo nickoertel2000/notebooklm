@@ -1,4 +1,5 @@
 import Image from "next/image"
+import Link from "next/link"
 import "material-symbols/outlined.css"
 import { headers } from "next/headers"
 import { auth } from "@/auth"
@@ -12,7 +13,9 @@ export default async function Header() {
   return (
     <header className={styles.header}>
       <div className={styles.header__left}>
-        <Image className={styles.header__logo} src="/notebook-logo.svg" alt="NotebookLM" width={1253} height={132} priority />
+        <Link href="/" aria-label="Zur Startseite">
+          <Image className={styles.header__logo} src="/notebook-logo.svg" alt="NotebookLM" width={1253} height={132} priority />
+        </Link>
       </div>
 
       <div className={styles.header__right}>

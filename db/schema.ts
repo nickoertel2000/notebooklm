@@ -1,4 +1,4 @@
-import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
+import { boolean, index, integer, jsonb, pgTable, text, timestamp, uuid, vector } from "drizzle-orm/pg-core"
 
 // ── Better Auth Tabellen ──────────────────────────────────────────────────────
 
@@ -52,13 +52,91 @@ export const verification = pgTable("verification", {
   updatedAt: timestamp("updated_at")
 })
 
-// ── Bestehende Tabelle ────────────────────────────────────────────────────────
+// ── Notebooks ─────────────────────────────────────────────────────────────────
+// Jedes Notebook ist fest an einen better-auth-User geknüpft. Wird der User
+// gelöscht, verschwinden seine Notebooks (und über die FK-Kaskaden auch deren
+// Quellen, Chunks und Nachrichten).
 
 export const notebooks = pgTable("notebooks", {
   id: uuid("id").defaultRandom().primaryKey(),
-  userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
   title: text("title").notNull().default("Unbenanntes Notebook"),
   emoji: text("emoji").notNull().default("📔"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
+})
+
+// ── Quellen (Ingestion) ───────────────────────────────────────────────────────
+
+export const sources = pgTable("sources", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  notebookId: uuid("notebook_id")
+    .notNull()
+    .references(() => notebooks.id, { onDelete: "cascade" }),
+  // 'pdf' | 'url' | 'text'
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  // S3-Key des hochgeladenen Originals bzw. der extrahierten .txt-Datei
+  s3Key: text("s3_key"),
+  // Ursprungs-URL bei type = 'url'
+  sourceUrl: text("source_url"),
+  // 'processing' | 'ready' | 'failed'
+  status: text("status").notNull().default("processing"),
+  error: text("error"),
+  charCount: integer("char_count"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+})
+
+// ── Chunks + Embeddings ───────────────────────────────────────────────────────
+// notebookId ist denormalisiert mitgeführt, damit die Similarity-Suche direkt
+// auf das Notebook gefiltert werden kann, ohne über sources zu joinen.
+
+export const sourceChunks = pgTable(
+  "source_chunks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sourceId: uuid("source_id")
+      .notNull()
+      .references(() => sources.id, { onDelete: "cascade" }),
+    notebookId: uuid("notebook_id")
+      .notNull()
+      .references(() => notebooks.id, { onDelete: "cascade" }),
+    idx: integer("idx").notNull(),
+    content: text("content").notNull(),
+    embedding: vector("embedding", { dimensions: 1024 }),
+    page: integer("page"),
+    charStart: integer("char_start"),
+    charEnd: integer("char_end"),
+    createdAt: timestamp("created_at").defaultNow().notNull()
+  },
+  (table) => [
+    index("source_chunks_notebook_idx").on(table.notebookId),
+    index("source_chunks_embedding_idx").using("hnsw", table.embedding.op("vector_cosine_ops"))
+  ]
+)
+
+// ── Chat-Nachrichten ──────────────────────────────────────────────────────────
+
+export type MessageCitation = {
+  sourceId: string
+  chunkId: string
+  snippet: string
+  page: number | null
+  charStart: number | null
+  charEnd: number | null
+}
+
+export const messages = pgTable("messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  notebookId: uuid("notebook_id")
+    .notNull()
+    .references(() => notebooks.id, { onDelete: "cascade" }),
+  // 'user' | 'assistant'
+  role: text("role").notNull(),
+  content: text("content").notNull(),
+  citations: jsonb("citations").$type<MessageCitation[]>(),
+  createdAt: timestamp("created_at").defaultNow().notNull()
 })

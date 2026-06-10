@@ -1,0 +1,193 @@
+// NotebookCard.module.scss
+
+$surface: #2b2c2f;
+$surface-hover: #36373b;
+$dialog-bg: #1f2023;
+$text-primary: #e3e3e3;
+$text-secondary: #9aa0a6;
+$border-subtle: rgba(255, 255, 255, 0.12);
+$accent-blue: #4f6dff;
+
+// Grid-Zelle: positioniert das Menü relativ zur Karte.
+.cell {
+  position: relative;
+}
+
+// ---- Drei-Punkte-Menü -------------------------------------------------------
+.menuWrap {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 2;
+}
+
+.menu {
+  position: absolute;
+  top: 42px;
+  right: 0;
+  min-width: 220px;
+  padding: 8px;
+  background: $surface;
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: $text-primary;
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: $surface-hover;
+  }
+
+  .material-symbols-outlined {
+    font-size: 20px;
+    color: $text-secondary;
+  }
+}
+
+// ---- Dialoge (Löschen / Bearbeiten) ----------------------------------------
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 1000;
+  padding: 24px;
+}
+
+.dialog {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  padding: 28px;
+  background: $dialog-bg;
+  border-radius: 16px;
+  color: $text-primary;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.dialogTitle {
+  margin: 0 0 18px;
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.dialogText {
+  margin: 0 0 28px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: $text-secondary;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.btnGhost {
+  padding: 10px 22px;
+  border: 1px solid $border-subtle;
+  border-radius: 999px;
+  background: transparent;
+  color: $text-primary;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+.btnPrimary,
+.btnDanger {
+  padding: 10px 26px;
+  border: none;
+  border-radius: 999px;
+  background: $accent-blue;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+// ---- Bearbeiten-Dialog ------------------------------------------------------
+.editEmoji {
+  width: 130px;
+  height: 130px;
+  margin: 12px auto 32px;
+  border-radius: 50%;
+  background: #b4b4b4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 56px;
+}
+
+.field {
+  display: block;
+  position: relative;
+  margin-bottom: 28px;
+  padding: 10px 14px;
+  border: 1px solid $border-subtle;
+  border-radius: 8px;
+
+  &:focus-within {
+    border-color: $accent-blue;
+  }
+}
+
+.fieldLabel {
+  position: absolute;
+  top: -9px;
+  left: 12px;
+  padding: 0 6px;
+  background: $dialog-bg;
+  font-size: 12px;
+  color: $text-secondary;
+}
+
+.input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: $text-primary;
+  font: inherit;
+  font-size: 17px;
+  outline: none;
+}

@@ -1,8 +1,19 @@
-import Link from "next/link"
+import { redirect } from "next/navigation"
 import "material-symbols/outlined.css"
+import NotebookCard from "@/components/NotebookCard/NotebookCard"
+import { getSessionUser } from "@/lib/auth/session"
+import { getNotebooksForUser } from "@/lib/notebooks"
+import { createNotebook } from "./actions"
 import "./notebook-home.scss"
 
-export default function NotebookLMHome() {
+const dateFormat = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })
+
+export default async function NotebookLMHome() {
+  const user = await getSessionUser()
+  if (!user) redirect("/login")
+
+  const notebookList = await getNotebooksForUser(user.id)
+
   return (
     <div className="nlm">
       {/* Topbar */}
@@ -33,10 +44,12 @@ export default function NotebookLMHome() {
             <span className="material-symbols-outlined">arrow_drop_down</span>
           </button>
 
-          <Link href="/notebook" className="nlm-create-btn">
-            <span className="material-symbols-outlined">add</span>
-            Neu erstellen
-          </Link>
+          <form action={createNotebook} style={{ display: "contents" }}>
+            <button type="submit" className="nlm-create-btn">
+              <span className="material-symbols-outlined">add</span>
+              Neu erstellen
+            </button>
+          </form>
         </div>
       </header>
 
@@ -44,44 +57,25 @@ export default function NotebookLMHome() {
       <h2 className="nlm-heading">Zuletzt geöffnete Notebooks</h2>
       <div className="nlm-grid">
         {/* Neues Notebook */}
-        <Link href="/notebook" className="nlm-card create">
-          <div className="nlm-create-circle">
-            <span className="material-symbols-outlined">add</span>
-          </div>
-          <span className="nlm-create-label">Neues Notebook erstellen</span>
-        </Link>
+        <form action={createNotebook} style={{ display: "contents" }}>
+          <button type="submit" className="nlm-card create">
+            <div className="nlm-create-circle">
+              <span className="material-symbols-outlined">add</span>
+            </div>
+            <span className="nlm-create-label">Neues Notebook erstellen</span>
+          </button>
+        </form>
 
-        {/* Test 1 */}
-        <div className="nlm-card nb test1">
-          <div className="nlm-card-top">
-            <span className="nlm-emoji" role="img" aria-label="Notizbuch">
-              📓
-            </span>
-            <button className="nlm-menu" aria-label="Mehr Optionen">
-              <span className="material-symbols-outlined">more_vert</span>
-            </button>
-          </div>
-          <div className="nlm-card-bottom">
-            <h3 className="nlm-card-title">Test 1</h3>
-            <span className="nlm-card-meta">06.06.2026 · 1 Quelle</span>
-          </div>
-        </div>
-
-        {/* Unbenanntes Notebook */}
-        <div className="nlm-card nb default">
-          <div className="nlm-card-top">
-            <span className="nlm-emoji" role="img" aria-label="Notizbuch">
-              📔
-            </span>
-            <button className="nlm-menu" aria-label="Mehr Optionen">
-              <span className="material-symbols-outlined">more_vert</span>
-            </button>
-          </div>
-          <div className="nlm-card-bottom">
-            <h3 className="nlm-card-title">Unbenanntes Notebook</h3>
-            <span className="nlm-card-meta">06.06.2026 · 0 Quellen</span>
-          </div>
-        </div>
+        {/* Notebooks aus der Datenbank */}
+        {notebookList.map((nb) => (
+          <NotebookCard
+            key={nb.id}
+            id={nb.id}
+            title={nb.title}
+            emoji={nb.emoji}
+            meta={`${dateFormat.format(nb.updatedAt)} · ${nb.sourceCount} ${nb.sourceCount === 1 ? "Quelle" : "Quellen"}`}
+          />
+        ))}
       </div>
     </div>
   )

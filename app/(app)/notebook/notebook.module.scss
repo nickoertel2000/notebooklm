@@ -18,7 +18,7 @@
 
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: calc(100vh - 64px); // Header (64px) abziehen → Seite inkl. Header genau 100vh
   padding: 10px;
   background: var(--bg);
   color: var(--text);
@@ -436,6 +436,189 @@
   &:hover {
     background: var(--surface-hover);
   }
+}
+
+/* ---------- Quellen-Liste ------------------------------------------------ */
+.sourceList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.sourceItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.sourceItemActive {
+  border-color: var(--accent);
+}
+
+.sourceIcon {
+  font-size: 20px !important;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.sourceTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sourceDelete {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+
+  span {
+    font-size: 16px;
+  }
+
+  &:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+  }
+}
+
+.statusReady {
+  font-size: 18px !important;
+  color: #81c995;
+  flex-shrink: 0;
+}
+
+.statusFailed {
+  font-size: 18px !important;
+  color: #f28b82;
+  flex-shrink: 0;
+}
+
+.statusProcessing {
+  font-size: 18px !important;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  animation: nlm-spin 1s linear infinite;
+}
+
+@keyframes nlm-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Nachrichtenliste --------------------------------------------- */
+.messageList {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 24px;
+  overflow-y: auto;
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  max-width: 85%;
+}
+
+.messageUser {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.messageAssistant {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.messageContent {
+  padding: 12px 16px;
+  border-radius: 16px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+
+  .messageUser & {
+    background: var(--surface-hover);
+    color: var(--text);
+  }
+
+  .messageAssistant & {
+    background: var(--surface);
+    color: var(--text);
+  }
+}
+
+.citations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding-left: 4px;
+}
+
+.citationChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-pill);
+  background: var(--chip-bg);
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  span {
+    font-size: 14px;
+  }
+
+  &:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.citationSnippet {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border-left: 2px solid var(--accent);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--text-muted);
 }
 
 /* ---------- Responsive --------------------------------------------------- */

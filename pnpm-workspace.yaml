@@ -1,8 +1,14 @@
 allowBuilds:
   "@parcel/watcher": true
+  core-js: false
   esbuild: true
   sharp: true
   unrs-resolver: true
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+overrides:
+  # better-auth@1.6.14 importiert Migration-Konstanten, die kysely 0.29.2 nicht
+  # exportiert (Turbopack-Build bricht sonst). 0.28.x liegt in der akzeptierten
+  # Range von better-auth und hat die Exporte.
+  kysely: 0.28.7

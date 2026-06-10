@@ -8,6 +8,13 @@
       "when": 1780915212351,
       "tag": "0000_chemical_screwball",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1780930607615,
+      "tag": "0001_unknown_scarlet_spider",
+      "breakpoints": true
     }
   ]
 }
