@@ -1,0 +1,47 @@
+.markdown {
+  color: var(--text, #e3e3e3);
+  font-size: 14.5px;
+  line-height: 1.65;
+
+  h1,
+  h2,
+  h3 {
+    margin: 22px 0 10px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--text, #e3e3e3);
+
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+
+  h1 {
+    font-size: 22px;
+  }
+  h2 {
+    font-size: 18px;
+  }
+  h3 {
+    font-size: 15.5px;
+  }
+
+  p {
+    margin: 0 0 12px;
+  }
+
+  ul,
+  ol {
+    margin: 0 0 12px;
+    padding-left: 22px;
+  }
+
+  li {
+    margin: 4px 0;
+  }
+
+  strong {
+    font-weight: 600;
+    color: var(--text, #e3e3e3);
+  }
+}

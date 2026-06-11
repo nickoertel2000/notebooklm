@@ -1,0 +1,188 @@
+$modal-bg: #1d1e20;
+$modal-radius: 16px;
+$border-subtle: rgba(255, 255, 255, 0.1);
+$surface: #2a2b2d;
+$surface-hover: #323335;
+$text-primary: #e3e3e3;
+$text-secondary: #9aa0a6;
+$accent: #a8c7fa;
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 720px;
+  max-height: 85vh;
+  background: $modal-bg;
+  border: 1px solid $border-subtle;
+  border-radius: $modal-radius;
+  color: $text-primary;
+  overflow: hidden;
+}
+
+/* ---------- Kopf -------------------------------------------------------- */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 18px;
+  border-bottom: 1px solid $border-subtle;
+}
+
+.title {
+  flex: 1;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.back,
+.close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: $text-secondary;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  span {
+    font-size: 20px;
+  }
+
+  &:hover {
+    background: $surface-hover;
+    color: $text-primary;
+  }
+}
+
+/* ---------- Typ-Auswahl ------------------------------------------------- */
+.chooser {
+  padding: 18px;
+}
+
+.hint {
+  margin: 0 0 16px;
+  font-size: 13.5px;
+  color: $text-secondary;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid $border-subtle;
+  border-radius: 12px;
+  background: $surface;
+  color: $text-primary;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: $surface-hover;
+  }
+}
+
+.cardIcon {
+  font-size: 22px;
+  color: $accent;
+}
+
+.cardLabel {
+  flex: 1;
+}
+
+/* ---------- Bericht-Anzeige --------------------------------------------- */
+.body {
+  flex: 1;
+  min-height: 0;
+  padding: 20px 22px;
+  overflow-y: auto;
+}
+
+.loading {
+  margin: 0;
+  font-size: 14px;
+  color: $text-secondary;
+}
+
+.error {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(242, 139, 130, 0.12);
+  color: #f28b82;
+  font-size: 13.5px;
+}
+
+.caret {
+  display: inline-block;
+  width: 8px;
+  height: 16px;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: $accent;
+  animation: blink 1s steps(2, start) infinite;
+}
+
+@keyframes blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* ---------- Fuß --------------------------------------------------------- */
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 18px;
+  border-top: 1px solid $border-subtle;
+}
+
+.copyBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid $border-subtle;
+  border-radius: 20px;
+  background: $surface;
+  color: $text-primary;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  span {
+    font-size: 18px;
+  }
+
+  &:hover {
+    background: $surface-hover;
+  }
+}

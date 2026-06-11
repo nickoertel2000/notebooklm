@@ -1,8 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import "material-symbols/outlined.css"
 import AddSourceModal, { AddSourcePayload } from "@/components/popup/AddSourceModal"
+import ReportModal from "@/components/popup/ReportModal"
+import ReportViewModal from "@/components/popup/ReportViewModal"
+import { getReportType, ReportType } from "@/lib/reports"
 import styles from "../notebook.module.scss"
 
 export type Citation = {
@@ -30,6 +33,15 @@ export type SourceItem = {
   createdAt: string
 }
 
+export type ReportItem = {
+  id: string
+  type: string
+  title: string
+  sourceCount: number
+  status: string
+  createdAt: string
+}
+
 const SOURCE_ICON: Record<string, string> = { pdf: "picture_as_pdf", url: "link", text: "description" }
 
 const studioTools = [
@@ -43,19 +55,44 @@ type Props = {
   title: string
   initialSources: SourceItem[]
   initialMessages: ChatMessage[]
+  initialReports: ReportItem[]
 }
 
-export default function NotebookView({ notebookId, initialSources, initialMessages }: Props) {
+export default function NotebookView({ notebookId, initialSources, initialMessages, initialReports }: Props) {
   const [sources, setSources] = useState<SourceItem[]>(initialSources)
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
-  const [modalOpen, setModalOpen] = useState(false)
+  const [reports, setReports] = useState<ReportItem[]>(initialReports)
+  const [modalOpen, setModalOpen] = useState(initialSources.length === 0)
+  const [reportOpen, setReportOpen] = useState(false)
+  const [viewReport, setViewReport] = useState<ReportItem | null>(null)
+  const [menuReportId, setMenuReportId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(initialSources.map((s) => s.id)))
   const [input, setInput] = useState("")
   const [streaming, setStreaming] = useState(false)
   const [activeSourceId, setActiveSourceId] = useState<string | null>(null)
   const [openCitation, setOpenCitation] = useState<string | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
-  const readyCount = sources.filter((s) => s.status === "ready").length
+  // Nur ausgewählte, fertige Quellen zählen für Chat & Berichte.
+  const selectedReadyIds = useMemo(
+    () => sources.filter((s) => s.status === "ready" && selectedIds.has(s.id)).map((s) => s.id),
+    [sources, selectedIds]
+  )
+  const readyCount = selectedReadyIds.length
+  const allSelected = sources.length > 0 && sources.every((s) => selectedIds.has(s.id))
+
+  function toggleSource(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    setSelectedIds(() => (allSelected ? new Set() : new Set(sources.map((s) => s.id))))
+  }
 
   const refreshSources = useCallback(async () => {
     const res = await fetch(`/api/notebooks/${notebookId}/sources`)
@@ -72,12 +109,37 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
     return () => clearInterval(id)
   }, [sources, refreshSources])
 
+  const refreshReports = useCallback(async () => {
+    const res = await fetch(`/api/notebooks/${notebookId}/reports`)
+    if (!res.ok) return
+    const data = await res.json()
+    // Lokale Platzhalter (temp-…) behalten, übrige durch Server-Stand ersetzen.
+    setReports((prev) => [...prev.filter((r) => r.id.startsWith("temp-")), ...data.reports])
+  }, [notebookId])
+
+  // Persistierte, noch laufende Berichte pollen (z. B. nach Reload während der
+  // Erstellung). Live-Platzhalter werden über die laufende Anfrage aktualisiert.
+  useEffect(() => {
+    if (!reports.some((r) => r.status === "processing" && !r.id.startsWith("temp-"))) return
+    const id = setInterval(refreshReports, 3000)
+    return () => clearInterval(id)
+  }, [reports, refreshReports])
+
+  // ⋮-Menü bei Klick außerhalb schließen.
+  useEffect(() => {
+    if (!menuReportId) return
+    const close = () => setMenuReportId(null)
+    document.addEventListener("click", close)
+    return () => document.removeEventListener("click", close)
+  }, [menuReportId])
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
   async function handleAddSource(payload: AddSourcePayload) {
     const base = `/api/notebooks/${notebookId}/sources`
+    let newId: string | undefined
     if (payload.type === "pdf") {
       const res = await fetch(base, {
         method: "POST",
@@ -85,7 +147,8 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
         body: JSON.stringify({ type: "pdf", filename: payload.file.name, contentType: payload.file.type || "application/pdf" })
       })
       if (!res.ok) throw new Error("Anlegen fehlgeschlagen")
-      const { uploadUrl } = await res.json()
+      const { sourceId, uploadUrl } = await res.json()
+      newId = sourceId
       const put = await fetch(uploadUrl, {
         method: "PUT",
         body: payload.file,
@@ -99,6 +162,7 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
         body: JSON.stringify({ type: "url", url: payload.url })
       })
       if (!res.ok) throw new Error((await res.json()).error || "URL fehlgeschlagen")
+      newId = (await res.json()).sourceId
     } else {
       const res = await fetch(base, {
         method: "POST",
@@ -106,14 +170,59 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
         body: JSON.stringify({ type: "text", title: payload.title, text: payload.text })
       })
       if (!res.ok) throw new Error("Text fehlgeschlagen")
+      newId = (await res.json()).sourceId
     }
+    // Neue Quelle automatisch auswählen.
+    if (newId) setSelectedIds((prev) => new Set(prev).add(newId!))
     setModalOpen(false)
     await refreshSources()
   }
 
   async function handleDeleteSource(sourceId: string) {
     await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}`, { method: "DELETE" })
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.delete(sourceId)
+      return next
+    })
     await refreshSources()
+  }
+
+  // Bericht im Hintergrund erstellen: Popup schließen, Ladekarte zeigen, dann
+  // den fertigen Bericht eintragen (oder als fehlgeschlagen markieren).
+  async function handleCreateReport(type: ReportType) {
+    setReportOpen(false)
+    const tempId = `temp-${crypto.randomUUID()}`
+    const placeholder: ReportItem = {
+      id: tempId,
+      type: type.id,
+      title: type.label,
+      sourceCount: selectedReadyIds.length,
+      status: "processing",
+      createdAt: new Date().toISOString()
+    }
+    setReports((prev) => [placeholder, ...prev])
+
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/reports`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: type.id, sourceIds: selectedReadyIds })
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Bericht fehlgeschlagen")
+      const { report } = await res.json()
+      setReports((prev) => prev.map((r) => (r.id === tempId ? report : r)))
+    } catch {
+      setReports((prev) => prev.map((r) => (r.id === tempId ? { ...r, status: "failed" } : r)))
+    }
+  }
+
+  async function handleDeleteReport(reportId: string) {
+    setMenuReportId(null)
+    setReports((prev) => prev.filter((r) => r.id !== reportId))
+    if (!reportId.startsWith("temp-")) {
+      await fetch(`/api/notebooks/${notebookId}/reports/${reportId}`, { method: "DELETE" })
+    }
   }
 
   async function sendMessage(text: string) {
@@ -133,7 +242,7 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
       const res = await fetch(`/api/notebooks/${notebookId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed })
+        body: JSON.stringify({ message: trimmed, sourceIds: selectedReadyIds })
       })
       if (!res.body) throw new Error("Kein Stream")
 
@@ -201,31 +310,65 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
                 </p>
               </div>
             ) : (
-              <ul className={styles.sourceList}>
-                {sources.map((s) => (
-                  <li
-                    key={s.id}
-                    className={`${styles.sourceItem} ${activeSourceId === s.id ? styles.sourceItemActive : ""}`}
-                    onClick={() => setActiveSourceId(s.id)}
+              <>
+                <div className={styles.selectAllRow}>
+                  <button
+                    className={styles.selectAllRefresh}
+                    aria-label="Quellen aktualisieren"
+                    onClick={() => refreshSources()}
                   >
-                    <span className={`material-symbols-outlined ${styles.sourceIcon}`}>
-                      {SOURCE_ICON[s.type] ?? "description"}
-                    </span>
-                    <span className={styles.sourceTitle}>{s.title}</span>
-                    <SourceStatus status={s.status} />
-                    <button
-                      className={styles.sourceDelete}
-                      aria-label="Quelle löschen"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDeleteSource(s.id)
-                      }}
+                    <span className="material-symbols-outlined">refresh</span>
+                  </button>
+                  <span className={styles.selectAllLabel}>Alle auswählen</span>
+                  <button
+                    className={styles.checkbox}
+                    role="checkbox"
+                    aria-checked={allSelected}
+                    aria-label="Alle auswählen"
+                    onClick={toggleAll}
+                  >
+                    <span className="material-symbols-outlined">check</span>
+                  </button>
+                </div>
+
+                <ul className={styles.sourceList}>
+                  {sources.map((s) => (
+                    <li
+                      key={s.id}
+                      className={`${styles.sourceItem} ${activeSourceId === s.id ? styles.sourceItemActive : ""}`}
+                      onClick={() => setActiveSourceId(s.id)}
                     >
-                      <span className="material-symbols-outlined">close</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                      <span className={`material-symbols-outlined ${styles.sourceIcon}`}>
+                        {SOURCE_ICON[s.type] ?? "description"}
+                      </span>
+                      <span className={styles.sourceTitle}>{s.title}</span>
+                      <SourceStatus status={s.status} />
+                      <button
+                        className={styles.sourceDelete}
+                        aria-label="Quelle löschen"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteSource(s.id)
+                        }}
+                      >
+                        <span className="material-symbols-outlined">close</span>
+                      </button>
+                      <button
+                        className={styles.checkbox}
+                        role="checkbox"
+                        aria-checked={selectedIds.has(s.id)}
+                        aria-label={`Quelle „${s.title}“ auswählen`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleSource(s.id)
+                        }}
+                      >
+                        <span className="material-symbols-outlined">check</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </div>
         </section>
@@ -309,18 +452,74 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
 
           <div className={styles.studioBody}>
             <div className={styles.studioGrid}>
-              {studioTools.map((tool) => (
-                <button key={tool.label} className={styles.studioCard} style={{ "--tint": tool.tint } as React.CSSProperties}>
-                  <span className={`material-symbols-outlined ${styles.studioCardIcon}`}>{tool.icon}</span>
-                  <span className={styles.studioCardLabel}>{tool.label}</span>
-                </button>
-              ))}
+              {studioTools.map((tool) => {
+                const isReports = tool.label === "Berichte"
+                return (
+                  <button
+                    key={tool.label}
+                    className={styles.studioCard}
+                    style={{ "--tint": tool.tint } as React.CSSProperties}
+                    disabled={isReports ? readyCount === 0 : false}
+                    title={isReports && readyCount === 0 ? "Zuerst Quellen auswählen" : undefined}
+                    onClick={isReports ? () => setReportOpen(true) : undefined}
+                  >
+                    <span className={`material-symbols-outlined ${styles.studioCardIcon}`}>{tool.icon}</span>
+                    <span className={styles.studioCardLabel}>{tool.label}</span>
+                  </button>
+                )
+              })}
             </div>
 
-            <div className={styles.emptyState}>
-              <span className={`material-symbols-outlined ${styles.emptyIcon}`}>auto_awesome</span>
-              <p className={styles.emptyTitle}>Studio-Funktionen folgen später.</p>
-            </div>
+            {reports.length > 0 && (
+              <ul className={styles.reportList}>
+                {reports.map((r) => {
+                  const meta = getReportType(r.type)
+                  const processing = r.status === "processing"
+                  const failed = r.status === "failed"
+                  return (
+                    <li
+                      key={r.id}
+                      className={`${styles.reportItem} ${processing ? styles.reportItemBusy : ""}`}
+                      onClick={() => !processing && !failed && setViewReport(r)}
+                    >
+                      <span className={`material-symbols-outlined ${styles.reportIcon} ${processing ? styles.reportIconBusy : ""}`}>
+                        {processing ? "sync" : failed ? "error" : (meta?.icon ?? "description")}
+                      </span>
+                      <div className={styles.reportText}>
+                        <p className={styles.reportTitle}>
+                          {processing ? "Bericht wird erstellt…" : failed ? "Erstellung fehlgeschlagen" : r.title}
+                        </p>
+                        <p className={styles.reportMeta}>
+                          {processing
+                            ? `basierend auf ${r.sourceCount} ${r.sourceCount === 1 ? "Quelle" : "Quellen"}`
+                            : `${meta?.metaLabel ?? "Bericht"} · ${r.sourceCount} ${r.sourceCount === 1 ? "Quelle" : "Quellen"} · ${relativeTime(r.createdAt)}`}
+                        </p>
+                      </div>
+
+                      {!processing && (
+                        <div className={styles.reportMenuWrap} onClick={(e) => e.stopPropagation()}>
+                          <button
+                            className={styles.reportMenuBtn}
+                            aria-label="Optionen"
+                            onClick={() => setMenuReportId((cur) => (cur === r.id ? null : r.id))}
+                          >
+                            <span className="material-symbols-outlined">more_vert</span>
+                          </button>
+                          {menuReportId === r.id && (
+                            <div className={styles.reportMenu} role="menu">
+                              <button className={styles.reportMenuItem} onClick={() => handleDeleteReport(r.id)}>
+                                <span className="material-symbols-outlined">delete</span>
+                                Löschen
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
           </div>
         </section>
       </div>
@@ -328,8 +527,29 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
       <p className={styles.disclaimer}>NotebookLM kann Fehler machen, überprüfe daher die Antworten.</p>
 
       {modalOpen && <AddSourceModal onClose={() => setModalOpen(false)} onAdd={handleAddSource} />}
+      {reportOpen && <ReportModal onClose={() => setReportOpen(false)} onSelect={handleCreateReport} />}
+      {viewReport && (
+        <ReportViewModal
+          notebookId={notebookId}
+          reportId={viewReport.id}
+          title={viewReport.title}
+          onClose={() => setViewReport(null)}
+        />
+      )}
     </div>
   )
+}
+
+// "Vor 1 Min.", "Vor 2 Std.", "Vor 3 Tagen" – kurze relative Zeitangabe (de).
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const min = Math.floor(diff / 60000)
+  if (min < 1) return "Gerade eben"
+  if (min < 60) return `Vor ${min} Min.`
+  const hours = Math.floor(min / 60)
+  if (hours < 24) return `Vor ${hours} Std.`
+  const days = Math.floor(hours / 24)
+  return `Vor ${days} ${days === 1 ? "Tag" : "Tagen"}`
 }
 
 function sourceTitleFor(sources: SourceItem[], sourceId: string) {

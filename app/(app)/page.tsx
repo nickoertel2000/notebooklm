@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import "material-symbols/outlined.css"
+import Header from "@/components/Header/Header"
 import NotebookCard from "@/components/NotebookCard/NotebookCard"
 import { getSessionUser } from "@/lib/auth/session"
 import { getNotebooksForUser } from "@/lib/notebooks"
@@ -15,7 +16,9 @@ export default async function NotebookLMHome() {
   const notebookList = await getNotebooksForUser(user.id)
 
   return (
-    <div className="nlm">
+    <>
+      <Header />
+      <div className="nlm">
       {/* Topbar */}
       <header className="nlm-topbar">
         <button className="nlm-chip">Alle</button>
@@ -76,7 +79,8 @@ export default async function NotebookLMHome() {
             meta={`${dateFormat.format(nb.updatedAt)} · ${nb.sourceCount} ${nb.sourceCount === 1 ? "Quelle" : "Quellen"}`}
           />
         ))}
+        </div>
       </div>
-    </div>
+    </>
   )
 }

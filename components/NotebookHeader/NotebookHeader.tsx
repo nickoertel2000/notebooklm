@@ -1,0 +1,51 @@
+import Image from "next/image"
+import Link from "next/link"
+import "material-symbols/outlined.css"
+import AccountMenu from "@/components/Header/AccountMenu"
+import { createNotebook, renameNotebook } from "@/app/(app)/actions"
+import NotebookTitle from "./NotebookTitle"
+import styles from "./notebookHeader.module.scss"
+
+type NotebookHeaderProps = {
+  notebookId: string
+  title: string
+  user: { name?: string | null; email?: string | null; image?: string | null }
+}
+
+export default function NotebookHeader({ notebookId, title, user }: NotebookHeaderProps) {
+  return (
+    <header className={styles.header}>
+      <div className={styles.left}>
+        <Link href="/" className={styles.logo} aria-label="Zur Startseite">
+          <Image src="/notebook-icon.svg" alt="" width={32} height={32} priority />
+        </Link>
+        <NotebookTitle notebookId={notebookId} initialTitle={title} onRename={renameNotebook} />
+      </div>
+
+      <div className={styles.right}>
+        <form action={createNotebook}>
+          <button type="submit" className={styles.createBtn}>
+            <span className="material-symbols-outlined">add</span>
+            Notebook erstellen
+          </button>
+        </form>
+
+        <button type="button" className={styles.pillBtn}>
+          <span className="material-symbols-outlined">share</span>
+          Freigeben
+        </button>
+
+        <button type="button" className={styles.pillBtn}>
+          <span className="material-symbols-outlined">settings</span>
+          Einstellungen
+        </button>
+
+        <button type="button" className={styles.iconBtn} aria-label="Google Apps">
+          <span className="material-symbols-outlined">apps</span>
+        </button>
+
+        <AccountMenu name={user.name ?? ""} email={user.email ?? ""} image={user.image} />
+      </div>
+    </header>
+  )
+}

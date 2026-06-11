@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk"
-import { and, asc, cosineDistance, eq } from "drizzle-orm"
+import { and, asc, cosineDistance, eq, inArray } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/db"
 import { messages, MessageCitation, sourceChunks, sources } from "@/db/schema"
@@ -38,11 +38,14 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const notebook = await getNotebookForUser(notebookId, user.id)
   if (!notebook) return NextResponse.json({ error: "Notebook nicht gefunden" }, { status: 404 })
 
-  const { message } = await req.json()
+  const { message, sourceIds } = await req.json()
   if (!message?.trim()) return NextResponse.json({ error: "Nachricht fehlt" }, { status: 400 })
 
   // User-Nachricht persistieren.
   await db.insert(messages).values({ notebookId, role: "user", content: message })
+
+  // Optional auf die vom Nutzer ausgewählten Quellen einschränken.
+  const selectedIds: string[] | null = Array.isArray(sourceIds) ? sourceIds.filter((id) => typeof id === "string") : null
 
   // Frage einbetten + notebook-gefilterte Similarity-Suche (nur fertige Quellen).
   const queryVector = await embedQuery(message)
@@ -59,7 +62,13 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     })
     .from(sourceChunks)
     .innerJoin(sources, eq(sourceChunks.sourceId, sources.id))
-    .where(and(eq(sourceChunks.notebookId, notebookId), eq(sources.status, "ready")))
+    .where(
+      and(
+        eq(sourceChunks.notebookId, notebookId),
+        eq(sources.status, "ready"),
+        selectedIds && selectedIds.length > 0 ? inArray(sourceChunks.sourceId, selectedIds) : undefined
+      )
+    )
     .orderBy(distance)
     .limit(TOP_K)
 

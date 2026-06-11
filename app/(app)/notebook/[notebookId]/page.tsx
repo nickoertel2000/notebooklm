@@ -1,7 +1,8 @@
-import { asc, eq } from "drizzle-orm"
+import { asc, desc, eq } from "drizzle-orm"
 import { notFound, redirect } from "next/navigation"
+import NotebookHeader from "@/components/NotebookHeader/NotebookHeader"
 import { db } from "@/db"
-import { messages, sources } from "@/db/schema"
+import { messages, reports, sources } from "@/db/schema"
 import { getSessionUser } from "@/lib/auth/session"
 import { getNotebookForUser } from "@/lib/notebooks"
 import NotebookView from "./NotebookView"
@@ -15,7 +16,7 @@ export default async function NotebookPage({ params }: { params: Promise<{ noteb
   const notebook = await getNotebookForUser(notebookId, user.id)
   if (!notebook) notFound()
 
-  const [sourceRows, messageRows] = await Promise.all([
+  const [sourceRows, messageRows, reportRows] = await Promise.all([
     db
       .select({
         id: sources.id,
@@ -37,15 +38,31 @@ export default async function NotebookPage({ params }: { params: Promise<{ noteb
       })
       .from(messages)
       .where(eq(messages.notebookId, notebookId))
-      .orderBy(asc(messages.createdAt))
+      .orderBy(asc(messages.createdAt)),
+    db
+      .select({
+        id: reports.id,
+        type: reports.type,
+        title: reports.title,
+        sourceCount: reports.sourceCount,
+        status: reports.status,
+        createdAt: reports.createdAt
+      })
+      .from(reports)
+      .where(eq(reports.notebookId, notebookId))
+      .orderBy(desc(reports.createdAt))
   ])
 
   return (
-    <NotebookView
-      notebookId={notebookId}
-      title={notebook.title}
-      initialSources={sourceRows.map((s) => ({ ...s, createdAt: s.createdAt.toISOString() }))}
-      initialMessages={messageRows}
-    />
+    <>
+      <NotebookHeader notebookId={notebookId} title={notebook.title} user={user} />
+      <NotebookView
+        notebookId={notebookId}
+        title={notebook.title}
+        initialSources={sourceRows.map((s) => ({ ...s, createdAt: s.createdAt.toISOString() }))}
+        initialMessages={messageRows}
+        initialReports={reportRows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }))}
+      />
+    </>
   )
 }

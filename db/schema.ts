@@ -140,3 +140,23 @@ export const messages = pgTable("messages", {
   citations: jsonb("citations").$type<MessageCitation[]>(),
   createdAt: timestamp("created_at").defaultNow().notNull()
 })
+
+// ── Studio-Berichte ───────────────────────────────────────────────────────────
+// Persistierte Studio-Artefakte (FAQ, Briefing-Dokument, …). Während der
+// Erstellung 'processing', danach 'ready' mit content; bei Fehler 'failed'.
+
+export const reports = pgTable("reports", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  notebookId: uuid("notebook_id")
+    .notNull()
+    .references(() => notebooks.id, { onDelete: "cascade" }),
+  // Bericht-Typ aus lib/reports.ts: 'briefing' | 'study-guide' | 'faq' | 'timeline'
+  type: text("type").notNull(),
+  title: text("title").notNull().default("Bericht"),
+  content: text("content"),
+  sourceCount: integer("source_count").notNull().default(0),
+  // 'processing' | 'ready' | 'failed'
+  status: text("status").notNull().default("processing"),
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+})

@@ -1,0 +1,120 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  padding: 0 16px;
+  background-color: #1b1c1d;
+  color: #e3e3e3;
+}
+
+/* ---------- Links: Logo + Titel ----------------------------------------- */
+.left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.logo {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+
+  img {
+    display: block;
+  }
+}
+
+// Gemeinsame Geometrie für Anzeige- und Edit-Zustand, damit beim Umschalten
+// nichts springt.
+.titleButton,
+.titleInput {
+  height: 36px;
+  max-width: 420px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 18px;
+  font-weight: 400;
+  font-family: inherit;
+  line-height: 36px;
+  color: #e3e3e3;
+}
+
+.titleButton {
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: text;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  transition: border-color 0.12s ease;
+
+  &:hover {
+    border-color: #5f6368;
+  }
+}
+
+.titleInput {
+  border: 1px solid #8ab4f8;
+  background: transparent;
+  outline: none;
+}
+
+/* ---------- Rechts: Aktionen -------------------------------------------- */
+.right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.createBtn,
+.pillBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  border: 1px solid #5f6368;
+  border-radius: 20px;
+  background: transparent;
+  color: #e3e3e3;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .material-symbols-outlined {
+    font-size: 18px;
+  }
+}
+
+.iconBtn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #e3e3e3;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+
+  .material-symbols-outlined {
+    font-size: 20px;
+  }
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+}
