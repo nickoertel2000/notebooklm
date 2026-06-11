@@ -6,6 +6,7 @@ import AddSourceModal, { AddSourcePayload } from "@/components/popup/AddSourceMo
 import ReportModal from "@/components/popup/ReportModal"
 import ReportViewModal from "@/components/popup/ReportViewModal"
 import { getReportType, ReportType } from "@/lib/reports"
+import { useDictation } from "@/lib/useDictation"
 import styles from "../notebook.module.scss"
 
 export type Citation = {
@@ -72,6 +73,16 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
   const [activeSourceId, setActiveSourceId] = useState<string | null>(null)
   const [openCitation, setOpenCitation] = useState<string | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
+
+  // Spracheingabe (Diktat) für das Chat-Eingabefeld.
+  const dictation = useDictation("de-DE")
+  const dictationBaseRef = useRef("")
+
+  function startDictation() {
+    // An bereits getippten Text anhängen.
+    dictationBaseRef.current = input.trim() ? input.replace(/\s+$/, "") + " " : ""
+    dictation.start((text) => setInput(dictationBaseRef.current + text))
+  }
 
   // Nur ausgewählte, fertige Quellen zählen für Chat & Berichte.
   const selectedReadyIds = useMemo(
@@ -228,6 +239,7 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
   async function sendMessage(text: string) {
     const trimmed = text.trim()
     if (!trimmed || streaming) return
+    if (dictation.listening) dictation.stop()
     setInput("")
 
     const assistantId = `streaming-${crypto.randomUUID()}`
@@ -429,7 +441,13 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
               <input
                 className={styles.composerInput}
                 type="text"
-                placeholder={readyCount === 0 ? "Erst Quellen hinzufügen…" : "Frage zu deinen Quellen stellen"}
+                placeholder={
+                  dictation.listening
+                    ? "Sprich jetzt…"
+                    : readyCount === 0
+                      ? "Erst Quellen hinzufügen…"
+                      : "Frage zu deinen Quellen stellen"
+                }
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={streaming}
@@ -437,6 +455,17 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
               <span className={styles.sourceCount}>
                 {readyCount} {readyCount === 1 ? "Quelle" : "Quellen"}
               </span>
+              {dictation.supported && (
+                <button
+                  type="button"
+                  className={`${styles.micButton} ${dictation.listening ? styles.micButtonActive : ""}`}
+                  aria-label={dictation.listening ? "Diktat beenden" : "Diktieren"}
+                  onClick={() => (dictation.listening ? dictation.stop() : startDictation())}
+                  disabled={streaming}
+                >
+                  <span className="material-symbols-outlined">{dictation.listening ? "stop" : "mic"}</span>
+                </button>
+              )}
               <button className={styles.sendButton} aria-label="Senden" type="submit" disabled={streaming || !input.trim()}>
                 <span className="material-symbols-outlined">{streaming ? "progress_activity" : "arrow_forward"}</span>
               </button>

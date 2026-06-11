@@ -372,6 +372,57 @@
   }
 }
 
+.micButton {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+
+  span {
+    font-size: 20px;
+  }
+
+  &:hover:not(:disabled) {
+    background: var(--surface-hover);
+    color: var(--text);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.micButtonActive {
+  background: #f28b82;
+  color: #3c0a06;
+  animation: nlm-pulse 1.4s ease-in-out infinite;
+
+  &:hover:not(:disabled) {
+    background: #f28b82;
+    color: #3c0a06;
+  }
+}
+
+@keyframes nlm-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(242, 139, 130, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(242, 139, 130, 0);
+  }
+}
+
 .disclaimer {
   margin: 0;
   padding: 10px 0 4px;
