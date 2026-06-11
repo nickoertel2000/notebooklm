@@ -16,17 +16,14 @@ frontend:
       commands:
         # Runtime-Env-Variablen fürs Next.js-SSR-Runtime verfügbar machen.
         # Amplify-Hosting-Env-Variablen stehen sonst nur im Build, nicht zur Laufzeit.
-        # `|| true`: grep liefert Exit-Code 1 ohne Treffer — das würde den Build sonst abbrechen.
         - env | grep -e DATABASE_URL -e BETTER_AUTH_SECRET -e GOOGLE_CLIENT_ID -e GOOGLE_CLIENT_SECRET -e ANTHROPIC_API_KEY -e VOYAGE_API_KEY -e S3_BUCKET_NAME >> .env.production || true
         - env | grep -e NEXT_PUBLIC_ >> .env.production || true
         - pnpm run build
   artifacts:
     baseDirectory: .next
     files:
-      - '**/*'
+      - "**/*"
   cache:
     paths:
-      # .next/cache bewusst NICHT cachen: Amplify komprimiert/lädt den Cache hoch,
-      # was bei großem Dependency-Baum zu "Build container ran out of memory" führt.
-      # (AWS-Troubleshooting-Empfehlung). Wieder aufnehmen, sobald der Build stabil ist.
-      - node_modules/**/*
+      # node_modules nicht cachen: pnpm legt node_modules als Symlink-Wald in den .pnpm-Store
+      - .pnpm-store/**/*
