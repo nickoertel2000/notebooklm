@@ -415,7 +415,8 @@ export default function NotebookView({ notebookId, title, initialSources, initia
           if (evt.type === "done") {
             setReports((prev) => prev.map((r) => (r.id === tempId ? evt.report : r)))
           } else if (evt.type === "error") {
-            setReports((prev) => prev.map((r) => (r.id === tempId ? { ...r, status: "failed" } : r)))
+            // Echte ID übernehmen, damit das Polling die Karte nicht dupliziert.
+            setReports((prev) => prev.map((r) => (r.id === tempId ? { ...r, id: evt.id ?? r.id, status: "failed" } : r)))
           }
         }
       }
@@ -480,7 +481,8 @@ export default function NotebookView({ notebookId, title, initialSources, initia
           if (evt.type === "done") {
             setAudios((prev) => prev.map((a) => (a.id === tempId ? evt.audio : a)))
           } else if (evt.type === "error") {
-            setAudios((prev) => prev.map((a) => (a.id === tempId ? { ...a, status: "failed" } : a)))
+            // Echte ID übernehmen, damit das Polling die Karte nicht dupliziert.
+            setAudios((prev) => prev.map((a) => (a.id === tempId ? { ...a, id: evt.id ?? a.id, status: "failed" } : a)))
           }
         }
       }

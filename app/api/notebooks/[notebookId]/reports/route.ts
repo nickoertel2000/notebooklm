@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, lt } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/db"
 import { reports, sourceChunks, sources } from "@/db/schema"
@@ -12,6 +12,11 @@ export const maxDuration = 120
 
 // Obergrenze für den Quellen-Kontext (~150k Zeichen ≈ ~45k Tokens).
 const MAX_CONTEXT_CHARS = 150_000
+
+// Berichte, die länger als das hier in 'processing' hängen, gelten als
+// abgebrochen (z. B. Verbindung beim Generieren verloren) und werden beim
+// Auflisten auf 'failed' gesetzt — sonst pollt das Studio-Panel endlos.
+const STALE_PROCESSING_MS = 5 * 60 * 1000
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
 
@@ -28,6 +33,18 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
   const auth = await authorize(notebookId)
   if (auth.error) return auth.error
+
+  // Hängengebliebene 'processing'-Berichte aufräumen, bevor wir auflisten.
+  await db
+    .update(reports)
+    .set({ status: "failed", error: "Zeitüberschreitung bei der Erstellung" })
+    .where(
+      and(
+        eq(reports.notebookId, notebookId),
+        eq(reports.status, "processing"),
+        lt(reports.createdAt, new Date(Date.now() - STALE_PROCESSING_MS))
+      )
+    )
 
   const rows = await db
     .select({
@@ -132,6 +149,17 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const readable = new ReadableStream<Uint8Array>({
     async start(controller) {
       const send = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"))
+      // Sofort ein Status-Byte + Keepalive, falls das Modell bei großem Kontext
+      // (viele Quellen) erst spät das erste Token liefert — sonst könnte der
+      // 30s-Time-to-first-byte-Timeout vor dem ersten Delta zuschlagen.
+      send({ type: "status" })
+      const keepalive = setInterval(() => {
+        try {
+          send({ type: "ping" })
+        } catch {
+          // Controller bereits geschlossen — ignorieren.
+        }
+      }, 5000)
       let fullText = ""
 
       try {
@@ -162,8 +190,9 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       } catch (err) {
         console.error("Bericht-Erstellung fehlgeschlagen:", err)
         await db.update(reports).set({ status: "failed", error: String(err) }).where(eq(reports.id, created.id))
-        send({ type: "error", error: String(err) })
+        send({ type: "error", id: created.id, error: String(err) })
       } finally {
+        clearInterval(keepalive)
         controller.close()
       }
     }

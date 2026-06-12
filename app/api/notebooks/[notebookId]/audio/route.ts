@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, lt } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/db"
 import { audioOverviews, sourceChunks, sources } from "@/db/schema"
@@ -18,6 +18,11 @@ const MAX_CONTEXT_CHARS = 150_000
 // Token-Budget für das Skript je nach Länge (klein genug für einen TTS-Call).
 const SCRIPT_MAX_TOKENS: Record<AudioLength, number> = { kurz: 1500, standard: 4000 }
 
+// Audio-Übersichten, die länger als das hier in 'processing' hängen, gelten als
+// abgebrochen und werden beim Auflisten auf 'failed' gesetzt — sonst pollt das
+// Studio-Panel endlos. Großzügig, da TTS einer 'standard'-Länge dauern kann.
+const STALE_PROCESSING_MS = 8 * 60 * 1000
+
 type RouteContext = { params: Promise<{ notebookId: string }> }
 
 async function authorize(notebookId: string) {
@@ -33,6 +38,18 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
   const auth = await authorize(notebookId)
   if (auth.error) return auth.error
+
+  // Hängengebliebene 'processing'-Audios aufräumen, bevor wir auflisten.
+  await db
+    .update(audioOverviews)
+    .set({ status: "failed", error: "Zeitüberschreitung bei der Erstellung" })
+    .where(
+      and(
+        eq(audioOverviews.notebookId, notebookId),
+        eq(audioOverviews.status, "processing"),
+        lt(audioOverviews.createdAt, new Date(Date.now() - STALE_PROCESSING_MS))
+      )
+    )
 
   const rows = await db
     .select({
@@ -174,7 +191,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       } catch (err) {
         console.error("Audio-Erstellung fehlgeschlagen:", err)
         await db.update(audioOverviews).set({ status: "failed", error: String(err) }).where(eq(audioOverviews.id, created.id))
-        send({ type: "error", error: String(err) })
+        send({ type: "error", id: created.id, error: String(err) })
       } finally {
         clearInterval(keepalive)
         controller.close()
