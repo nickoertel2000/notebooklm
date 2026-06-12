@@ -19,6 +19,19 @@ export default function NotebookTitle({ notebookId, initialTitle, onRename }: No
     setTitle(initialTitle)
   }, [initialTitle])
 
+  // Auto-Titel aus dem NotebookView (anderer Teilbaum) live übernehmen.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const next = (e as CustomEvent<string>).detail
+      if (typeof next === "string" && next) {
+        setTitle(next)
+        setDraft(next)
+      }
+    }
+    window.addEventListener("notebook-title", handler)
+    return () => window.removeEventListener("notebook-title", handler)
+  }, [])
+
   // Beim Wechsel in den Edit-Modus den Text markieren.
   useLayoutEffect(() => {
     if (editing) {

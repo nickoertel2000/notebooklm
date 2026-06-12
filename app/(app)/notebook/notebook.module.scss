@@ -159,6 +159,7 @@
 }
 
 .searchCard {
+  margin-top: 10px;
   padding: 14px;
   border: 1px solid var(--panel-border);
   border-radius: var(--radius-md);
@@ -218,6 +219,241 @@
 
   &:hover {
     background: var(--surface-hover);
+  }
+}
+
+// Dropdown-Wrapper + Menü für die Such-Chips (Web/Nachrichten, Recherche-Tiefe).
+.searchSelectWrap {
+  position: relative;
+}
+
+.searchMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: 4px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.searchMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  .material-symbols-outlined {
+    font-size: 18px;
+    color: var(--text-muted);
+  }
+
+  &:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.searchMenuItemActive {
+  color: var(--accent);
+
+  .material-symbols-outlined {
+    color: var(--accent);
+  }
+}
+
+// Eingabefeld der Web-Quellensuche (ersetzt das frühere Label).
+.searchInput {
+  display: block;
+  width: 100%;
+  margin-bottom: 12px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+
+  &::placeholder {
+    color: var(--text-muted);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+  }
+}
+
+// Lauf-Hinweis „Recherche auf Websites läuft…".
+.searchLoading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(66, 89, 255, 0.25);
+  border-radius: var(--radius-md);
+  background: rgba(66, 89, 255, 0.1);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.searchSpinner {
+  font-size: 20px !important;
+  color: var(--accent);
+  animation: nlm-spin 1s linear infinite;
+}
+
+.searchError {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(242, 139, 130, 0.12);
+  color: #f28b82;
+  font-size: 13px;
+}
+
+// Gefundene Quellen (Inline-Trefferliste).
+.searchResults {
+  margin-top: 10px;
+  padding: 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.searchResultsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.searchResultsClose {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+
+  span {
+    font-size: 18px;
+  }
+
+  &:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.searchResultsEmpty {
+  margin: 0;
+  padding: 8px 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.searchResultList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.searchResultItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: var(--surface);
+  }
+}
+
+.searchResultText {
+  flex: 1;
+  min-width: 0;
+}
+
+.searchResultTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.searchResultDesc {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.searchResultUrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: fit-content;
+  margin: 3px 0 0;
+  font-size: 11.5px;
+  color: var(--accent);
+  text-decoration: none;
+
+  span {
+    font-size: 13px;
+  }
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.searchImportBtn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  &:not(:disabled):hover {
+    filter: brightness(1.08);
   }
 }
 
@@ -781,6 +1017,14 @@
   flex-shrink: 0;
 }
 
+.sourceFavicon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
 .sourceTitle {
   flex: 1;
   min-width: 0;
@@ -810,6 +1054,27 @@
   &:hover {
     background: var(--surface-hover);
     color: var(--text);
+  }
+}
+
+.sourceRetry {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+
+  span {
+    font-size: 18px;
+  }
+
+  &:hover {
+    background: var(--surface-hover);
   }
 }
 

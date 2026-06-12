@@ -1,15 +1,16 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import "material-symbols/outlined.css"
-import AddSourceModal, { AddSourcePayload } from "@/components/popup/AddSourceModal"
 import AudioPlayer from "@/components/AudioPlayer/AudioPlayer"
+import AddSourceModal, { AddSourcePayload } from "@/components/popup/AddSourceModal"
 import AudioModal, { AudioOptions } from "@/components/popup/AudioModal"
 import ReportModal from "@/components/popup/ReportModal"
 import ReportViewModal from "@/components/popup/ReportViewModal"
 import { getAudioFormat } from "@/lib/audio"
+import { DEFAULT_NOTEBOOK_TITLE } from "@/lib/notebookTitle"
 import { getReportType, ReportType } from "@/lib/reports"
 import { useDictation } from "@/lib/useDictation"
+import "material-symbols/outlined.css"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import styles from "../notebook.module.scss"
 
 export type Citation = {
@@ -34,6 +35,7 @@ export type SourceItem = {
   title: string
   status: string
   error: string | null
+  sourceUrl: string | null
   createdAt: string
 }
 
@@ -56,6 +58,8 @@ export type AudioItem = {
   createdAt: string
 }
 
+type WebResult = { title: string; url: string; description: string }
+
 const SOURCE_ICON: Record<string, string> = { pdf: "picture_as_pdf", url: "link", text: "description" }
 
 const studioTools = [
@@ -73,7 +77,10 @@ type Props = {
   initialAudios: AudioItem[]
 }
 
-export default function NotebookView({ notebookId, initialSources, initialMessages, initialReports, initialAudios }: Props) {
+export default function NotebookView({ notebookId, title, initialSources, initialMessages, initialReports, initialAudios }: Props) {
+  // Lokal verfolgter Notebook-Titel – Basis für die Auto-Benennung.
+  const [notebookTitle, setNotebookTitle] = useState(title)
+  const autoTitlingRef = useRef(false)
   const [sources, setSources] = useState<SourceItem[]>(initialSources)
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [reports, setReports] = useState<ReportItem[]>(initialReports)
@@ -81,11 +88,23 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
   const [modalOpen, setModalOpen] = useState(initialSources.length === 0)
   const [reportOpen, setReportOpen] = useState(false)
   const [audioOpen, setAudioOpen] = useState(false)
+  // Web-Quellensuche (Discover): Inline-Karte in „Quellen".
+  const [webMode, setWebMode] = useState<"web" | "news">("web")
+  const [searchDepth, setSearchDepth] = useState<"quick" | "deep">("quick")
+  const [searchMenu, setSearchMenu] = useState<"web" | "depth" | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searching, setSearching] = useState(false)
+  const [searchResults, setSearchResults] = useState<WebResult[] | null>(null)
+  const [selectedResults, setSelectedResults] = useState<Set<string>>(new Set())
+  const [importingResults, setImportingResults] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
   const [viewReport, setViewReport] = useState<ReportItem | null>(null)
   const [menuReportId, setMenuReportId] = useState<string | null>(null)
   const [menuAudioId, setMenuAudioId] = useState<string | null>(null)
   // Aktuell abgespielte Audio-Übersicht inkl. presigned URL und Titel.
   const [playingAudio, setPlayingAudio] = useState<{ id: string; url: string; title: string } | null>(null)
+  // Echter Play/Pause-Status des Players (für das Listen-Icon).
+  const [audioPlaying, setAudioPlaying] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(initialSources.map((s) => s.id)))
   const [input, setInput] = useState("")
   const [streaming, setStreaming] = useState(false)
@@ -104,10 +123,7 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
   }
 
   // Nur ausgewählte, fertige Quellen zählen für Chat & Berichte.
-  const selectedReadyIds = useMemo(
-    () => sources.filter((s) => s.status === "ready" && selectedIds.has(s.id)).map((s) => s.id),
-    [sources, selectedIds]
-  )
+  const selectedReadyIds = useMemo(() => sources.filter((s) => s.status === "ready" && selectedIds.has(s.id)).map((s) => s.id), [sources, selectedIds])
   const readyCount = selectedReadyIds.length
   const allSelected = sources.length > 0 && sources.every((s) => selectedIds.has(s.id))
 
@@ -185,8 +201,38 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
   }, [menuAudioId])
 
   useEffect(() => {
+    if (!searchMenu) return
+    const close = () => setSearchMenu(null)
+    document.addEventListener("click", close)
+    return () => document.removeEventListener("click", close)
+  }, [searchMenu])
+
+  useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
+
+  // Trägt das Notebook noch den Standardtitel, aus dem Kontext automatisch einen
+  // Titel generieren und im Header live aktualisieren.
+  async function maybeAutoTitle() {
+    if (notebookTitle !== DEFAULT_NOTEBOOK_TITLE || autoTitlingRef.current) return
+    autoTitlingRef.current = true
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/auto-title`, { method: "POST" })
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.title) {
+        setNotebookTitle(data.title)
+        if (data.generated && data.title !== DEFAULT_NOTEBOOK_TITLE) {
+          // Header (separate Komponente) live aktualisieren.
+          window.dispatchEvent(new CustomEvent("notebook-title", { detail: data.title }))
+        }
+      }
+    } catch {
+      // Auto-Titel ist optional – Fehler still ignorieren.
+    } finally {
+      autoTitlingRef.current = false
+    }
+  }
 
   async function handleAddSource(payload: AddSourcePayload) {
     const base = `/api/notebooks/${notebookId}/sources`
@@ -226,6 +272,97 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
     // Neue Quelle automatisch auswählen.
     if (newId) setSelectedIds((prev) => new Set(prev).add(newId!))
     setModalOpen(false)
+    await refreshSources()
+    maybeAutoTitle()
+  }
+
+  // Im Web gefundene URLs als Quellen importieren (löst die normale Ingestion aus).
+  async function handleImportSources(urls: string[]) {
+    const newIds: string[] = []
+    for (const url of urls) {
+      try {
+        const res = await fetch(`/api/notebooks/${notebookId}/sources`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "url", url })
+        })
+        if (res.ok) {
+          const { sourceId } = await res.json()
+          if (sourceId) newIds.push(sourceId)
+        }
+      } catch {
+        // Einzelne fehlgeschlagene URL überspringen.
+      }
+    }
+    if (newIds.length > 0) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        newIds.forEach((id) => next.add(id))
+        return next
+      })
+    }
+    await refreshSources()
+    maybeAutoTitle()
+  }
+
+  // Inline-Websuche: Claude durchsucht das Web nach neuen Quellen.
+  async function runWebSearch() {
+    const q = searchQuery.trim()
+    if (!q || searching) return
+    setSearching(true)
+    setSearchError(null)
+    setSearchResults(null)
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/discover`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q, depth: searchDepth, mode: webMode })
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Suche fehlgeschlagen")
+      const data = await res.json()
+      const found: WebResult[] = data.results ?? []
+      setSearchResults(found)
+      setSelectedResults(new Set(found.map((r) => r.url))) // standardmäßig alle ausgewählt
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  function toggleResult(url: string) {
+    setSelectedResults((prev) => {
+      const next = new Set(prev)
+      if (next.has(url)) next.delete(url)
+      else next.add(url)
+      return next
+    })
+  }
+
+  async function importSelectedResults() {
+    if (selectedResults.size === 0 || importingResults) return
+    setImportingResults(true)
+    try {
+      await handleImportSources([...selectedResults])
+      // Nach dem Import die Suche zurücksetzen.
+      setSearchResults(null)
+      setSearchQuery("")
+    } finally {
+      setImportingResults(false)
+    }
+  }
+
+  // Fehlgeschlagenen Import erneut versuchen. Optimistisch auf „processing"
+  // setzen; das laufende Status-Polling übernimmt danach.
+  async function handleRetrySource(sourceId: string) {
+    setSources((prev) => prev.map((s) => (s.id === sourceId ? { ...s, status: "processing", error: null } : s)))
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}`, { method: "POST" })
+      if (!res.ok) throw new Error()
+    } catch {
+      setSources((prev) => prev.map((s) => (s.id === sourceId ? { ...s, status: "failed" } : s)))
+      return
+    }
     await refreshSources()
   }
 
@@ -315,7 +452,10 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
   async function handleDeleteAudio(audioId: string) {
     setMenuAudioId(null)
     setAudios((prev) => prev.filter((a) => a.id !== audioId))
-    if (playingAudio?.id === audioId) setPlayingAudio(null)
+    if (playingAudio?.id === audioId) {
+      setPlayingAudio(null)
+      setAudioPlaying(false)
+    }
     if (!audioId.startsWith("temp-")) {
       await fetch(`/api/notebooks/${notebookId}/audio/${audioId}`, { method: "DELETE" })
     }
@@ -325,6 +465,7 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
   async function handlePlayAudio(audioId: string) {
     if (playingAudio?.id === audioId) {
       setPlayingAudio(null)
+      setAudioPlaying(false)
       return
     }
     const res = await fetch(`/api/notebooks/${notebookId}/audio/${audioId}`)
@@ -371,22 +512,17 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
           if (evt.type === "text") {
             setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + evt.text } : m)))
           } else if (evt.type === "done") {
-            setMessages((prev) =>
-              prev.map((m) => (m.id === assistantId ? { ...m, id: evt.messageId, citations: evt.citations } : m))
-            )
+            setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, id: evt.messageId, citations: evt.citations } : m)))
           } else if (evt.type === "error") {
-            setMessages((prev) =>
-              prev.map((m) => (m.id === assistantId ? { ...m, content: `${m.content}\n\n[Fehler: ${evt.error}]` } : m))
-            )
+            setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: `${m.content}\n\n[Fehler: ${evt.error}]` } : m)))
           }
         }
       }
     } catch (err) {
-      setMessages((prev) =>
-        prev.map((m) => (m.id === assistantId ? { ...m, content: `${m.content}\n\n[Fehler: ${String(err)}]` } : m))
-      )
+      setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: `${m.content}\n\n[Fehler: ${String(err)}]` } : m)))
     } finally {
       setStreaming(false)
+      maybeAutoTitle()
     }
   }
 
@@ -410,48 +546,193 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
               Quellen hinzufügen
             </button>
 
+            {/* Im Web nach neuen Quellen suchen (Claude-Websuche) */}
+            <div className={styles.searchCard}>
+              <input
+                className={styles.searchInput}
+                type="text"
+                placeholder="Im Web nach neuen Quellen suchen"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    runWebSearch()
+                  }
+                }}
+                disabled={searching}
+              />
+              <div className={styles.searchRow}>
+                <div className={styles.searchSelectWrap} onClick={(e) => e.stopPropagation()}>
+                  <button className={styles.chip} onClick={() => setSearchMenu((m) => (m === "web" ? null : "web"))}>
+                    <span className="material-symbols-outlined">language</span>
+                    {webMode === "news" ? "Nachrichten" : "Web"}
+                    <span className="material-symbols-outlined">expand_more</span>
+                  </button>
+                  {searchMenu === "web" && (
+                    <div className={styles.searchMenu} role="menu">
+                      <button
+                        className={`${styles.searchMenuItem} ${webMode === "web" ? styles.searchMenuItemActive : ""}`}
+                        onClick={() => {
+                          setWebMode("web")
+                          setSearchMenu(null)
+                        }}
+                      >
+                        <span className="material-symbols-outlined">language</span>
+                        Web
+                      </button>
+                      <button
+                        className={`${styles.searchMenuItem} ${webMode === "news" ? styles.searchMenuItemActive : ""}`}
+                        onClick={() => {
+                          setWebMode("news")
+                          setSearchMenu(null)
+                        }}
+                      >
+                        <span className="material-symbols-outlined">newspaper</span>
+                        Nachrichten
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className={styles.searchSelectWrap} onClick={(e) => e.stopPropagation()}>
+                  <button className={styles.chip} onClick={() => setSearchMenu((m) => (m === "depth" ? null : "depth"))}>
+                    <span className="material-symbols-outlined">travel_explore</span>
+                    {searchDepth === "deep" ? "Deep Research" : "Schnelle Recherche"}
+                    <span className="material-symbols-outlined">expand_more</span>
+                  </button>
+                  {searchMenu === "depth" && (
+                    <div className={styles.searchMenu} role="menu">
+                      <button
+                        className={`${styles.searchMenuItem} ${searchDepth === "quick" ? styles.searchMenuItemActive : ""}`}
+                        onClick={() => {
+                          setSearchDepth("quick")
+                          setSearchMenu(null)
+                        }}
+                      >
+                        <span className="material-symbols-outlined">bolt</span>
+                        Schnelle Recherche
+                      </button>
+                      <button
+                        className={`${styles.searchMenuItem} ${searchDepth === "deep" ? styles.searchMenuItemActive : ""}`}
+                        onClick={() => {
+                          setSearchDepth("deep")
+                          setSearchMenu(null)
+                        }}
+                      >
+                        <span className="material-symbols-outlined">manage_search</span>
+                        Deep Research
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <button className={styles.searchSubmit} aria-label="Im Web suchen" onClick={runWebSearch} disabled={searching || !searchQuery.trim()}>
+                  <span className="material-symbols-outlined">search</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Lauf-Hinweis während der Recherche */}
+            {searching && (
+              <div className={styles.searchLoading}>
+                <span className={`material-symbols-outlined ${styles.searchSpinner}`}>progress_activity</span>
+                Recherche auf Websites läuft…
+              </div>
+            )}
+
+            {searchError && <p className={styles.searchError}>{searchError}</p>}
+
+            {/* Gefundene Quellen zur Auswahl */}
+            {searchResults && !searching && (
+              <div className={styles.searchResults}>
+                {searchResults.length === 0 ? (
+                  <p className={styles.searchResultsEmpty}>Keine passenden Quellen gefunden.</p>
+                ) : (
+                  <>
+                    <div className={styles.searchResultsHead}>
+                      <span>Gefundene Quellen</span>
+                      <button className={styles.searchResultsClose} aria-label="Ergebnisse schließen" onClick={() => setSearchResults(null)}>
+                        <span className="material-symbols-outlined">close</span>
+                      </button>
+                    </div>
+                    <ul className={styles.searchResultList}>
+                      {searchResults.map((r) => {
+                        const checked = selectedResults.has(r.url)
+                        return (
+                          <li key={r.url} className={styles.searchResultItem} onClick={() => toggleResult(r.url)}>
+                            <button
+                              className={styles.checkbox}
+                              role="checkbox"
+                              aria-checked={checked}
+                              aria-label={`„${r.title}" auswählen`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleResult(r.url)
+                              }}
+                            >
+                              <span className="material-symbols-outlined">check</span>
+                            </button>
+                            <div className={styles.searchResultText}>
+                              <p className={styles.searchResultTitle}>{r.title}</p>
+                              {r.description && <p className={styles.searchResultDesc}>{r.description}</p>}
+                              <a
+                                className={styles.searchResultUrl}
+                                href={r.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {hostOf(r.url)}
+                                <span className="material-symbols-outlined">open_in_new</span>
+                              </a>
+                            </div>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                    <button className={styles.searchImportBtn} onClick={importSelectedResults} disabled={importingResults || selectedResults.size === 0}>
+                      {importingResults ? "Wird importiert…" : `${selectedResults.size} ${selectedResults.size === 1 ? "Quelle" : "Quellen"} importieren`}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
             {sources.length === 0 ? (
               <div className={styles.emptyState}>
                 <span className={`material-symbols-outlined ${styles.emptyIcon}`}>description</span>
                 <p className={styles.emptyTitle}>Gespeicherte Quellen werden hier angezeigt</p>
-                <p className={styles.emptyText}>
-                  Klicke oben auf „Quellen hinzufügen“, um PDFs, Websites oder eingefügten Text hinzuzufügen.
-                </p>
+                <p className={styles.emptyText}>Klicke oben auf „Quellen hinzufügen“, um PDFs, Websites oder eigene Texte hinzuzufügen.</p>
               </div>
             ) : (
               <>
                 <div className={styles.selectAllRow}>
-                  <button
-                    className={styles.selectAllRefresh}
-                    aria-label="Quellen aktualisieren"
-                    onClick={() => refreshSources()}
-                  >
+                  <button className={styles.selectAllRefresh} aria-label="Quellen aktualisieren" onClick={() => refreshSources()}>
                     <span className="material-symbols-outlined">refresh</span>
                   </button>
                   <span className={styles.selectAllLabel}>Alle auswählen</span>
-                  <button
-                    className={styles.checkbox}
-                    role="checkbox"
-                    aria-checked={allSelected}
-                    aria-label="Alle auswählen"
-                    onClick={toggleAll}
-                  >
+                  <button className={styles.checkbox} role="checkbox" aria-checked={allSelected} aria-label="Alle auswählen" onClick={toggleAll}>
                     <span className="material-symbols-outlined">check</span>
                   </button>
                 </div>
 
                 <ul className={styles.sourceList}>
-                  {sources.map((s) => (
+                  {sources.map((s) => {
+                    const link = s.type === "url" ? s.sourceUrl : null
+                    return (
                     <li
                       key={s.id}
                       className={`${styles.sourceItem} ${activeSourceId === s.id ? styles.sourceItemActive : ""}`}
-                      onClick={() => setActiveSourceId(s.id)}
+                      title={link ?? undefined}
+                      onClick={() => {
+                        setActiveSourceId(s.id)
+                        if (link) window.open(link, "_blank", "noopener,noreferrer")
+                      }}
                     >
-                      <span className={`material-symbols-outlined ${styles.sourceIcon}`}>
-                        {SOURCE_ICON[s.type] ?? "description"}
-                      </span>
+                      <SourceIcon type={s.type} url={link} />
                       <span className={styles.sourceTitle}>{s.title}</span>
-                      <SourceStatus status={s.status} />
+                      <SourceStatus status={s.status} error={s.error} />
                       <button
                         className={styles.sourceDelete}
                         aria-label="Quelle löschen"
@@ -462,20 +743,35 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
                       >
                         <span className="material-symbols-outlined">close</span>
                       </button>
-                      <button
-                        className={styles.checkbox}
-                        role="checkbox"
-                        aria-checked={selectedIds.has(s.id)}
-                        aria-label={`Quelle „${s.title}“ auswählen`}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleSource(s.id)
-                        }}
-                      >
-                        <span className="material-symbols-outlined">check</span>
-                      </button>
+                      {s.status === "failed" ? (
+                        <button
+                          className={styles.sourceRetry}
+                          aria-label={`Import von „${s.title}“ wiederholen`}
+                          title="Import wiederholen"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRetrySource(s.id)
+                          }}
+                        >
+                          <span className="material-symbols-outlined">refresh</span>
+                        </button>
+                      ) : (
+                        <button
+                          className={styles.checkbox}
+                          role="checkbox"
+                          aria-checked={selectedIds.has(s.id)}
+                          aria-label={`Quelle „${s.title}“ auswählen`}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleSource(s.id)
+                          }}
+                        >
+                          <span className="material-symbols-outlined">check</span>
+                        </button>
+                      )}
                     </li>
-                  ))}
+                    )
+                  })}
                 </ul>
               </>
             )}
@@ -495,8 +791,8 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
               </span>
               <h1 className={styles.chatTitle}>Lass uns dein Notebook einrichten…</h1>
               <p className={styles.chatLead}>
-                Füge links Quellen hinzu und stelle dann unten eine Frage. Antworten werden ausschließlich aus deinen
-                Quellen erzeugt und mit anklickbaren Zitaten belegt.
+                Füge links Quellen hinzu und stelle dann unten eine Frage. Antworten werden ausschließlich aus deinen Quellen erzeugt und mit anklickbaren Zitaten
+                belegt.
               </p>
             </div>
           ) : (
@@ -538,13 +834,7 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
               <input
                 className={styles.composerInput}
                 type="text"
-                placeholder={
-                  dictation.listening
-                    ? "Sprich jetzt…"
-                    : readyCount === 0
-                      ? "Erst Quellen hinzufügen…"
-                      : "Frage zu deinen Quellen stellen"
-                }
+                placeholder={dictation.listening ? "Sprich jetzt…" : readyCount === 0 ? "Erst Quellen hinzufügen…" : "Frage zu deinen Quellen stellen"}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={streaming}
@@ -582,11 +872,7 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
                 const isReports = tool.label === "Berichte"
                 const isAudio = tool.label === "Audio-Übersicht"
                 const interactive = isReports || isAudio
-                const onClick = isReports
-                  ? () => setReportOpen(true)
-                  : isAudio
-                    ? () => setAudioOpen(true)
-                    : undefined
+                const onClick = isReports ? () => setReportOpen(true) : isAudio ? () => setAudioOpen(true) : undefined
                 return (
                   <button
                     key={tool.label}
@@ -609,22 +895,19 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
                   const meta = getAudioFormat(a.format)
                   const processing = a.status === "processing"
                   const failed = a.status === "failed"
-                  const isPlaying = playingAudio?.id === a.id
+                  // Aktiv = im Player geladen; Icon spiegelt den echten Play/Pause-Status.
+                  const active = playingAudio?.id === a.id
                   return (
                     <li key={a.id} className={styles.audioEntry}>
                       <div
                         className={`${styles.reportItem} ${processing ? styles.reportItemBusy : ""}`}
                         onClick={() => !processing && !failed && handlePlayAudio(a.id)}
                       >
-                        <span
-                          className={`material-symbols-outlined ${styles.reportIcon} ${processing ? styles.reportIconBusy : ""}`}
-                        >
-                          {processing ? "sync" : failed ? "error" : isPlaying ? "pause_circle" : "play_circle"}
+                        <span className={`material-symbols-outlined ${styles.reportIcon} ${processing ? styles.reportIconBusy : ""}`}>
+                          {processing ? "sync" : failed ? "error" : active && audioPlaying ? "pause_circle" : "play_circle"}
                         </span>
                         <div className={styles.reportText}>
-                          <p className={styles.reportTitle}>
-                            {processing ? "Audio wird erstellt…" : failed ? "Erstellung fehlgeschlagen" : a.title}
-                          </p>
+                          <p className={styles.reportTitle}>{processing ? "Audio wird erstellt…" : failed ? "Erstellung fehlgeschlagen" : a.title}</p>
                           <p className={styles.reportMeta}>
                             {processing
                               ? `basierend auf ${a.sourceCount} ${a.sourceCount === 1 ? "Quelle" : "Quellen"}`
@@ -634,11 +917,7 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
 
                         {!processing && (
                           <div className={styles.reportMenuWrap} onClick={(e) => e.stopPropagation()}>
-                            <button
-                              className={styles.reportMenuBtn}
-                              aria-label="Optionen"
-                              onClick={() => setMenuAudioId((cur) => (cur === a.id ? null : a.id))}
-                            >
+                            <button className={styles.reportMenuBtn} aria-label="Optionen" onClick={() => setMenuAudioId((cur) => (cur === a.id ? null : a.id))}>
                               <span className="material-symbols-outlined">more_vert</span>
                             </button>
                             {menuAudioId === a.id && (
@@ -674,9 +953,7 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
                         {processing ? "sync" : failed ? "error" : (meta?.icon ?? "description")}
                       </span>
                       <div className={styles.reportText}>
-                        <p className={styles.reportTitle}>
-                          {processing ? "Bericht wird erstellt…" : failed ? "Erstellung fehlgeschlagen" : r.title}
-                        </p>
+                        <p className={styles.reportTitle}>{processing ? "Bericht wird erstellt…" : failed ? "Erstellung fehlgeschlagen" : r.title}</p>
                         <p className={styles.reportMeta}>
                           {processing
                             ? `basierend auf ${r.sourceCount} ${r.sourceCount === 1 ? "Quelle" : "Quellen"}`
@@ -686,11 +963,7 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
 
                       {!processing && (
                         <div className={styles.reportMenuWrap} onClick={(e) => e.stopPropagation()}>
-                          <button
-                            className={styles.reportMenuBtn}
-                            aria-label="Optionen"
-                            onClick={() => setMenuReportId((cur) => (cur === r.id ? null : r.id))}
-                          >
+                          <button className={styles.reportMenuBtn} aria-label="Optionen" onClick={() => setMenuReportId((cur) => (cur === r.id ? null : r.id))}>
                             <span className="material-symbols-outlined">more_vert</span>
                           </button>
                           {menuReportId === r.id && (
@@ -714,7 +987,11 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
             <AudioPlayer
               title={playingAudio.title}
               src={playingAudio.url}
-              onClose={() => setPlayingAudio(null)}
+              onPlayingChange={setAudioPlaying}
+              onClose={() => {
+                setPlayingAudio(null)
+                setAudioPlaying(false)
+              }}
             />
           )}
         </section>
@@ -725,14 +1002,7 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
       {modalOpen && <AddSourceModal onClose={() => setModalOpen(false)} onAdd={handleAddSource} />}
       {reportOpen && <ReportModal onClose={() => setReportOpen(false)} onSelect={handleCreateReport} />}
       {audioOpen && <AudioModal onClose={() => setAudioOpen(false)} onCreate={handleCreateAudio} />}
-      {viewReport && (
-        <ReportViewModal
-          notebookId={notebookId}
-          reportId={viewReport.id}
-          title={viewReport.title}
-          onClose={() => setViewReport(null)}
-        />
-      )}
+      {viewReport && <ReportViewModal notebookId={notebookId} reportId={viewReport.id} title={viewReport.title} onClose={() => setViewReport(null)} />}
     </div>
   )
 }
@@ -749,6 +1019,15 @@ function relativeTime(iso: string): string {
   return `Vor ${days} ${days === 1 ? "Tag" : "Tagen"}`
 }
 
+// Anzeige-Host einer URL (ohne „www.").
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "")
+  } catch {
+    return url
+  }
+}
+
 function sourceTitleFor(sources: SourceItem[], sourceId: string) {
   return sources.find((s) => s.id === sourceId)?.title ?? "Quelle"
 }
@@ -760,12 +1039,39 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")} Min.`
 }
 
-function SourceStatus({ status }: { status: string }) {
-  if (status === "ready") {
-    return <span className={`material-symbols-outlined ${styles.statusReady}`}>check_circle</span>
+// Quellen-Icon: Bei URL-Quellen das Favicon der Website, sonst (oder bei
+// fehlendem/fehlerhaftem Favicon) das passende Material-Symbol.
+function SourceIcon({ type, url }: { type: string; url: string | null }) {
+  const [failed, setFailed] = useState(false)
+  const host = url ? hostOf(url) : null
+
+  if (host && !failed) {
+    return (
+      <img
+        className={styles.sourceFavicon}
+        src={`https://icons.duckduckgo.com/ip3/${host}.ico`}
+        alt=""
+        loading="lazy"
+        onError={() => setFailed(true)}
+      />
+    )
   }
+
+  return <span className={`material-symbols-outlined ${styles.sourceIcon}`}>{SOURCE_ICON[type] ?? "description"}</span>
+}
+
+function SourceStatus({ status, error }: { status: string; error?: string | null }) {
+  // Erfolgreicher Import: kein Symbol. Nur Fehler (und der laufende Vorgang) werden angezeigt.
+  if (status === "ready") return null
   if (status === "failed") {
-    return <span className={`material-symbols-outlined ${styles.statusFailed}`}>error</span>
+    return (
+      <span
+        className={`material-symbols-outlined ${styles.statusFailed}`}
+        title={error || "Verarbeitung fehlgeschlagen"}
+      >
+        error
+      </span>
+    )
   }
   return <span className={`material-symbols-outlined ${styles.statusProcessing}`}>progress_activity</span>
 }

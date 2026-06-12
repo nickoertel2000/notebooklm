@@ -32,6 +32,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
       title: sources.title,
       status: sources.status,
       error: sources.error,
+      sourceUrl: sources.sourceUrl,
       createdAt: sources.createdAt
     })
     .from(sources)

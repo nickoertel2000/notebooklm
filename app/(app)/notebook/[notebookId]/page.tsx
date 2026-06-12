@@ -24,6 +24,7 @@ export default async function NotebookPage({ params }: { params: Promise<{ noteb
         title: sources.title,
         status: sources.status,
         error: sources.error,
+        sourceUrl: sources.sourceUrl,
         createdAt: sources.createdAt
       })
       .from(sources)

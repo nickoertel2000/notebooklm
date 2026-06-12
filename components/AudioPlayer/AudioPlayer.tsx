@@ -22,15 +22,22 @@ type AudioPlayerProps = {
   title: string
   src: string
   onClose: () => void
+  // Meldet den echten Play/Pause-Status nach außen (z. B. fürs Listen-Icon).
+  onPlayingChange?: (playing: boolean) => void
 }
 
-export default function AudioPlayer({ title, src, onClose }: AudioPlayerProps) {
+export default function AudioPlayer({ title, src, onClose, onPlayingChange }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null)
   const [playing, setPlaying] = useState(false)
   const [current, setCurrent] = useState(0)
   const [duration, setDuration] = useState(0)
   const [rate, setRate] = useState(1.0)
   const [speedOpen, setSpeedOpen] = useState(false)
+
+  // Play/Pause-Status nach außen spiegeln.
+  useEffect(() => {
+    onPlayingChange?.(playing)
+  }, [playing, onPlayingChange])
 
   // Beim Wechsel der Quelle (anderes Audio gewählt) gewählte Geschwindigkeit
   // wieder anwenden und von vorne starten.

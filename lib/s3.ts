@@ -1,4 +1,5 @@
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
@@ -37,6 +38,21 @@ export async function putText(key: string, body: string) {
 
 export async function putBinary(key: string, body: Buffer, contentType: string) {
   await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: body, ContentType: contentType }))
+}
+
+// Stösst die ingest-Lambda erneut an, indem das vorhandene Objekt auf sich
+// selbst kopiert wird (feuert ein ObjectCreated:Copy-Event). MetadataDirective
+// REPLACE ist nötig, sonst lehnt S3 das Kopieren auf denselben Key ab.
+export async function retriggerIngest(key: string) {
+  await s3.send(
+    new CopyObjectCommand({
+      Bucket: BUCKET,
+      CopySource: `${BUCKET}/${key.split("/").map(encodeURIComponent).join("/")}`,
+      Key: key,
+      MetadataDirective: "REPLACE",
+      Metadata: { retriggeredat: new Date().toISOString() }
+    })
+  )
 }
 
 export async function deleteObject(key: string) {
