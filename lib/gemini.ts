@@ -1,5 +1,7 @@
 import { GoogleGenAI } from "@google/genai"
-import { SPEAKER_LABELS } from "@/lib/audio"
+// Relativer Import (nicht @/-Alias): lib/gemini wird auch in die ingest-Lambda
+// gebündelt, deren Backend-Typecheck den @/-Alias nicht kennt.
+import { SPEAKER_LABELS } from "./audio"
 
 // Lazy initialisiert, damit der bloße Import (z. B. beim Build) nicht fehlschlägt,
 // falls GEMINI_API_KEY noch nicht gesetzt ist.
