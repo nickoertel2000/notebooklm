@@ -1,22 +1,13 @@
-import { and, asc, desc, eq, inArray, lt } from "drizzle-orm"
+import { and, desc, eq, inArray, lt } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/db"
-import { audioOverviews, sourceChunks, sources } from "@/db/schema"
-import { getAnthropic, REPORT_MODEL } from "@/lib/anthropic"
-import { AudioLength, buildScriptSystemPrompt, getAudioFormat, parseScript } from "@/lib/audio"
-import { synthesizeSpeech } from "@/lib/gemini"
-import { audioKey, putBinary } from "@/lib/s3"
+import { audioOverviews, sources } from "@/db/schema"
+import { AudioLength, getAudioFormat } from "@/lib/audio"
+import { putText } from "@/lib/s3"
 import { getSessionUser } from "@/lib/auth/session"
 import { getNotebookForUser } from "@/lib/notebooks"
 
 export const runtime = "nodejs"
-export const maxDuration = 300
-
-// Obergrenze für den Quellen-Kontext (~150k Zeichen ≈ ~45k Tokens).
-const MAX_CONTEXT_CHARS = 150_000
-
-// Token-Budget für das Skript je nach Länge (klein genug für einen TTS-Call).
-const SCRIPT_MAX_TOKENS: Record<AudioLength, number> = { kurz: 1500, standard: 4000 }
 
 // Audio-Übersichten, die länger als das hier in 'processing' hängen, gelten als
 // abgebrochen und werden beim Auflisten auf 'failed' gesetzt — sonst pollt das
@@ -68,8 +59,9 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   return NextResponse.json({ audios: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })) })
 }
 
-// Audio-Übersicht erstellen: Zeile als 'processing' anlegen, Skript via Claude
-// generieren, mit Gemini TTS vertonen, WAV nach S3, Zeile auf 'ready' setzen.
+// Audio-Übersicht erstellen: 'processing'-Zeile anlegen und einen Job nach S3
+// schreiben. Die lange Generierung (Claude-Skript + Gemini-TTS) übernimmt der
+// ingest-Worker; das Frontend pollt. So umgehen wir das 30s-Timeout des SSR.
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
   const auth = await authorize(notebookId)
@@ -86,120 +78,57 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     ? body.sourceIds.filter((id: unknown) => typeof id === "string")
     : null
 
-  // Alle Chunks der (ausgewählten) fertigen Quellen, geordnet nach Quelle und Position.
-  const rows = await db
-    .select({
-      sourceId: sourceChunks.sourceId,
-      sourceTitle: sources.title,
-      idx: sourceChunks.idx,
-      content: sourceChunks.content
-    })
-    .from(sourceChunks)
-    .innerJoin(sources, eq(sourceChunks.sourceId, sources.id))
+  // Sicherstellen, dass es überhaupt fertige Quellen gibt (schnelle Prüfung).
+  const ready = await db
+    .select({ id: sources.id })
+    .from(sources)
     .where(
       and(
-        eq(sourceChunks.notebookId, notebookId),
+        eq(sources.notebookId, notebookId),
         eq(sources.status, "ready"),
-        selectedIds && selectedIds.length > 0 ? inArray(sourceChunks.sourceId, selectedIds) : undefined
+        selectedIds && selectedIds.length > 0 ? inArray(sources.id, selectedIds) : undefined
       )
     )
-    .orderBy(asc(sources.title), asc(sourceChunks.idx))
 
-  if (rows.length === 0) {
+  if (ready.length === 0) {
     return NextResponse.json({ error: "Keine fertigen Quellen ausgewählt" }, { status: 400 })
   }
 
-  const sourceCount = new Set(rows.map((r) => r.sourceId)).size
+  const sourceCount = ready.length
 
   const [created] = await db
     .insert(audioOverviews)
     .values({ notebookId, format: format.id, title: format.label, length, language, focus, sourceCount, status: "processing" })
     .returning({ id: audioOverviews.id, createdAt: audioOverviews.createdAt })
 
-  // Kontext nach Quelle gruppiert aufbauen, bis das Zeichenbudget erreicht ist.
-  let context = ""
-  let currentSource = ""
-  for (const row of rows) {
-    if (row.sourceTitle !== currentSource) {
-      currentSource = row.sourceTitle
-      context += `\n\n=== Quelle: ${row.sourceTitle} ===\n`
-    }
-    context += row.content + "\n"
-    if (context.length >= MAX_CONTEXT_CHARS) break
-  }
+  // Job-Datei nach S3 schreiben → triggert den ingest-Worker.
+  const jobKey = `notebooks/${notebookId}/jobs/audio/${created.id}.json`
+  await putText(
+    jobKey,
+    JSON.stringify({
+      kind: "audio",
+      audioId: created.id,
+      notebookId,
+      formatId: format.id,
+      length,
+      language,
+      focus,
+      sourceIds: selectedIds
+    })
+  )
 
-  const focusLine = focus ? `\n\nLege den Fokus auf Folgendes: ${focus}` : ""
-  const userContent = `Hier sind die Quellen des Notebooks:\n${context.trim()}\n\n---\n\nAufgabe: ${format.instruction}${focusLine}`
-
-  // Antwort gestreamt (NDJSON): Sofort ein Status-Byte + alle 5s ein Keepalive-
-  // 'ping', damit weder der Time-to-first-byte- noch ein Idle-Timeout des
-  // Amplify-SSR-Runtime (30s) greift. Die Gemini-TTS-Synthese ist ein langer,
-  // stiller Call — ohne die Pings würde die Verbindung in dieser Zeit abbrechen.
-  const encoder = new TextEncoder()
-  const readable = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const send = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"))
-      send({ type: "status", phase: "script" })
-      const keepalive = setInterval(() => {
-        try {
-          send({ type: "ping" })
-        } catch {
-          // Controller bereits geschlossen — ignorieren.
-        }
-      }, 5000)
-
-      try {
-        // 1) Skript via Claude.
-        const message = await getAnthropic().messages.create({
-          model: REPORT_MODEL,
-          max_tokens: SCRIPT_MAX_TOKENS[length],
-          system: buildScriptSystemPrompt(format, length, language),
-          messages: [{ role: "user", content: userContent }]
-        })
-
-        const rawScript = message.content
-          .map((b) => (b.type === "text" ? b.text : ""))
-          .join("")
-          .trim()
-
-        const { title, script } = parseScript(rawScript, format.label)
-        if (!script) throw new Error("Leeres Skript erzeugt")
-
-        // 2) Vertonen via Gemini TTS und nach S3 laden.
-        send({ type: "status", phase: "tts" })
-        const { wav, durationSeconds } = await synthesizeSpeech(script, format.speakers)
-        const key = audioKey(notebookId, created.id)
-        await putBinary(key, wav, "audio/wav")
-
-        await db
-          .update(audioOverviews)
-          .set({ title, s3Key: key, durationSeconds, status: "ready" })
-          .where(eq(audioOverviews.id, created.id))
-
-        send({
-          type: "done",
-          audio: {
-            id: created.id,
-            format: format.id,
-            title,
-            durationSeconds,
-            sourceCount,
-            status: "ready",
-            createdAt: created.createdAt.toISOString()
-          }
-        })
-      } catch (err) {
-        console.error("Audio-Erstellung fehlgeschlagen:", err)
-        await db.update(audioOverviews).set({ status: "failed", error: String(err) }).where(eq(audioOverviews.id, created.id))
-        send({ type: "error", id: created.id, error: String(err) })
-      } finally {
-        clearInterval(keepalive)
-        controller.close()
+  return NextResponse.json(
+    {
+      audio: {
+        id: created.id,
+        format: format.id,
+        title: format.label,
+        durationSeconds: null,
+        sourceCount,
+        status: "processing",
+        createdAt: created.createdAt.toISOString()
       }
-    }
-  })
-
-  return new Response(readable, {
-    headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store" }
-  })
+    },
+    { status: 202 }
+  )
 }

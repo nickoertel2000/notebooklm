@@ -11,6 +11,8 @@ export const storage = defineStorage({
     onUpload: ingest
   },
   access: (allow) => ({
-    "notebooks/*": [allow.resource(ingest).to(["read"])]
+    // Worker liest Quellen/Job-Dateien, schreibt erzeugte Audios und räumt
+    // abgearbeitete Job-Dateien wieder weg.
+    "notebooks/*": [allow.resource(ingest).to(["read", "write", "delete"])]
   })
 })

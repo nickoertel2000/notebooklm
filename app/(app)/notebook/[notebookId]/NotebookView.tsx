@@ -397,29 +397,11 @@ export default function NotebookView({ notebookId, title, initialSources, initia
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, sourceIds: selectedReadyIds })
       })
-      if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).error || "Bericht fehlgeschlagen")
-
-      // Gestreamte NDJSON-Antwort lesen (umgeht das 30s-Timeout des SSR-Runtime).
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ""
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split("\n")
-        buffer = lines.pop() ?? ""
-        for (const line of lines) {
-          if (!line.trim()) continue
-          const evt = JSON.parse(line)
-          if (evt.type === "done") {
-            setReports((prev) => prev.map((r) => (r.id === tempId ? evt.report : r)))
-          } else if (evt.type === "error") {
-            // Echte ID übernehmen, damit das Polling die Karte nicht dupliziert.
-            setReports((prev) => prev.map((r) => (r.id === tempId ? { ...r, id: evt.id ?? r.id, status: "failed" } : r)))
-          }
-        }
-      }
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Bericht fehlgeschlagen")
+      // 202: Bericht ist 'processing'; der ingest-Worker generiert, das Polling
+      // (siehe useEffect) holt den fertigen Stand.
+      const { report } = await res.json()
+      setReports((prev) => prev.map((r) => (r.id === tempId ? report : r)))
     } catch {
       setReports((prev) => prev.map((r) => (r.id === tempId ? { ...r, status: "failed" } : r)))
     }
@@ -461,31 +443,11 @@ export default function NotebookView({ notebookId, title, initialSources, initia
           sourceIds: selectedReadyIds
         })
       })
-      if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).error || "Audio fehlgeschlagen")
-
-      // Gestreamte NDJSON-Antwort lesen: 'status'/'ping' ignorieren, am Ende
-      // 'done' (fertiges Audio) bzw. 'error'. Hält die Verbindung über das
-      // 30s-Timeout des SSR-Runtime hinaus offen.
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ""
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split("\n")
-        buffer = lines.pop() ?? ""
-        for (const line of lines) {
-          if (!line.trim()) continue
-          const evt = JSON.parse(line)
-          if (evt.type === "done") {
-            setAudios((prev) => prev.map((a) => (a.id === tempId ? evt.audio : a)))
-          } else if (evt.type === "error") {
-            // Echte ID übernehmen, damit das Polling die Karte nicht dupliziert.
-            setAudios((prev) => prev.map((a) => (a.id === tempId ? { ...a, id: evt.id ?? a.id, status: "failed" } : a)))
-          }
-        }
-      }
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Audio fehlgeschlagen")
+      // 202: Audio ist 'processing'; der ingest-Worker generiert, das Polling
+      // (siehe useEffect) holt den fertigen Stand.
+      const { audio } = await res.json()
+      setAudios((prev) => prev.map((a) => (a.id === tempId ? audio : a)))
     } catch {
       setAudios((prev) => prev.map((a) => (a.id === tempId ? { ...a, status: "failed" } : a)))
     }

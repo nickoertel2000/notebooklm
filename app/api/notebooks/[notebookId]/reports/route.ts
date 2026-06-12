@@ -1,21 +1,17 @@
-import { and, asc, desc, eq, inArray, lt } from "drizzle-orm"
+import { and, desc, eq, inArray, lt } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/db"
-import { reports, sourceChunks, sources } from "@/db/schema"
-import { buildReportSystemPrompt, deriveReportTitle, getReportType } from "@/lib/reports"
-import { getAnthropic, REPORT_MODEL } from "@/lib/anthropic"
+import { reports, sources } from "@/db/schema"
+import { getReportType } from "@/lib/reports"
 import { getSessionUser } from "@/lib/auth/session"
 import { getNotebookForUser } from "@/lib/notebooks"
+import { putText } from "@/lib/s3"
 
 export const runtime = "nodejs"
-export const maxDuration = 120
-
-// Obergrenze für den Quellen-Kontext (~150k Zeichen ≈ ~45k Tokens).
-const MAX_CONTEXT_CHARS = 150_000
 
 // Berichte, die länger als das hier in 'processing' hängen, gelten als
-// abgebrochen (z. B. Verbindung beim Generieren verloren) und werden beim
-// Auflisten auf 'failed' gesetzt — sonst pollt das Studio-Panel endlos.
+// abgebrochen und werden beim Auflisten auf 'failed' gesetzt — sonst pollt das
+// Studio-Panel endlos.
 const STALE_PROCESSING_MS = 5 * 60 * 1000
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
@@ -62,8 +58,9 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   return NextResponse.json({ reports: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })) })
 }
 
-// Bericht erstellen: Zeile als 'processing' anlegen, synchron generieren,
-// persistieren und das fertige Element zurückgeben.
+// Bericht erstellen: 'processing'-Zeile anlegen und einen Job nach S3 schreiben.
+// Die eigentliche (lange) Generierung übernimmt der ingest-Worker; das Frontend
+// pollt den Status. So umgehen wir das 30s-Timeout des SSR-Runtime.
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
   const auth = await authorize(notebookId)
@@ -89,116 +86,55 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
   const selectedIds: string[] | null = Array.isArray(sourceIds) ? sourceIds.filter((id) => typeof id === "string") : null
 
-  // Alle Chunks der (ausgewählten) fertigen Quellen, geordnet nach Quelle und Position.
-  const rows = await db
-    .select({
-      sourceId: sourceChunks.sourceId,
-      sourceTitle: sources.title,
-      idx: sourceChunks.idx,
-      content: sourceChunks.content
-    })
-    .from(sourceChunks)
-    .innerJoin(sources, eq(sourceChunks.sourceId, sources.id))
+  // Sicherstellen, dass es überhaupt fertige Quellen gibt (schnelle Prüfung).
+  const ready = await db
+    .select({ id: sources.id })
+    .from(sources)
     .where(
       and(
-        eq(sourceChunks.notebookId, notebookId),
+        eq(sources.notebookId, notebookId),
         eq(sources.status, "ready"),
-        selectedIds && selectedIds.length > 0 ? inArray(sourceChunks.sourceId, selectedIds) : undefined
+        selectedIds && selectedIds.length > 0 ? inArray(sources.id, selectedIds) : undefined
       )
     )
-    .orderBy(asc(sources.title), asc(sourceChunks.idx))
 
-  if (rows.length === 0) {
+  if (ready.length === 0) {
     return NextResponse.json({ error: "Keine fertigen Quellen ausgewählt" }, { status: 400 })
   }
 
-  const sourceCount = new Set(rows.map((r) => r.sourceId)).size
+  const sourceCount = ready.length
 
-  // Bericht zunächst als 'processing' persistieren.
   const [created] = await db
     .insert(reports)
     .values({ notebookId, type: reportTypeId, title: reportLabel, sourceCount, status: "processing" })
     .returning({ id: reports.id, createdAt: reports.createdAt })
 
-  // Kontext nach Quelle gruppiert aufbauen, bis das Zeichenbudget erreicht ist.
-  let context = ""
-  let currentSource = ""
-  for (const row of rows) {
-    if (row.sourceTitle !== currentSource) {
-      currentSource = row.sourceTitle
-      context += `\n\n=== Quelle: ${row.sourceTitle} ===\n`
-    }
-    context += row.content + "\n"
-    if (context.length >= MAX_CONTEXT_CHARS) break
-  }
+  // Job-Datei nach S3 schreiben → triggert den ingest-Worker.
+  const jobKey = `notebooks/${notebookId}/jobs/report/${created.id}.json`
+  await putText(
+    jobKey,
+    JSON.stringify({
+      kind: "report",
+      reportId: created.id,
+      notebookId,
+      instruction,
+      reportLabel,
+      language: typeof language === "string" ? language : undefined,
+      sourceIds: selectedIds
+    })
+  )
 
-  const userContent = `Hier sind die Quellen des Notebooks:\n${context.trim()}\n\n---\n\nAufgabe: ${instruction}`
-
-  // Antwort gestreamt (NDJSON): Der erste Byte geht sofort raus, dadurch greift
-  // das 30-Sekunden-Timeout des Amplify-SSR-Runtime (Time-to-first-byte) nicht.
-  // Die Synthese läuft anschließend beliebig lange weiter. Am Ende wird der
-  // fertige Bericht persistiert und als 'done'-Event geschickt.
-  const stream = getAnthropic().messages.stream({
-    model: REPORT_MODEL,
-    max_tokens: 8000,
-    system: buildReportSystemPrompt(typeof language === "string" ? language : undefined),
-    messages: [{ role: "user", content: userContent }]
-  })
-
-  const encoder = new TextEncoder()
-  const readable = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const send = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"))
-      // Sofort ein Status-Byte + Keepalive, falls das Modell bei großem Kontext
-      // (viele Quellen) erst spät das erste Token liefert — sonst könnte der
-      // 30s-Time-to-first-byte-Timeout vor dem ersten Delta zuschlagen.
-      send({ type: "status" })
-      const keepalive = setInterval(() => {
-        try {
-          send({ type: "ping" })
-        } catch {
-          // Controller bereits geschlossen — ignorieren.
-        }
-      }, 5000)
-      let fullText = ""
-
-      try {
-        for await (const event of stream) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            fullText += event.delta.text
-            send({ type: "text", text: event.delta.text })
-          }
-        }
-        await stream.finalMessage()
-
-        const content = fullText.trim()
-        const title = deriveReportTitle(content, reportLabel)
-        await db.update(reports).set({ title, content, status: "ready" }).where(eq(reports.id, created.id))
-
-        send({
-          type: "done",
-          report: {
-            id: created.id,
-            type: reportTypeId,
-            title,
-            content,
-            sourceCount,
-            status: "ready",
-            createdAt: created.createdAt.toISOString()
-          }
-        })
-      } catch (err) {
-        console.error("Bericht-Erstellung fehlgeschlagen:", err)
-        await db.update(reports).set({ status: "failed", error: String(err) }).where(eq(reports.id, created.id))
-        send({ type: "error", id: created.id, error: String(err) })
-      } finally {
-        clearInterval(keepalive)
-        controller.close()
+  return NextResponse.json(
+    {
+      report: {
+        id: created.id,
+        type: reportTypeId,
+        title: reportLabel,
+        sourceCount,
+        status: "processing",
+        createdAt: created.createdAt.toISOString()
       }
-    }
-  })
-
-  return new Response(readable, {
-    headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store" }
-  })
+    },
+    { status: 202 }
+  )
 }
