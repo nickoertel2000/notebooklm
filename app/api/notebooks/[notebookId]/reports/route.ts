@@ -103,51 +103,73 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     .values({ notebookId, type: reportTypeId, title: reportLabel, sourceCount, status: "processing" })
     .returning({ id: reports.id, createdAt: reports.createdAt })
 
-  try {
-    // Kontext nach Quelle gruppiert aufbauen, bis das Zeichenbudget erreicht ist.
-    let context = ""
-    let currentSource = ""
-    for (const row of rows) {
-      if (row.sourceTitle !== currentSource) {
-        currentSource = row.sourceTitle
-        context += `\n\n=== Quelle: ${row.sourceTitle} ===\n`
-      }
-      context += row.content + "\n"
-      if (context.length >= MAX_CONTEXT_CHARS) break
+  // Kontext nach Quelle gruppiert aufbauen, bis das Zeichenbudget erreicht ist.
+  let context = ""
+  let currentSource = ""
+  for (const row of rows) {
+    if (row.sourceTitle !== currentSource) {
+      currentSource = row.sourceTitle
+      context += `\n\n=== Quelle: ${row.sourceTitle} ===\n`
     }
-
-    const userContent = `Hier sind die Quellen des Notebooks:\n${context.trim()}\n\n---\n\nAufgabe: ${instruction}`
-
-    const message = await getAnthropic().messages.create({
-      model: REPORT_MODEL,
-      max_tokens: 8000,
-      system: buildReportSystemPrompt(typeof language === "string" ? language : undefined),
-      messages: [{ role: "user", content: userContent }]
-    })
-
-    const content = message.content
-      .map((b) => (b.type === "text" ? b.text : ""))
-      .join("")
-      .trim()
-
-    const title = deriveReportTitle(content, reportLabel)
-
-    await db.update(reports).set({ title, content, status: "ready" }).where(eq(reports.id, created.id))
-
-    return NextResponse.json({
-      report: {
-        id: created.id,
-        type: reportTypeId,
-        title,
-        content,
-        sourceCount,
-        status: "ready",
-        createdAt: created.createdAt.toISOString()
-      }
-    })
-  } catch (err) {
-    console.error("Bericht-Erstellung fehlgeschlagen:", err)
-    await db.update(reports).set({ status: "failed", error: String(err) }).where(eq(reports.id, created.id))
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    context += row.content + "\n"
+    if (context.length >= MAX_CONTEXT_CHARS) break
   }
+
+  const userContent = `Hier sind die Quellen des Notebooks:\n${context.trim()}\n\n---\n\nAufgabe: ${instruction}`
+
+  // Antwort gestreamt (NDJSON): Der erste Byte geht sofort raus, dadurch greift
+  // das 30-Sekunden-Timeout des Amplify-SSR-Runtime (Time-to-first-byte) nicht.
+  // Die Synthese läuft anschließend beliebig lange weiter. Am Ende wird der
+  // fertige Bericht persistiert und als 'done'-Event geschickt.
+  const stream = getAnthropic().messages.stream({
+    model: REPORT_MODEL,
+    max_tokens: 8000,
+    system: buildReportSystemPrompt(typeof language === "string" ? language : undefined),
+    messages: [{ role: "user", content: userContent }]
+  })
+
+  const encoder = new TextEncoder()
+  const readable = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"))
+      let fullText = ""
+
+      try {
+        for await (const event of stream) {
+          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            fullText += event.delta.text
+            send({ type: "text", text: event.delta.text })
+          }
+        }
+        await stream.finalMessage()
+
+        const content = fullText.trim()
+        const title = deriveReportTitle(content, reportLabel)
+        await db.update(reports).set({ title, content, status: "ready" }).where(eq(reports.id, created.id))
+
+        send({
+          type: "done",
+          report: {
+            id: created.id,
+            type: reportTypeId,
+            title,
+            content,
+            sourceCount,
+            status: "ready",
+            createdAt: created.createdAt.toISOString()
+          }
+        })
+      } catch (err) {
+        console.error("Bericht-Erstellung fehlgeschlagen:", err)
+        await db.update(reports).set({ status: "failed", error: String(err) }).where(eq(reports.id, created.id))
+        send({ type: "error", error: String(err) })
+      } finally {
+        controller.close()
+      }
+    }
+  })
+
+  return new Response(readable, {
+    headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store" }
+  })
 }

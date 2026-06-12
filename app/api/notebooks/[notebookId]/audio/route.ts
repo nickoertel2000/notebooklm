@@ -99,62 +99,90 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     .values({ notebookId, format: format.id, title: format.label, length, language, focus, sourceCount, status: "processing" })
     .returning({ id: audioOverviews.id, createdAt: audioOverviews.createdAt })
 
-  try {
-    // Kontext nach Quelle gruppiert aufbauen, bis das Zeichenbudget erreicht ist.
-    let context = ""
-    let currentSource = ""
-    for (const row of rows) {
-      if (row.sourceTitle !== currentSource) {
-        currentSource = row.sourceTitle
-        context += `\n\n=== Quelle: ${row.sourceTitle} ===\n`
-      }
-      context += row.content + "\n"
-      if (context.length >= MAX_CONTEXT_CHARS) break
+  // Kontext nach Quelle gruppiert aufbauen, bis das Zeichenbudget erreicht ist.
+  let context = ""
+  let currentSource = ""
+  for (const row of rows) {
+    if (row.sourceTitle !== currentSource) {
+      currentSource = row.sourceTitle
+      context += `\n\n=== Quelle: ${row.sourceTitle} ===\n`
     }
-
-    const focusLine = focus ? `\n\nLege den Fokus auf Folgendes: ${focus}` : ""
-    const userContent = `Hier sind die Quellen des Notebooks:\n${context.trim()}\n\n---\n\nAufgabe: ${format.instruction}${focusLine}`
-
-    // 1) Skript via Claude.
-    const message = await getAnthropic().messages.create({
-      model: REPORT_MODEL,
-      max_tokens: SCRIPT_MAX_TOKENS[length],
-      system: buildScriptSystemPrompt(format, length, language),
-      messages: [{ role: "user", content: userContent }]
-    })
-
-    const raw = message.content
-      .map((b) => (b.type === "text" ? b.text : ""))
-      .join("")
-      .trim()
-
-    const { title, script } = parseScript(raw, format.label)
-    if (!script) throw new Error("Leeres Skript erzeugt")
-
-    // 2) Vertonen via Gemini TTS und nach S3 laden.
-    const { wav, durationSeconds } = await synthesizeSpeech(script, format.speakers)
-    const key = audioKey(notebookId, created.id)
-    await putBinary(key, wav, "audio/wav")
-
-    await db
-      .update(audioOverviews)
-      .set({ title, s3Key: key, durationSeconds, status: "ready" })
-      .where(eq(audioOverviews.id, created.id))
-
-    return NextResponse.json({
-      audio: {
-        id: created.id,
-        format: format.id,
-        title,
-        durationSeconds,
-        sourceCount,
-        status: "ready",
-        createdAt: created.createdAt.toISOString()
-      }
-    })
-  } catch (err) {
-    console.error("Audio-Erstellung fehlgeschlagen:", err)
-    await db.update(audioOverviews).set({ status: "failed", error: String(err) }).where(eq(audioOverviews.id, created.id))
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    context += row.content + "\n"
+    if (context.length >= MAX_CONTEXT_CHARS) break
   }
+
+  const focusLine = focus ? `\n\nLege den Fokus auf Folgendes: ${focus}` : ""
+  const userContent = `Hier sind die Quellen des Notebooks:\n${context.trim()}\n\n---\n\nAufgabe: ${format.instruction}${focusLine}`
+
+  // Antwort gestreamt (NDJSON): Sofort ein Status-Byte + alle 5s ein Keepalive-
+  // 'ping', damit weder der Time-to-first-byte- noch ein Idle-Timeout des
+  // Amplify-SSR-Runtime (30s) greift. Die Gemini-TTS-Synthese ist ein langer,
+  // stiller Call — ohne die Pings würde die Verbindung in dieser Zeit abbrechen.
+  const encoder = new TextEncoder()
+  const readable = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"))
+      send({ type: "status", phase: "script" })
+      const keepalive = setInterval(() => {
+        try {
+          send({ type: "ping" })
+        } catch {
+          // Controller bereits geschlossen — ignorieren.
+        }
+      }, 5000)
+
+      try {
+        // 1) Skript via Claude.
+        const message = await getAnthropic().messages.create({
+          model: REPORT_MODEL,
+          max_tokens: SCRIPT_MAX_TOKENS[length],
+          system: buildScriptSystemPrompt(format, length, language),
+          messages: [{ role: "user", content: userContent }]
+        })
+
+        const rawScript = message.content
+          .map((b) => (b.type === "text" ? b.text : ""))
+          .join("")
+          .trim()
+
+        const { title, script } = parseScript(rawScript, format.label)
+        if (!script) throw new Error("Leeres Skript erzeugt")
+
+        // 2) Vertonen via Gemini TTS und nach S3 laden.
+        send({ type: "status", phase: "tts" })
+        const { wav, durationSeconds } = await synthesizeSpeech(script, format.speakers)
+        const key = audioKey(notebookId, created.id)
+        await putBinary(key, wav, "audio/wav")
+
+        await db
+          .update(audioOverviews)
+          .set({ title, s3Key: key, durationSeconds, status: "ready" })
+          .where(eq(audioOverviews.id, created.id))
+
+        send({
+          type: "done",
+          audio: {
+            id: created.id,
+            format: format.id,
+            title,
+            durationSeconds,
+            sourceCount,
+            status: "ready",
+            createdAt: created.createdAt.toISOString()
+          }
+        })
+      } catch (err) {
+        console.error("Audio-Erstellung fehlgeschlagen:", err)
+        await db.update(audioOverviews).set({ status: "failed", error: String(err) }).where(eq(audioOverviews.id, created.id))
+        send({ type: "error", error: String(err) })
+      } finally {
+        clearInterval(keepalive)
+        controller.close()
+      }
+    }
+  })
+
+  return new Response(readable, {
+    headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store" }
+  })
 }

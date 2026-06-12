@@ -397,9 +397,28 @@ export default function NotebookView({ notebookId, title, initialSources, initia
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, sourceIds: selectedReadyIds })
       })
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Bericht fehlgeschlagen")
-      const { report } = await res.json()
-      setReports((prev) => prev.map((r) => (r.id === tempId ? report : r)))
+      if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).error || "Bericht fehlgeschlagen")
+
+      // Gestreamte NDJSON-Antwort lesen (umgeht das 30s-Timeout des SSR-Runtime).
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ""
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split("\n")
+        buffer = lines.pop() ?? ""
+        for (const line of lines) {
+          if (!line.trim()) continue
+          const evt = JSON.parse(line)
+          if (evt.type === "done") {
+            setReports((prev) => prev.map((r) => (r.id === tempId ? evt.report : r)))
+          } else if (evt.type === "error") {
+            setReports((prev) => prev.map((r) => (r.id === tempId ? { ...r, status: "failed" } : r)))
+          }
+        }
+      }
     } catch {
       setReports((prev) => prev.map((r) => (r.id === tempId ? { ...r, status: "failed" } : r)))
     }
@@ -441,9 +460,30 @@ export default function NotebookView({ notebookId, title, initialSources, initia
           sourceIds: selectedReadyIds
         })
       })
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Audio fehlgeschlagen")
-      const { audio } = await res.json()
-      setAudios((prev) => prev.map((a) => (a.id === tempId ? audio : a)))
+      if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).error || "Audio fehlgeschlagen")
+
+      // Gestreamte NDJSON-Antwort lesen: 'status'/'ping' ignorieren, am Ende
+      // 'done' (fertiges Audio) bzw. 'error'. Hält die Verbindung über das
+      // 30s-Timeout des SSR-Runtime hinaus offen.
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ""
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split("\n")
+        buffer = lines.pop() ?? ""
+        for (const line of lines) {
+          if (!line.trim()) continue
+          const evt = JSON.parse(line)
+          if (evt.type === "done") {
+            setAudios((prev) => prev.map((a) => (a.id === tempId ? evt.audio : a)))
+          } else if (evt.type === "error") {
+            setAudios((prev) => prev.map((a) => (a.id === tempId ? { ...a, status: "failed" } : a)))
+          }
+        }
+      }
     } catch {
       setAudios((prev) => prev.map((a) => (a.id === tempId ? { ...a, status: "failed" } : a)))
     }
