@@ -2,7 +2,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/db"
 import { reports, sourceChunks, sources } from "@/db/schema"
-import { deriveReportTitle, getReportType, REPORT_SYSTEM_PROMPT } from "@/lib/reports"
+import { buildReportSystemPrompt, deriveReportTitle, getReportType } from "@/lib/reports"
 import { getAnthropic, REPORT_MODEL } from "@/lib/anthropic"
 import { getSessionUser } from "@/lib/auth/session"
 import { getNotebookForUser } from "@/lib/notebooks"
@@ -52,9 +52,23 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const auth = await authorize(notebookId)
   if (auth.error) return auth.error
 
-  const { type, sourceIds } = await req.json()
+  const { type, sourceIds, instruction: customInstruction, title: customTitle, language } = await req.json()
+
+  // Entweder ein bekannter Typ ODER eine freie Anweisung (Eigener Bericht /
+  // KI-Formatvorschlag).
   const reportType = getReportType(type)
-  if (!reportType) return NextResponse.json({ error: "Unbekannter Bericht-Typ" }, { status: 400 })
+  const freeInstruction = typeof customInstruction === "string" ? customInstruction.trim() : ""
+  if (!reportType && !freeInstruction) {
+    return NextResponse.json({ error: "Unbekannter Bericht-Typ" }, { status: 400 })
+  }
+
+  const instruction = reportType ? reportType.instruction : freeInstruction
+  const reportTypeId = reportType ? reportType.id : "custom"
+  const reportLabel = reportType
+    ? reportType.label
+    : typeof customTitle === "string" && customTitle.trim()
+      ? customTitle.trim()
+      : "Eigener Bericht"
 
   const selectedIds: string[] | null = Array.isArray(sourceIds) ? sourceIds.filter((id) => typeof id === "string") : null
 
@@ -86,7 +100,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   // Bericht zunächst als 'processing' persistieren.
   const [created] = await db
     .insert(reports)
-    .values({ notebookId, type: reportType.id, title: reportType.label, sourceCount, status: "processing" })
+    .values({ notebookId, type: reportTypeId, title: reportLabel, sourceCount, status: "processing" })
     .returning({ id: reports.id, createdAt: reports.createdAt })
 
   try {
@@ -102,12 +116,12 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       if (context.length >= MAX_CONTEXT_CHARS) break
     }
 
-    const userContent = `Hier sind die Quellen des Notebooks:\n${context.trim()}\n\n---\n\nAufgabe: ${reportType.instruction}`
+    const userContent = `Hier sind die Quellen des Notebooks:\n${context.trim()}\n\n---\n\nAufgabe: ${instruction}`
 
     const message = await getAnthropic().messages.create({
       model: REPORT_MODEL,
       max_tokens: 8000,
-      system: REPORT_SYSTEM_PROMPT,
+      system: buildReportSystemPrompt(typeof language === "string" ? language : undefined),
       messages: [{ role: "user", content: userContent }]
     })
 
@@ -116,14 +130,14 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       .join("")
       .trim()
 
-    const title = deriveReportTitle(content, reportType.label)
+    const title = deriveReportTitle(content, reportLabel)
 
     await db.update(reports).set({ title, content, status: "ready" }).where(eq(reports.id, created.id))
 
     return NextResponse.json({
       report: {
         id: created.id,
-        type: reportType.id,
+        type: reportTypeId,
         title,
         content,
         sourceCount,

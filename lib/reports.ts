@@ -4,9 +4,11 @@
 export type ReportType = {
   id: string
   label: string
-  // Kurzbezeichnung für die Meta-Zeile im Studio (z. B. "Briefing Doc").
+  // Kurzbezeichnung für die Meta-Zeile im Studio.
   metaLabel: string
   icon: string
+  // Kurzbeschreibung für die Karte im Bericht-Popup.
+  description: string
   // Beschreibt dem Modell, welche Art von Dokument es erzeugen soll.
   instruction: string
 }
@@ -14,35 +16,30 @@ export type ReportType = {
 export const REPORT_TYPES: ReportType[] = [
   {
     id: "briefing",
-    label: "Briefing-Dokument",
-    metaLabel: "Briefing Doc",
+    label: "Überblick",
+    metaLabel: "Überblick",
     icon: "description",
+    description: "Übersicht über Ihre Quellen mit wichtigen Informationen und Zitaten",
     instruction:
-      "Erstelle ein prägnantes Briefing-Dokument. Beginne mit einer kurzen Zusammenfassung (2–3 Sätze), gefolgt von den wichtigsten Themen als Abschnitte mit Überschriften und den zentralen Erkenntnissen je Thema als Stichpunkte. Schließe mit den wichtigsten Schlussfolgerungen ab."
+      "Erstelle einen prägnanten Überblick über die Quellen. Beginne mit einer kurzen Zusammenfassung (2–3 Sätze), gefolgt von den wichtigsten Themen als Abschnitte mit Überschriften und den zentralen Erkenntnissen je Thema als Stichpunkte. Schließe mit den wichtigsten Schlussfolgerungen ab."
   },
   {
     id: "study-guide",
-    label: "Studienleitfaden",
-    metaLabel: "Study Guide",
+    label: "Lernplan",
+    metaLabel: "Lernplan",
     icon: "school",
+    description: "Quiz mit kurzen Antworten, vorgeschlagene Essay-Fragestellungen und Glossar",
     instruction:
-      "Erstelle einen Studienleitfaden. Gliedere ihn in: (1) eine Liste der zentralen Begriffe mit kurzen Definitionen, (2) 8–12 Verständnisfragen mit kurzen Musterantworten, (3) einige weiterführende Diskussionsfragen ohne Antwort."
+      "Erstelle einen Lernplan. Gliedere ihn in: (1) ein Glossar der zentralen Begriffe mit kurzen Definitionen, (2) ein Quiz aus 8–12 Verständnisfragen mit kurzen Musterantworten, (3) einige weiterführende Essay-/Diskussionsfragen ohne Antwort."
   },
   {
-    id: "faq",
-    label: "FAQ",
-    metaLabel: "FAQ",
-    icon: "quiz",
+    id: "blogpost",
+    label: "Blogpost",
+    metaLabel: "Blogpost",
+    icon: "article",
+    description: "Aufschlussreiche Kernpunkte, zusammengefasst in einem leicht verständlichen Artikel",
     instruction:
-      "Erstelle eine FAQ. Formuliere die 8–12 wichtigsten Fragen, die sich aus den Quellen beantworten lassen, und beantworte jede knapp und konkret. Nutze pro Eintrag eine fettgedruckte Frage gefolgt von der Antwort."
-  },
-  {
-    id: "timeline",
-    label: "Zeitleiste",
-    metaLabel: "Zeitleiste",
-    icon: "timeline",
-    instruction:
-      "Erstelle eine chronologische Zeitleiste der in den Quellen genannten Ereignisse. Liste sie geordnet als Stichpunkte mit Datum/Zeitangabe und kurzer Beschreibung. Falls keine zeitlichen Angaben vorkommen, sage das offen."
+      "Erstelle einen gut lesbaren Blogartikel zum Thema der Quellen. Beginne mit einer fesselnden Einleitung, gliedere den Hauptteil mit aussagekräftigen Zwischenüberschriften, erkläre Fachbegriffe verständlich und schließe mit einem prägnanten Fazit. Schreibe in einem klaren, ansprechenden, aber sachlich korrekten Ton."
   }
 ]
 
@@ -50,12 +47,18 @@ export function getReportType(id: string): ReportType | undefined {
   return REPORT_TYPES.find((t) => t.id === id)
 }
 
-export const REPORT_SYSTEM_PROMPT = `Du bist der KI-Assistent eines Notebooks und erstellst strukturierte Berichte ausschließlich auf Basis der bereitgestellten Quellen-Dokumente.
+// System-Prompt für die Bericht-Erstellung. `language` ist der Anzeigename der
+// gewählten Sprache (z. B. „Deutsch (Standard)", „English"); ohne Angabe Deutsch.
+export function buildReportSystemPrompt(language?: string): string {
+  const isGerman = !language || /deutsch|german|standard/i.test(language)
+  const langLine = isGerman ? "- Antworte auf Deutsch." : `- Schreibe den gesamten Bericht auf: ${language}.`
+  return `Du bist der KI-Assistent eines Notebooks und erstellst strukturierte Berichte ausschließlich auf Basis der bereitgestellten Quellen-Dokumente.
 - Stütze dich ausschließlich auf die Quellen, erfinde nichts und füge kein Allgemeinwissen hinzu.
 - Wenn die Quellen für den gewünschten Bericht zu wenig hergeben, sage das offen.
-- Antworte auf Deutsch.
-- Beginne IMMER mit einer einzelnen H1-Überschrift (# ) als Titel des Dokuments im Format "<Bezeichnung des Berichts>: <kurzes, konkretes Thema>" (z. B. "# Briefing-Dokument: …"). Danach folgt der Inhalt.
+${langLine}
+- Beginne IMMER mit einer einzelnen H1-Überschrift (# ) als Titel des Dokuments im Format "<Bezeichnung des Berichts>: <kurzes, konkretes Thema>". Danach folgt der Inhalt.
 - Formatiere die Ausgabe als einfaches Markdown: Überschriften mit #/##/###, Aufzählungen mit "- ", Nummerierungen mit "1.", Hervorhebungen mit **fett**. Verwende keine Tabellen und keinen Code.`
+}
 
 // Leitet aus dem erzeugten Markdown einen kurzen Titel ab: erste H1/H2,
 // sonst die erste nichtleere Zeile. Fällt auf das Label zurück.

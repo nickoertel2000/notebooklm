@@ -6,6 +6,7 @@ import { redirect } from "next/navigation"
 import { db } from "@/db"
 import { notebooks } from "@/db/schema"
 import { getSessionUser } from "@/lib/auth/session"
+import { pickNotebookEmoji } from "@/lib/notebookIcons"
 import { getNotebookForUser } from "@/lib/notebooks"
 import { deleteByPrefix } from "@/lib/s3"
 
@@ -45,12 +46,17 @@ export async function renameNotebook(notebookId: string, title: string) {
   if (!user) redirect("/login")
 
   const trimmed = title.trim()
-  if (!trimmed) return
+  if (!trimmed) return null
+
+  // Zum neuen Titel automatisch ein passendes Icon aus der Bibliothek wählen.
+  const emoji = await pickNotebookEmoji(trimmed)
 
   await db
     .update(notebooks)
-    .set({ title: trimmed, updatedAt: new Date() })
+    .set({ title: trimmed, ...(emoji ? { emoji } : {}), updatedAt: new Date() })
     .where(and(eq(notebooks.id, notebookId), eq(notebooks.userId, user.id)))
 
   revalidatePath("/")
+  // Das gewählte Emoji zurückgeben, damit der Header es sofort anzeigen kann.
+  return emoji
 }

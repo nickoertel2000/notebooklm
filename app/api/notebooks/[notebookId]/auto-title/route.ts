@@ -5,6 +5,7 @@ import { db } from "@/db"
 import { messages, notebooks, sourceChunks, sources } from "@/db/schema"
 import { CHAT_MODEL, getAnthropic } from "@/lib/anthropic"
 import { getSessionUser } from "@/lib/auth/session"
+import { pickNotebookEmoji } from "@/lib/notebookIcons"
 import { getNotebookForUser } from "@/lib/notebooks"
 import { DEFAULT_NOTEBOOK_TITLE } from "@/lib/notebookTitle"
 
@@ -17,9 +18,10 @@ const SYSTEM_PROMPT = `Du erzeugst einen kurzen, prägnanten Titel für ein Note
 - 2 bis 6 Wörter, auf Deutsch.
 - Beschreibe das übergreifende Thema, nicht eine einzelne Quelle.`
 
-// Generiert – nur wenn das Notebook noch den Standardtitel trägt – aus den
-// vorhandenen Quellen und Chat-Nachrichten automatisch einen Titel.
-export async function POST(_req: NextRequest, { params }: RouteContext) {
+// Generiert aus den vorhandenen Quellen und Chat-Nachrichten automatisch einen
+// Titel. Standardmäßig nur, wenn das Notebook noch den Standardtitel trägt –
+// mit `{ force: true }` auch für bereits benannte Notebooks (manueller Neu-Vorschlag).
+export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
 
   const user = await getSessionUser()
@@ -27,8 +29,11 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
   const notebook = await getNotebookForUser(notebookId, user.id)
   if (!notebook) return NextResponse.json({ error: "Notebook nicht gefunden" }, { status: 404 })
 
-  // Bereits benannt → nichts tun.
-  if (notebook.title !== DEFAULT_NOTEBOOK_TITLE) {
+  const body = await req.json().catch(() => ({}))
+  const force = body?.force === true
+
+  // Bereits benannt und kein erzwungener Neu-Vorschlag → nichts tun.
+  if (!force && notebook.title !== DEFAULT_NOTEBOOK_TITLE) {
     return NextResponse.json({ title: notebook.title, generated: false })
   }
 
@@ -86,14 +91,24 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
 
     if (!title) return NextResponse.json({ title: notebook.title, generated: false })
 
-    // Nur überschreiben, wenn der Titel zwischenzeitlich nicht manuell geändert wurde.
+    // Passendes Icon aus der Bibliothek zum erzeugten Titel wählen.
+    const emoji = await pickNotebookEmoji(title)
+
+    // Ohne force nur überschreiben, wenn der Titel zwischenzeitlich nicht manuell
+    // geändert wurde; mit force (manueller Neu-Vorschlag) immer.
     await db
       .update(notebooks)
-      .set({ title, updatedAt: new Date() })
-      .where(and(eq(notebooks.id, notebookId), eq(notebooks.userId, user.id), eq(notebooks.title, DEFAULT_NOTEBOOK_TITLE)))
+      .set({ title, ...(emoji ? { emoji } : {}), updatedAt: new Date() })
+      .where(
+        and(
+          eq(notebooks.id, notebookId),
+          eq(notebooks.userId, user.id),
+          ...(force ? [] : [eq(notebooks.title, DEFAULT_NOTEBOOK_TITLE)])
+        )
+      )
 
     revalidatePath("/")
-    return NextResponse.json({ title, generated: true })
+    return NextResponse.json({ title, emoji, generated: true })
   } catch (err) {
     console.error("Auto-Titel fehlgeschlagen:", err)
     return NextResponse.json({ title: notebook.title, generated: false })

@@ -64,6 +64,65 @@
   outline: none;
 }
 
+// Edit-Feld mit KI-Button am Ende.
+.titleEditWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+// Platz für den KI-Button rechts schaffen.
+.titleInputAi {
+  padding-right: 38px;
+}
+
+.titleAiBtn {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #8ab4f8;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+
+  .material-symbols-outlined {
+    font-size: 19px;
+  }
+
+  &:hover {
+    background-color: rgba(138, 180, 248, 0.16);
+  }
+
+  &:disabled {
+    cursor: default;
+  }
+}
+
+.titleAiSpin {
+  animation: title-ai-spin 0.9s linear infinite;
+}
+
+@keyframes title-ai-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Notebook-Icon hinter dem Titel.
+.titleEmoji {
+  flex-shrink: 0;
+  font-size: 22px;
+  line-height: 1;
+}
+
 /* ---------- Rechts: Aktionen -------------------------------------------- */
 .right {
   display: flex;

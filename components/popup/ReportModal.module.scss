@@ -186,3 +186,198 @@ $accent: #a8c7fa;
     background: $surface-hover;
   }
 }
+
+/* ---------- Bericht-Auswahl (Format + Vorschläge) ----------------------- */
+$report-accent: #4259ff;
+
+.modalWide {
+  max-width: 920px;
+}
+
+.headerIcon {
+  font-size: 22px;
+  color: $text-primary;
+}
+
+.back {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: $text-secondary;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  span {
+    font-size: 20px;
+  }
+
+  &:hover {
+    background: $surface-hover;
+    color: $text-primary;
+  }
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: $text-secondary;
+
+  &:not(:first-child) {
+    margin-top: 22px;
+  }
+}
+
+.wand {
+  font-size: 18px !important;
+  color: $report-accent;
+}
+
+.formatGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.formatCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 128px;
+  padding: 14px;
+  border: 1px solid $border-subtle;
+  border-radius: 12px;
+  background: $surface;
+  color: $text-primary;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover {
+    background: $surface-hover;
+    border-color: rgba(66, 89, 255, 0.5);
+  }
+}
+
+.formatCardTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.formatCardDesc {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: $text-secondary;
+  // Beschreibung auf wenige Zeilen begrenzen.
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.formatCardSkeleton {
+  cursor: default;
+  background: $surface;
+  opacity: 0.5;
+  animation: report-pulse 1.2s ease-in-out infinite;
+
+  &:hover {
+    background: $surface;
+    border-color: $border-subtle;
+  }
+}
+
+@keyframes report-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.suggestHint {
+  margin: 0;
+  font-size: 13px;
+  color: $text-secondary;
+}
+
+/* ---------- Eigener Bericht --------------------------------------------- */
+.fieldLabel {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: $text-primary;
+
+  &:not(:first-child) {
+    margin-top: 22px;
+  }
+}
+
+.langSelect {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid $border-subtle;
+  border-radius: 10px;
+  background: $surface;
+  color: $text-primary;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.customArea {
+  width: 100%;
+  padding: 14px;
+  border: 1px solid $border-subtle;
+  border-radius: 10px;
+  background: $surface;
+  color: $text-primary;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+
+  &::placeholder {
+    color: $text-secondary;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $report-accent;
+  }
+}
+
+.customFooter {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.generateBtn {
+  height: 42px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 21px;
+  background: $report-accent;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  &:not(:disabled):hover {
+    filter: brightness(1.08);
+  }
+}

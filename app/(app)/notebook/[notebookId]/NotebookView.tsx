@@ -3,11 +3,11 @@
 import AudioPlayer from "@/components/AudioPlayer/AudioPlayer"
 import AddSourceModal, { AddSourcePayload } from "@/components/popup/AddSourceModal"
 import AudioModal, { AudioOptions } from "@/components/popup/AudioModal"
-import ReportModal from "@/components/popup/ReportModal"
+import ReportModal, { ReportGeneratePayload } from "@/components/popup/ReportModal"
 import ReportViewModal from "@/components/popup/ReportViewModal"
 import { getAudioFormat } from "@/lib/audio"
 import { DEFAULT_NOTEBOOK_TITLE } from "@/lib/notebookTitle"
-import { getReportType, ReportType } from "@/lib/reports"
+import { getReportType } from "@/lib/reports"
 import { useDictation } from "@/lib/useDictation"
 import "material-symbols/outlined.css"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -223,8 +223,8 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       if (data.title) {
         setNotebookTitle(data.title)
         if (data.generated && data.title !== DEFAULT_NOTEBOOK_TITLE) {
-          // Header (separate Komponente) live aktualisieren.
-          window.dispatchEvent(new CustomEvent("notebook-title", { detail: data.title }))
+          // Header (separate Komponente) live aktualisieren – Titel inkl. Icon.
+          window.dispatchEvent(new CustomEvent("notebook-title", { detail: { title: data.title, emoji: data.emoji } }))
         }
       }
     } catch {
@@ -378,13 +378,14 @@ export default function NotebookView({ notebookId, title, initialSources, initia
 
   // Bericht im Hintergrund erstellen: Popup schließen, Ladekarte zeigen, dann
   // den fertigen Bericht eintragen (oder als fehlgeschlagen markieren).
-  async function handleCreateReport(type: ReportType) {
+  async function handleCreateReport(payload: ReportGeneratePayload) {
     setReportOpen(false)
     const tempId = `temp-${crypto.randomUUID()}`
+    const placeholderTitle = payload.type ? (getReportType(payload.type)?.label ?? "Bericht") : (payload.title ?? "Eigener Bericht")
     const placeholder: ReportItem = {
       id: tempId,
-      type: type.id,
-      title: type.label,
+      type: payload.type ?? "custom",
+      title: placeholderTitle,
       sourceCount: selectedReadyIds.length,
       status: "processing",
       createdAt: new Date().toISOString()
@@ -395,7 +396,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       const res = await fetch(`/api/notebooks/${notebookId}/reports`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: type.id, sourceIds: selectedReadyIds })
+        body: JSON.stringify({ ...payload, sourceIds: selectedReadyIds })
       })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Bericht fehlgeschlagen")
       const { report } = await res.json()
@@ -1000,7 +1001,14 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       <p className={styles.disclaimer}>NotebookLM kann Fehler machen, überprüfe daher die Antworten.</p>
 
       {modalOpen && <AddSourceModal onClose={() => setModalOpen(false)} onAdd={handleAddSource} />}
-      {reportOpen && <ReportModal onClose={() => setReportOpen(false)} onSelect={handleCreateReport} />}
+      {reportOpen && (
+        <ReportModal
+          notebookId={notebookId}
+          sourceIds={selectedReadyIds}
+          onClose={() => setReportOpen(false)}
+          onGenerate={handleCreateReport}
+        />
+      )}
       {audioOpen && <AudioModal onClose={() => setAudioOpen(false)} onCreate={handleCreateAudio} />}
       {viewReport && <ReportViewModal notebookId={notebookId} reportId={viewReport.id} title={viewReport.title} onClose={() => setViewReport(null)} />}
     </div>

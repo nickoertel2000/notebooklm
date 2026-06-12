@@ -69,7 +69,7 @@ export default async function NotebookPage({ params }: { params: Promise<{ noteb
 
   return (
     <>
-      <NotebookHeader notebookId={notebookId} title={notebook.title} user={user} />
+      <NotebookHeader notebookId={notebookId} title={notebook.title} emoji={notebook.emoji} user={user} />
       <NotebookView
         notebookId={notebookId}
         title={notebook.title}

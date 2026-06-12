@@ -6,27 +6,35 @@ import styles from "./notebookHeader.module.scss"
 type NotebookTitleProps = {
   notebookId: string
   initialTitle: string
-  onRename: (notebookId: string, title: string) => Promise<void>
+  initialEmoji: string
+  onRename: (notebookId: string, title: string) => Promise<string | null | void>
 }
 
-export default function NotebookTitle({ notebookId, initialTitle, onRename }: NotebookTitleProps) {
+export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, onRename }: NotebookTitleProps) {
   const [title, setTitle] = useState(initialTitle)
+  const [emoji, setEmoji] = useState(initialEmoji)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(initialTitle)
+  const [generating, setGenerating] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setTitle(initialTitle)
   }, [initialTitle])
 
-  // Auto-Titel aus dem NotebookView (anderer Teilbaum) live übernehmen.
+  useEffect(() => {
+    setEmoji(initialEmoji)
+  }, [initialEmoji])
+
+  // Auto-Titel (inkl. Icon) aus dem NotebookView (anderer Teilbaum) live übernehmen.
   useEffect(() => {
     const handler = (e: Event) => {
-      const next = (e as CustomEvent<string>).detail
-      if (typeof next === "string" && next) {
-        setTitle(next)
-        setDraft(next)
+      const detail = (e as CustomEvent<{ title?: string; emoji?: string }>).detail
+      if (detail?.title) {
+        setTitle(detail.title)
+        setDraft(detail.title)
       }
+      if (detail?.emoji) setEmoji(detail.emoji)
     }
     window.addEventListener("notebook-title", handler)
     return () => window.removeEventListener("notebook-title", handler)
@@ -54,7 +62,9 @@ export default function NotebookTitle({ notebookId, initialTitle, onRename }: No
     }
     setTitle(next)
     try {
-      await onRename(notebookId, next)
+      // Der Rename wählt serverseitig ein passendes Icon und gibt es zurück.
+      const nextEmoji = await onRename(notebookId, next)
+      if (typeof nextEmoji === "string" && nextEmoji) setEmoji(nextEmoji)
     } catch {
       // Bei Fehler auf den alten Titel zurücksetzen.
       setTitle(title)
@@ -67,31 +77,84 @@ export default function NotebookTitle({ notebookId, initialTitle, onRename }: No
     setEditing(false)
   }
 
+  // Wie bei neuen Notebooks: Claude erzeugt aus dem Inhalt einen Titel (inkl.
+  // Icon) – hier per force auch, wenn das Notebook bereits einen Namen hat.
+  async function generateTitle() {
+    if (generating) return
+    setGenerating(true)
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/auto-title`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force: true })
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.generated && data.title) {
+        setTitle(data.title)
+        setDraft(data.title)
+        if (data.emoji) setEmoji(data.emoji)
+        setEditing(false)
+      }
+    } catch {
+      // KI-Vorschlag ist optional – Fehler still ignorieren.
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   if (editing) {
     return (
-      <input
-        ref={inputRef}
-        className={styles.titleInput}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault()
-            commit()
-          } else if (e.key === "Escape") {
-            e.preventDefault()
-            cancel()
-          }
-        }}
-        aria-label="Notebook-Name"
-      />
+      <>
+        <span className={styles.titleEditWrap}>
+          <input
+            ref={inputRef}
+            className={`${styles.titleInput} ${styles.titleInputAi}`}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault()
+                commit()
+              } else if (e.key === "Escape") {
+                e.preventDefault()
+                cancel()
+              }
+            }}
+            aria-label="Notebook-Name"
+          />
+          {/* mousedown-preventDefault: hält den Fokus, damit onBlur (commit) den
+              Button nicht entfernt, bevor der Klick ausgelöst wird. */}
+          <button
+            type="button"
+            className={styles.titleAiBtn}
+            aria-label="Titel mit KI vorschlagen"
+            title="Titel mit KI vorschlagen"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={generateTitle}
+            disabled={generating}
+          >
+            <span className={`material-symbols-outlined ${generating ? styles.titleAiSpin : ""}`}>
+              {generating ? "progress_activity" : "auto_awesome"}
+            </span>
+          </button>
+        </span>
+        <span className={styles.titleEmoji} role="img" aria-label="Notebook-Icon">
+          {emoji}
+        </span>
+      </>
     )
   }
 
   return (
-    <button type="button" className={styles.titleButton} onClick={startEditing}>
-      {title}
-    </button>
+    <>
+      <button type="button" className={styles.titleButton} onClick={startEditing}>
+        {title}
+      </button>
+      <span className={styles.titleEmoji} role="img" aria-label="Notebook-Icon">
+        {emoji}
+      </span>
+    </>
   )
 }

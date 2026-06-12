@@ -9,17 +9,18 @@ import styles from "./notebookHeader.module.scss"
 type NotebookHeaderProps = {
   notebookId: string
   title: string
+  emoji: string
   user: { name?: string | null; email?: string | null; image?: string | null }
 }
 
-export default function NotebookHeader({ notebookId, title, user }: NotebookHeaderProps) {
+export default function NotebookHeader({ notebookId, title, emoji, user }: NotebookHeaderProps) {
   return (
     <header className={styles.header}>
       <div className={styles.left}>
         <Link href="/" className={styles.logo} aria-label="Zur Startseite">
           <Image src="/notebook-icon.svg" alt="" width={32} height={32} priority />
         </Link>
-        <NotebookTitle notebookId={notebookId} initialTitle={title} onRename={renameNotebook} />
+        <NotebookTitle notebookId={notebookId} initialTitle={title} initialEmoji={emoji} onRename={renameNotebook} />
       </div>
 
       <div className={styles.right}>
