@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import "material-symbols/outlined.css"
 import AddSourceModal, { AddSourcePayload } from "@/components/popup/AddSourceModal"
+import AudioPlayer from "@/components/AudioPlayer/AudioPlayer"
+import AudioModal, { AudioOptions } from "@/components/popup/AudioModal"
 import ReportModal from "@/components/popup/ReportModal"
 import ReportViewModal from "@/components/popup/ReportViewModal"
+import { getAudioFormat } from "@/lib/audio"
 import { getReportType, ReportType } from "@/lib/reports"
 import { useDictation } from "@/lib/useDictation"
 import styles from "../notebook.module.scss"
@@ -43,6 +46,16 @@ export type ReportItem = {
   createdAt: string
 }
 
+export type AudioItem = {
+  id: string
+  format: string
+  title: string
+  durationSeconds: number | null
+  sourceCount: number
+  status: string
+  createdAt: string
+}
+
 const SOURCE_ICON: Record<string, string> = { pdf: "picture_as_pdf", url: "link", text: "description" }
 
 const studioTools = [
@@ -57,16 +70,22 @@ type Props = {
   initialSources: SourceItem[]
   initialMessages: ChatMessage[]
   initialReports: ReportItem[]
+  initialAudios: AudioItem[]
 }
 
-export default function NotebookView({ notebookId, initialSources, initialMessages, initialReports }: Props) {
+export default function NotebookView({ notebookId, initialSources, initialMessages, initialReports, initialAudios }: Props) {
   const [sources, setSources] = useState<SourceItem[]>(initialSources)
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [reports, setReports] = useState<ReportItem[]>(initialReports)
+  const [audios, setAudios] = useState<AudioItem[]>(initialAudios)
   const [modalOpen, setModalOpen] = useState(initialSources.length === 0)
   const [reportOpen, setReportOpen] = useState(false)
+  const [audioOpen, setAudioOpen] = useState(false)
   const [viewReport, setViewReport] = useState<ReportItem | null>(null)
   const [menuReportId, setMenuReportId] = useState<string | null>(null)
+  const [menuAudioId, setMenuAudioId] = useState<string | null>(null)
+  // Aktuell abgespielte Audio-Übersicht inkl. presigned URL und Titel.
+  const [playingAudio, setPlayingAudio] = useState<{ id: string; url: string; title: string } | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(initialSources.map((s) => s.id)))
   const [input, setInput] = useState("")
   const [streaming, setStreaming] = useState(false)
@@ -136,6 +155,20 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
     return () => clearInterval(id)
   }, [reports, refreshReports])
 
+  const refreshAudios = useCallback(async () => {
+    const res = await fetch(`/api/notebooks/${notebookId}/audio`)
+    if (!res.ok) return
+    const data = await res.json()
+    setAudios((prev) => [...prev.filter((a) => a.id.startsWith("temp-")), ...data.audios])
+  }, [notebookId])
+
+  // Noch laufende Audio-Übersichten pollen (z. B. nach Reload während der Erstellung).
+  useEffect(() => {
+    if (!audios.some((a) => a.status === "processing" && !a.id.startsWith("temp-"))) return
+    const id = setInterval(refreshAudios, 4000)
+    return () => clearInterval(id)
+  }, [audios, refreshAudios])
+
   // ⋮-Menü bei Klick außerhalb schließen.
   useEffect(() => {
     if (!menuReportId) return
@@ -143,6 +176,13 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
     document.addEventListener("click", close)
     return () => document.removeEventListener("click", close)
   }, [menuReportId])
+
+  useEffect(() => {
+    if (!menuAudioId) return
+    const close = () => setMenuAudioId(null)
+    document.addEventListener("click", close)
+    return () => document.removeEventListener("click", close)
+  }, [menuAudioId])
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -234,6 +274,63 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
     if (!reportId.startsWith("temp-")) {
       await fetch(`/api/notebooks/${notebookId}/reports/${reportId}`, { method: "DELETE" })
     }
+  }
+
+  // Audio-Übersicht im Hintergrund erstellen: Modal schließen, Ladekarte zeigen,
+  // dann das fertige Audio eintragen (oder als fehlgeschlagen markieren).
+  async function handleCreateAudio(options: AudioOptions) {
+    setAudioOpen(false)
+    const tempId = `temp-${crypto.randomUUID()}`
+    const placeholder: AudioItem = {
+      id: tempId,
+      format: options.format.id,
+      title: options.format.label,
+      durationSeconds: null,
+      sourceCount: selectedReadyIds.length,
+      status: "processing",
+      createdAt: new Date().toISOString()
+    }
+    setAudios((prev) => [placeholder, ...prev])
+
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/audio`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          format: options.format.id,
+          length: options.length,
+          language: options.language,
+          focus: options.focus,
+          sourceIds: selectedReadyIds
+        })
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Audio fehlgeschlagen")
+      const { audio } = await res.json()
+      setAudios((prev) => prev.map((a) => (a.id === tempId ? audio : a)))
+    } catch {
+      setAudios((prev) => prev.map((a) => (a.id === tempId ? { ...a, status: "failed" } : a)))
+    }
+  }
+
+  async function handleDeleteAudio(audioId: string) {
+    setMenuAudioId(null)
+    setAudios((prev) => prev.filter((a) => a.id !== audioId))
+    if (playingAudio?.id === audioId) setPlayingAudio(null)
+    if (!audioId.startsWith("temp-")) {
+      await fetch(`/api/notebooks/${notebookId}/audio/${audioId}`, { method: "DELETE" })
+    }
+  }
+
+  // Beim Anklicken eines fertigen Audios die presigned URL laden und abspielen.
+  async function handlePlayAudio(audioId: string) {
+    if (playingAudio?.id === audioId) {
+      setPlayingAudio(null)
+      return
+    }
+    const res = await fetch(`/api/notebooks/${notebookId}/audio/${audioId}`)
+    if (!res.ok) return
+    const { audio } = await res.json()
+    if (audio.url) setPlayingAudio({ id: audioId, url: audio.url, title: audio.title })
   }
 
   async function sendMessage(text: string) {
@@ -483,14 +580,21 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
             <div className={styles.studioGrid}>
               {studioTools.map((tool) => {
                 const isReports = tool.label === "Berichte"
+                const isAudio = tool.label === "Audio-Übersicht"
+                const interactive = isReports || isAudio
+                const onClick = isReports
+                  ? () => setReportOpen(true)
+                  : isAudio
+                    ? () => setAudioOpen(true)
+                    : undefined
                 return (
                   <button
                     key={tool.label}
                     className={styles.studioCard}
                     style={{ "--tint": tool.tint } as React.CSSProperties}
-                    disabled={isReports ? readyCount === 0 : false}
-                    title={isReports && readyCount === 0 ? "Zuerst Quellen auswählen" : undefined}
-                    onClick={isReports ? () => setReportOpen(true) : undefined}
+                    disabled={interactive ? readyCount === 0 : false}
+                    title={interactive && readyCount === 0 ? "Zuerst Quellen auswählen" : undefined}
+                    onClick={onClick}
                   >
                     <span className={`material-symbols-outlined ${styles.studioCardIcon}`}>{tool.icon}</span>
                     <span className={styles.studioCardLabel}>{tool.label}</span>
@@ -498,6 +602,61 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
                 )
               })}
             </div>
+
+            {audios.length > 0 && (
+              <ul className={styles.reportList}>
+                {audios.map((a) => {
+                  const meta = getAudioFormat(a.format)
+                  const processing = a.status === "processing"
+                  const failed = a.status === "failed"
+                  const isPlaying = playingAudio?.id === a.id
+                  return (
+                    <li key={a.id} className={styles.audioEntry}>
+                      <div
+                        className={`${styles.reportItem} ${processing ? styles.reportItemBusy : ""}`}
+                        onClick={() => !processing && !failed && handlePlayAudio(a.id)}
+                      >
+                        <span
+                          className={`material-symbols-outlined ${styles.reportIcon} ${processing ? styles.reportIconBusy : ""}`}
+                        >
+                          {processing ? "sync" : failed ? "error" : isPlaying ? "pause_circle" : "play_circle"}
+                        </span>
+                        <div className={styles.reportText}>
+                          <p className={styles.reportTitle}>
+                            {processing ? "Audio wird erstellt…" : failed ? "Erstellung fehlgeschlagen" : a.title}
+                          </p>
+                          <p className={styles.reportMeta}>
+                            {processing
+                              ? `basierend auf ${a.sourceCount} ${a.sourceCount === 1 ? "Quelle" : "Quellen"}`
+                              : `${meta?.label ?? "Audio"} · ${a.sourceCount} ${a.sourceCount === 1 ? "Quelle" : "Quellen"}${a.durationSeconds ? ` · ${formatDuration(a.durationSeconds)}` : ""} · ${relativeTime(a.createdAt)}`}
+                          </p>
+                        </div>
+
+                        {!processing && (
+                          <div className={styles.reportMenuWrap} onClick={(e) => e.stopPropagation()}>
+                            <button
+                              className={styles.reportMenuBtn}
+                              aria-label="Optionen"
+                              onClick={() => setMenuAudioId((cur) => (cur === a.id ? null : a.id))}
+                            >
+                              <span className="material-symbols-outlined">more_vert</span>
+                            </button>
+                            {menuAudioId === a.id && (
+                              <div className={styles.reportMenu} role="menu">
+                                <button className={styles.reportMenuItem} onClick={() => handleDeleteAudio(a.id)}>
+                                  <span className="material-symbols-outlined">delete</span>
+                                  Löschen
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
 
             {reports.length > 0 && (
               <ul className={styles.reportList}>
@@ -550,6 +709,14 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
               </ul>
             )}
           </div>
+
+          {playingAudio && (
+            <AudioPlayer
+              title={playingAudio.title}
+              src={playingAudio.url}
+              onClose={() => setPlayingAudio(null)}
+            />
+          )}
         </section>
       </div>
 
@@ -557,6 +724,7 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
 
       {modalOpen && <AddSourceModal onClose={() => setModalOpen(false)} onAdd={handleAddSource} />}
       {reportOpen && <ReportModal onClose={() => setReportOpen(false)} onSelect={handleCreateReport} />}
+      {audioOpen && <AudioModal onClose={() => setAudioOpen(false)} onCreate={handleCreateAudio} />}
       {viewReport && (
         <ReportViewModal
           notebookId={notebookId}
@@ -583,6 +751,13 @@ function relativeTime(iso: string): string {
 
 function sourceTitleFor(sources: SourceItem[], sourceId: string) {
   return sources.find((s) => s.id === sourceId)?.title ?? "Quelle"
+}
+
+// "1:05 Min." – Dauer in mm:ss.
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}:${s.toString().padStart(2, "0")} Min.`
 }
 
 function SourceStatus({ status }: { status: string }) {

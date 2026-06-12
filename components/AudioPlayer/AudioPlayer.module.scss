@@ -1,0 +1,213 @@
+// Angedockte Player-Leiste am unteren Rand des Studio-Panels.
+.player {
+  flex-shrink: 0;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+}
+
+/* ---------- Kopfzeile: Titel + Schließen --------------------------------- */
+.top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Fortschritt + Zeit ------------------------------------------- */
+// Exakter Blauton aus dem Original-Player.
+$seek-blue: #4259ff;
+
+.seek {
+  --seek-pct: 0%;
+  width: 100%;
+  height: 16px; // hoch genug für den größeren Daumen
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+// WebKit: Track mit linker blauer Spur (Fortschritt) über Gradient.
+.seek::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, $seek-blue var(--seek-pct), var(--surface-hover) var(--seek-pct));
+}
+
+.seek::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -8px; // 16px-Daumen auf 4px-Track zentrieren
+  border-radius: 50%;
+  background: $seek-blue;
+  cursor: pointer;
+}
+
+// Firefox: native Fortschritts-Spur links vom Daumen.
+.seek::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-hover);
+}
+
+.seek::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: $seek-blue;
+}
+
+.seek::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: $seek-blue;
+  cursor: pointer;
+}
+
+.time {
+  margin: 6px 0 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ---------- Steuerung: Speed | Transport | Spacer ------------------------ */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.speedWrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.speedBtn {
+  padding: 4px 6px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: var(--surface);
+  }
+}
+
+.speedMenu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.speedItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px 7px 8px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  span {
+    font-size: 18px;
+    color: var(--text-muted);
+  }
+
+  &:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.speedItemActive {
+  color: var(--accent);
+
+  span {
+    color: var(--accent);
+  }
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.iconBtn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  span {
+    font-size: 24px;
+  }
+
+  &:hover {
+    background: var(--surface);
+  }
+}
+
+.playBtn {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #0b1320;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+
+  span {
+    font-size: 28px;
+  }
+
+  &:hover {
+    filter: brightness(1.05);
+  }
+}

@@ -2,7 +2,7 @@ import { asc, desc, eq } from "drizzle-orm"
 import { notFound, redirect } from "next/navigation"
 import NotebookHeader from "@/components/NotebookHeader/NotebookHeader"
 import { db } from "@/db"
-import { messages, reports, sources } from "@/db/schema"
+import { audioOverviews, messages, reports, sources } from "@/db/schema"
 import { getSessionUser } from "@/lib/auth/session"
 import { getNotebookForUser } from "@/lib/notebooks"
 import NotebookView from "./NotebookView"
@@ -16,7 +16,7 @@ export default async function NotebookPage({ params }: { params: Promise<{ noteb
   const notebook = await getNotebookForUser(notebookId, user.id)
   if (!notebook) notFound()
 
-  const [sourceRows, messageRows, reportRows] = await Promise.all([
+  const [sourceRows, messageRows, reportRows, audioRows] = await Promise.all([
     db
       .select({
         id: sources.id,
@@ -50,7 +50,20 @@ export default async function NotebookPage({ params }: { params: Promise<{ noteb
       })
       .from(reports)
       .where(eq(reports.notebookId, notebookId))
-      .orderBy(desc(reports.createdAt))
+      .orderBy(desc(reports.createdAt)),
+    db
+      .select({
+        id: audioOverviews.id,
+        format: audioOverviews.format,
+        title: audioOverviews.title,
+        durationSeconds: audioOverviews.durationSeconds,
+        sourceCount: audioOverviews.sourceCount,
+        status: audioOverviews.status,
+        createdAt: audioOverviews.createdAt
+      })
+      .from(audioOverviews)
+      .where(eq(audioOverviews.notebookId, notebookId))
+      .orderBy(desc(audioOverviews.createdAt))
   ])
 
   return (
@@ -62,6 +75,7 @@ export default async function NotebookPage({ params }: { params: Promise<{ noteb
         initialSources={sourceRows.map((s) => ({ ...s, createdAt: s.createdAt.toISOString() }))}
         initialMessages={messageRows}
         initialReports={reportRows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }))}
+        initialAudios={audioRows.map((a) => ({ ...a, createdAt: a.createdAt.toISOString() }))}
       />
     </>
   )

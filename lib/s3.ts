@@ -1,6 +1,7 @@
 import {
   DeleteObjectCommand,
   DeleteObjectsCommand,
+  GetObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client
@@ -18,6 +19,11 @@ export function presignUpload(key: string, contentType: string) {
   })
 }
 
+// Presigned GET-URL, z. B. damit der Audio-Player eine Datei direkt aus S3 streamt.
+export function presignDownload(key: string) {
+  return getSignedUrl(s3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: 3600 })
+}
+
 export async function putText(key: string, body: string) {
   await s3.send(
     new PutObjectCommand({
@@ -27,6 +33,10 @@ export async function putText(key: string, body: string) {
       ContentType: "text/plain; charset=utf-8"
     })
   )
+}
+
+export async function putBinary(key: string, body: Buffer, contentType: string) {
+  await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: body, ContentType: contentType }))
 }
 
 export async function deleteObject(key: string) {
@@ -57,4 +67,9 @@ export async function deleteByPrefix(prefix: string) {
 // Quelle eindeutig zuordnen kann.
 export function sourceKey(notebookId: string, sourceId: string, filename: string) {
   return `notebooks/${notebookId}/sources/${sourceId}/${filename}`
+}
+
+// Pfadschema für erzeugte Audio-Übersichten (WAV).
+export function audioKey(notebookId: string, audioId: string) {
+  return `notebooks/${notebookId}/audio/${audioId}.wav`
 }

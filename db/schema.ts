@@ -160,3 +160,30 @@ export const reports = pgTable("reports", {
   error: text("error"),
   createdAt: timestamp("created_at").defaultNow().notNull()
 })
+
+// ── Studio-Audio ──────────────────────────────────────────────────────────────
+// Audio-Übersichten (NotebookLM-Stil): Claude erzeugt ein sprechbares Skript aus
+// den Quellen, Gemini TTS vertont es. Die WAV-Datei liegt unter s3Key im Bucket.
+// Während der Erzeugung 'processing', danach 'ready' mit s3Key; bei Fehler 'failed'.
+
+export const audioOverviews = pgTable("audio_overviews", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  notebookId: uuid("notebook_id")
+    .notNull()
+    .references(() => notebooks.id, { onDelete: "cascade" }),
+  // Format aus lib/audio.ts: 'brief' | 'deep-dive' | 'critique' | 'debate'
+  format: text("format").notNull(),
+  title: text("title").notNull().default("Audio-Übersicht"),
+  // S3-Key der erzeugten WAV-Datei (null bis fertig)
+  s3Key: text("s3_key"),
+  durationSeconds: integer("duration_seconds"),
+  // 'kurz' | 'standard'
+  length: text("length").notNull().default("standard"),
+  language: text("language").notNull().default("de"),
+  focus: text("focus"),
+  sourceCount: integer("source_count").notNull().default(0),
+  // 'processing' | 'ready' | 'failed'
+  status: text("status").notNull().default("processing"),
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+})

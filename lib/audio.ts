@@ -1,0 +1,117 @@
+// Audio-Formate für die Studio-Funktion „Audio-Übersicht". Jedes Format ist im
+// Kern ein Skript-Prompt, der über alle (ausgewählten) Quellen läuft. Claude
+// erzeugt das sprechbare Skript, Gemini TTS vertont es (siehe lib/gemini.ts).
+
+export type AudioLength = "kurz" | "standard"
+
+export type AudioFormat = {
+  id: string
+  // Anzeigename im Modal (Screenshot-Layout).
+  label: string
+  // Beschreibung unter dem Titel der Format-Karte.
+  description: string
+  icon: string
+  // 1 = Einzelsprecher-Erzählung, 2 = Dialog zwischen zwei Moderatoren.
+  speakers: 1 | 2
+  // Beschreibt dem Modell, welche Art von Skript es erzeugen soll.
+  instruction: string
+}
+
+export const AUDIO_FORMATS: AudioFormat[] = [
+  {
+    id: "deep-dive",
+    label: "Detaillierte Analyse",
+    description:
+      "Eine lebhafte Unterhaltung zwischen zwei KI-Moderatoren, bei der die Themen in Ihren Quellen analysiert und in Zusammenhang gebracht werden.",
+    icon: "graphic_eq",
+    speakers: 2,
+    instruction:
+      "Erzeuge ein lebhaftes, tiefgehendes Gespräch zwischen zwei Moderatoren. Sie analysieren die wichtigsten Themen der Quellen, stellen einander Fragen, bringen Zusammenhänge auf den Punkt und erklären Fachbegriffe verständlich."
+  },
+  {
+    id: "brief",
+    label: "Zusammenfassung",
+    description: "Eine kurze Übersicht, mit der Sie die wichtigsten Informationen aus Ihren Quellen schnell erfassen können.",
+    icon: "summarize",
+    speakers: 1,
+    instruction:
+      "Erzeuge eine kompakte, gut hörbare Zusammenfassung der wichtigsten Informationen aus den Quellen. Eine erzählende Stimme bringt die Kernpunkte klar und in sinnvoller Reihenfolge auf den Punkt."
+  },
+  {
+    id: "critique",
+    label: "Kritische Bewertung",
+    description:
+      "Eine sachkundige Bewertung Ihrer Quellen mit konstruktivem Feedback, anhand dessen Sie Ihre Quellen verbessern können.",
+    icon: "rate_review",
+    speakers: 1,
+    instruction:
+      "Erzeuge eine sachkundige, kritische Bewertung der Quellen. Eine erzählende Stimme benennt Stärken und Schwächen, weist auf Lücken oder Widersprüche hin und gibt konstruktives, umsetzbares Feedback."
+  },
+  {
+    id: "debate",
+    label: "Diskussion",
+    description:
+      "Eine aufschlussreiche Diskussion zwischen zwei KI-Moderatoren, die Ihre Quellen aus verschiedenen Perspektiven beleuchtet.",
+    icon: "forum",
+    speakers: 2,
+    instruction:
+      "Erzeuge eine aufschlussreiche Diskussion zwischen zwei Moderatoren, die unterschiedliche Standpunkte einnehmen. Sie beleuchten die Quellen aus verschiedenen Perspektiven, wägen Argumente ab und bleiben dabei fair und sachlich."
+  }
+]
+
+export function getAudioFormat(id: string): AudioFormat | undefined {
+  return AUDIO_FORMATS.find((f) => f.id === id)
+}
+
+// Sprecher-Labels für den Dialog. Müssen exakt zu den Stimmen-Configs in
+// lib/gemini.ts passen.
+export const SPEAKER_LABELS = ["Sprecher 1", "Sprecher 2"] as const
+
+// Grobe Längen-Vorgaben (Wörter), klein genug für einen einzelnen TTS-Call.
+const LENGTH_HINT: Record<AudioLength, string> = {
+  kurz: "Halte es kurz: ca. 150–250 Wörter (etwa 1–2 Minuten gesprochen).",
+  standard: "Mittlere Länge: ca. 450–700 Wörter (etwa 3–5 Minuten gesprochen)."
+}
+
+// System-Prompt für die Skript-Erzeugung durch Claude. Erzeugt sprechbaren
+// Text ohne Markdown – bei 2 Sprechern als beschrifteten Dialog. `language` ist
+// der Anzeigename der gewählten Sprache (z. B. „Deutsch", „English").
+export function buildScriptSystemPrompt(format: AudioFormat, length: AudioLength, language: string): string {
+  const speakerRules =
+    format.speakers === 2
+      ? `- Schreibe einen Dialog. Jede Wortmeldung beginnt in einer eigenen Zeile mit „${SPEAKER_LABELS[0]}:" bzw. „${SPEAKER_LABELS[1]}:".
+- Die beiden wechseln sich natürlich ab; ${SPEAKER_LABELS[0]} beginnt.
+- Keine Regieanweisungen, keine Klammerzusätze, keine Beschreibungen von Geräuschen.`
+      : `- Schreibe einen durchgehenden, erzählenden Fließtext für eine einzelne Stimme.
+- Keine Sprecher-Labels, keine Dialogform.`
+
+  return `Du erstellst das Skript für eine vertonte Audio-Übersicht eines Notebooks, ausschließlich auf Basis der bereitgestellten Quellen.
+- Stütze dich ausschließlich auf die Quellen, erfinde nichts und füge kein Allgemeinwissen hinzu.
+- Wenn die Quellen zu wenig hergeben, sage das offen im Skript.
+- Schreibe das gesamte Skript (inkl. Titel) in folgender Sprache: ${language}. Verwende natürliche, gesprochene Sprache.
+- Die Sprecher-Labels „${SPEAKER_LABELS[0]}:"/„${SPEAKER_LABELS[1]}:" bleiben unabhängig von der Sprache exakt so stehen.
+- Die ALLERERSTE Zeile lautet exakt „TITEL: <kurzer, konkreter Titel>" – dieser Titel wird NICHT vorgelesen.
+- Danach folgt das eigentliche Skript.
+- Verwende KEIN Markdown: keine Überschriften, keine Aufzählungszeichen, keine Sternchen, keine Doppelpunkte für Gliederung. Nur natürlicher Sprechtext.
+${speakerRules}
+- ${LENGTH_HINT[length]}`
+}
+
+// Trennt die „TITEL:"-Zeile vom eigentlichen Sprechtext ab.
+export function parseScript(raw: string, fallbackTitle: string): { title: string; script: string } {
+  const lines = raw.split("\n")
+  let title = fallbackTitle
+  let startIdx = 0
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+    if (!line) continue
+    const m = /^TITEL:\s*(.+)$/i.exec(line)
+    if (m) {
+      title = m[1].trim().slice(0, 120)
+      startIdx = i + 1
+    }
+    break
+  }
+  const script = lines.slice(startIdx).join("\n").trim()
+  return { title, script }
+}

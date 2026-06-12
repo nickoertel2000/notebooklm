@@ -22,6 +22,13 @@
       "when": 1781185806068,
       "tag": "0002_whole_pandemic",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781250332135,
+      "tag": "0003_daily_tyger_tiger",
+      "breakpoints": true
     }
   ]
 }
