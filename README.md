@@ -10,7 +10,7 @@
 ![AWS](https://img.shields.io/badge/AWS-Amplify_·_S3_·_Lambda-FF9900?logo=amazonwebservices&logoColor=white)
 ![Claude](https://img.shields.io/badge/Anthropic-Claude-D97757?logo=anthropic&logoColor=white)
 
-Der NotebookLM Klon ist ein **KI-gestützter Recherche-Assistent**: Man lädt eigene Quellen hoch (PDF, Web-URLs oder Text), und die App macht daraus durchsuchbares Wissen. Darauf aufbauend lassen sich ein **RAG-Chat mit echten Quellen-Zitaten** führen, **Audio-Übersichten**, **Mindmaps** und strukturierte **Berichte** generieren — jeweils ausschließlich auf Basis der hochgeladenen Quellen.
+Der NotebookLM Klon ist ein **KI-gestützter Recherche-Assistent**: Man lädt eigene Quellen hoch (PDF, Web-URLs oder Text), und die App macht daraus durchsuchbares Wissen. Darauf aufbauend lassen sich ein **RAG-Chat mit echten Quellen-Zitaten** führen, **Audio-Übersichten** und strukturierte **Berichte** generieren — jeweils ausschließlich auf Basis der hochgeladenen Quellen.
 
 ---
 
@@ -56,11 +56,6 @@ Claude recherchiert über das **`web_search`-Server-Tool** automatisch passende 
 Claude generiert ein sprechbares Skript, das **Google Gemini 2.5 TTS** mit **Multi-Speaker-Stimmen** in eine WAV-Datei vertont (→ S3). Vier Formate: **Deep Dive** (Dialog), **Brief** (Zusammenfassung), **Critique** (kritische Bewertung) und **Debate** (Streitgespräch), in zwei Längen.
 → [`lib/audio.ts`](lib/audio.ts) · [`app/api/notebooks/[notebookId]/audio/route.ts`](app/api/notebooks/%5BnotebookId%5D/audio/route.ts)
 
-### 🧠 Studio – Mindmaps
-
-Claude erzeugt eine Markdown-Gliederung aus den Quellen, die mit **markmap** als interaktive, zoombare Mindmap gerendert wird.
-→ [`lib/mindmap.ts`](lib/mindmap.ts)
-
 ### 📄 Studio – Berichte
 
 Vordefinierte Formate (**Überblick / Briefing**, **Lernplan** mit Glossar & Quiz, **Blogpost**) sowie frei formulierbare Reports. Dazu **KI-Formatvorschläge**: Claude analysiert die Quellen und schlägt vier passende Berichtsformate vor.
@@ -79,15 +74,15 @@ Browser-basiertes Diktat für Chat-Eingaben ([`lib/useDictation.ts`](lib/useDict
 
 ## 🛠️ Tech-Stack
 
-| Bereich             | Technologie                                                                                                  |
-| ------------------- | ------------------------------------------------------------------------------------------------------------ |
-| **Frontend**        | Next.js 15.5 (App Router), React 19.2, TypeScript 5, SCSS-Module, Material Symbols                           |
-| **Backend**         | Next.js API Routes & Server Actions (Node.js Runtime)                                                        |
-| **Datenbank**       | PostgreSQL (Supabase) + Drizzle ORM 0.45 + `pgvector` (1024-Dim, HNSW-Index)                                 |
-| **KI**              | Anthropic Claude (Chat, Berichte, Audio-Skript, Mindmaps) · Google Gemini 2.5 (TTS) · Voyage AI (Embeddings) |
-| **Infrastruktur**   | AWS Amplify Gen 2, S3 (Quellen & Audio), Lambda (`ingest`)                                                   |
-| **Quellen-Parsing** | `unpdf` (PDF), `@mozilla/readability` + `linkedom` (Web), `markmap-lib`/`markmap-view` (Mindmaps)            |
-| **Tooling**         | pnpm, ESLint 9, Prettier, 1Password CLI (Secret-Management)                                                  |
+| Bereich             | Technologie                                                                                        |
+| ------------------- | -------------------------------------------------------------------------------------------------- |
+| **Frontend**        | Next.js 15.5 (App Router), React 19.2, TypeScript 5, SCSS-Module, Material Symbols                 |
+| **Backend**         | Next.js API Routes & Server Actions (Node.js Runtime)                                              |
+| **Datenbank**       | PostgreSQL (Supabase) + Drizzle ORM 0.45 + `pgvector` (1024-Dim, HNSW-Index)                       |
+| **KI**              | Anthropic Claude (Chat, Berichte, Audio-Skript) · Google Gemini 2.5 (TTS) · Voyage AI (Embeddings) |
+| **Infrastruktur**   | AWS Amplify Gen 2, S3 (Quellen & Audio), Lambda (`ingest`)                                         |
+| **Quellen-Parsing** | `unpdf` (PDF), `@mozilla/readability` + `linkedom` (Web)                                           |
+| **Tooling**         | pnpm, ESLint 9, Prettier, 1Password CLI (Secret-Management)                                        |
 
 ---
 
@@ -133,16 +128,16 @@ styles/      Globale SCSS-Basis (styles/globals.scss)
 
 Der spannendere Teil für eine Code-Beurteilung — nicht nur _was_, sondern _warum_:
 
-| Entscheidung                                                    | Begründung                                                                                                                                                                                                                                                                                                                                                                |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Claude Sonnet 4.6 als Standardmodell**                        | Sonnet liefert über alle Funktionen — Chat, Berichte, Audio-Skript, Mindmaps — die nötige Antwortqualität und Synthese über viele Quellen. Die Modelle sind über `CLAUDE_MODEL` / `CLAUDE_REPORT_MODEL` austauschbar — kein Modell ist hart verdrahtet, sodass sich bei Bedarf pro Use-Case ein günstigeres Modell setzen lässt. ([`lib/anthropic.ts`](lib/anthropic.ts)) |
-| **`pgvector` statt dedizierter Vektor-DB**                      | Eine einzige Datenquelle statt zwei Systeme synchron zu halten — weniger Infrastruktur, ACID-Garantien und Vektorsuche im selben Postgres. HNSW-Index liefert schnelle Cosine-Similarity.                                                                                                                                                                                 |
-| **Native Claude Citations** statt selbstgebautem Zitat-Matching | Belege sind präzise und verifizierbar, inklusive Sprung zur exakten Originalstelle (Seite, `charStart`/`charEnd`) — statt fragiler String-Heuristiken im Nachhinein.                                                                                                                                                                                                      |
-| **AWS Lambda für die Ingestion**                                | PDF-Extraktion und Embedding sind rechenintensiv und stoßweise. Per S3-Event entkoppelt belasten sie nicht den Web-Server und skalieren unabhängig.                                                                                                                                                                                                                       |
-| **Drizzle ORM**                                                 | Typsicheres Schema direkt in TypeScript, nah an SQL, mit nachvollziehbaren Migrationen statt Magie.                                                                                                                                                                                                                                                                       |
-| **Better Auth statt Amplify Auth**                              | Volle Kontrolle über das Auth-Modell und nahtlose Integration in dieselbe Drizzle/Postgres-Schicht.                                                                                                                                                                                                                                                                       |
-| **SCSS-Module statt Tailwind / CSS-in-JS**                      | Scoped Styles pro Komponente, klare Konventionen (`components/<Name>/<Name>.module.scss`), kein Utility-Class-Rauschen im Markup.                                                                                                                                                                                                                                         |
-| **1Password CLI für Secrets**                                   | Secrets werden per `op inject` zur Laufzeit aus dem Vault geladen — kein Klartext-`.env` im Repo oder auf der Platte.                                                                                                                                                                                                                                                     |
+| Entscheidung                                                    | Begründung                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Claude Sonnet 4.6 als Standardmodell**                        | Sonnet liefert über alle Funktionen — Chat, Berichte, Audio-Skript — die nötige Antwortqualität und Synthese über viele Quellen. Die Modelle sind über `CLAUDE_MODEL` / `CLAUDE_REPORT_MODEL` austauschbar — kein Modell ist hart verdrahtet, sodass sich bei Bedarf pro Use-Case ein günstigeres Modell setzen lässt. ([`lib/anthropic.ts`](lib/anthropic.ts)) |
+| **`pgvector` statt dedizierter Vektor-DB**                      | Eine einzige Datenquelle statt zwei Systeme synchron zu halten — weniger Infrastruktur, ACID-Garantien und Vektorsuche im selben Postgres. HNSW-Index liefert schnelle Cosine-Similarity.                                                                                                                                                                       |
+| **Native Claude Citations** statt selbstgebautem Zitat-Matching | Belege sind präzise und verifizierbar, inklusive Sprung zur exakten Originalstelle (Seite, `charStart`/`charEnd`) — statt fragiler String-Heuristiken im Nachhinein.                                                                                                                                                                                            |
+| **AWS Lambda für die Ingestion**                                | PDF-Extraktion und Embedding sind rechenintensiv und stoßweise. Per S3-Event entkoppelt belasten sie nicht den Web-Server und skalieren unabhängig.                                                                                                                                                                                                             |
+| **Drizzle ORM**                                                 | Typsicheres Schema direkt in TypeScript, nah an SQL, mit nachvollziehbaren Migrationen statt Magie.                                                                                                                                                                                                                                                             |
+| **Better Auth statt Amplify Auth**                              | Volle Kontrolle über das Auth-Modell und nahtlose Integration in dieselbe Drizzle/Postgres-Schicht.                                                                                                                                                                                                                                                             |
+| **SCSS-Module statt Tailwind / CSS-in-JS**                      | Scoped Styles pro Komponente, klare Konventionen (`components/<Name>/<Name>.module.scss`), kein Utility-Class-Rauschen im Markup.                                                                                                                                                                                                                               |
+| **1Password CLI für Secrets**                                   | Secrets werden per `op inject` zur Laufzeit aus dem Vault geladen — kein Klartext-`.env` im Repo oder auf der Platte.                                                                                                                                                                                                                                           |
 
 ---
 
@@ -158,9 +153,8 @@ Definiert in [`db/schema.ts`](db/schema.ts) (Drizzle ORM). Kerntabellen:
 | `messages`        | Chat-Verlauf inkl. Zitate (JSONB)                                               |
 | `reports`         | Generierte Berichte                                                             |
 | `audio_overviews` | Audio-Übersichten (Format, Dauer, S3-Key)                                       |
-| `mindmaps`        | Mindmaps (Markdown-Inhalt)                                                      |
 
-Dazu die Better-Auth-Tabellen (`user`, `session`, `account`, `verification`). Alle Inhalte hängen per **Cascade-Delete** am Notebook bzw. User: Wird ein User gelöscht, verschwinden Notebooks → Quellen → Chunks, Nachrichten, Berichte, Audios und Mindmaps automatisch.
+Dazu die Better-Auth-Tabellen (`user`, `session`, `account`, `verification`). Alle Inhalte hängen per **Cascade-Delete** am Notebook bzw. User: Wird ein User gelöscht, verschwinden Notebooks → Quellen → Chunks, Nachrichten, Berichte und Audios automatisch.
 
 ---
 

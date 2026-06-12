@@ -65,7 +65,6 @@ const SOURCE_ICON: Record<string, string> = { pdf: "picture_as_pdf", url: "link"
 
 const studioTools = [
   { label: "Audio-Übersicht", icon: "graphic_eq", tint: "#8ab4f8" },
-  { label: "Mindmap", icon: "account_tree", tint: "#81c995" },
   { label: "Berichte", icon: "summarize", tint: "#fdd663" }
 ]
 
@@ -645,13 +644,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
                             <div className={styles.searchResultText}>
                               <p className={styles.searchResultTitle}>{r.title}</p>
                               {r.description && <p className={styles.searchResultDesc}>{r.description}</p>}
-                              <a
-                                className={styles.searchResultUrl}
-                                href={r.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                              >
+                              <a className={styles.searchResultUrl} href={r.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
                                 {hostOf(r.url)}
                                 <span className="material-symbols-outlined">open_in_new</span>
                               </a>
@@ -690,55 +683,55 @@ export default function NotebookView({ notebookId, title, initialSources, initia
                   {sources.map((s) => {
                     const link = s.type === "url" ? s.sourceUrl : null
                     return (
-                    <li
-                      key={s.id}
-                      className={`${styles.sourceItem} ${activeSourceId === s.id ? styles.sourceItemActive : ""}`}
-                      title={link ?? undefined}
-                      onClick={() => {
-                        setActiveSourceId(s.id)
-                        if (link) window.open(link, "_blank", "noopener,noreferrer")
-                      }}
-                    >
-                      <SourceIcon type={s.type} url={link} />
-                      <span className={styles.sourceTitle}>{s.title}</span>
-                      <SourceStatus status={s.status} error={s.error} />
-                      <button
-                        className={styles.sourceDelete}
-                        aria-label="Quelle löschen"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteSource(s.id)
+                      <li
+                        key={s.id}
+                        className={`${styles.sourceItem} ${activeSourceId === s.id ? styles.sourceItemActive : ""}`}
+                        title={link ?? undefined}
+                        onClick={() => {
+                          setActiveSourceId(s.id)
+                          if (link) window.open(link, "_blank", "noopener,noreferrer")
                         }}
                       >
-                        <span className="material-symbols-outlined">close</span>
-                      </button>
-                      {s.status === "failed" ? (
+                        <SourceIcon type={s.type} url={link} />
+                        <span className={styles.sourceTitle}>{s.title}</span>
+                        <SourceStatus status={s.status} error={s.error} />
                         <button
-                          className={styles.sourceRetry}
-                          aria-label={`Import von „${s.title}“ wiederholen`}
-                          title="Import wiederholen"
+                          className={styles.sourceDelete}
+                          aria-label="Quelle löschen"
                           onClick={(e) => {
                             e.stopPropagation()
-                            handleRetrySource(s.id)
+                            handleDeleteSource(s.id)
                           }}
                         >
-                          <span className="material-symbols-outlined">refresh</span>
+                          <span className="material-symbols-outlined">close</span>
                         </button>
-                      ) : (
-                        <button
-                          className={styles.checkbox}
-                          role="checkbox"
-                          aria-checked={selectedIds.has(s.id)}
-                          aria-label={`Quelle „${s.title}“ auswählen`}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleSource(s.id)
-                          }}
-                        >
-                          <span className="material-symbols-outlined">check</span>
-                        </button>
-                      )}
-                    </li>
+                        {s.status === "failed" ? (
+                          <button
+                            className={styles.sourceRetry}
+                            aria-label={`Import von „${s.title}“ wiederholen`}
+                            title="Import wiederholen"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleRetrySource(s.id)
+                            }}
+                          >
+                            <span className="material-symbols-outlined">refresh</span>
+                          </button>
+                        ) : (
+                          <button
+                            className={styles.checkbox}
+                            role="checkbox"
+                            aria-checked={selectedIds.has(s.id)}
+                            aria-label={`Quelle „${s.title}“ auswählen`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleSource(s.id)
+                            }}
+                          >
+                            <span className="material-symbols-outlined">check</span>
+                          </button>
+                        )}
+                      </li>
                     )
                   })}
                 </ul>
@@ -769,11 +762,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
               {messages.map((m) => (
                 <div key={m.id} className={`${styles.message} ${m.role === "user" ? styles.messageUser : styles.messageAssistant}`}>
                   <div className={styles.messageContent}>
-                    {m.role === "assistant" ? (
-                      m.content ? <Markdown>{m.content}</Markdown> : (streaming ? "…" : "")
-                    ) : (
-                      m.content
-                    )}
+                    {m.role === "assistant" ? m.content ? <Markdown>{m.content}</Markdown> : streaming ? "…" : "" : m.content}
                   </div>
                   {m.role === "assistant" && m.citations && m.citations.length > 0 && (
                     <div className={styles.citations}>
@@ -975,14 +964,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       <p className={styles.disclaimer}>NotebookLM kann Fehler machen, überprüfe daher die Antworten.</p>
 
       {modalOpen && <AddSourceModal onClose={() => setModalOpen(false)} onAdd={handleAddSource} />}
-      {reportOpen && (
-        <ReportModal
-          notebookId={notebookId}
-          sourceIds={selectedReadyIds}
-          onClose={() => setReportOpen(false)}
-          onGenerate={handleCreateReport}
-        />
-      )}
+      {reportOpen && <ReportModal notebookId={notebookId} sourceIds={selectedReadyIds} onClose={() => setReportOpen(false)} onGenerate={handleCreateReport} />}
       {audioOpen && <AudioModal onClose={() => setAudioOpen(false)} onCreate={handleCreateAudio} />}
       {viewReport && <ReportViewModal notebookId={notebookId} reportId={viewReport.id} title={viewReport.title} onClose={() => setViewReport(null)} />}
     </div>
@@ -1028,15 +1010,7 @@ function SourceIcon({ type, url }: { type: string; url: string | null }) {
   const host = url ? hostOf(url) : null
 
   if (host && !failed) {
-    return (
-      <img
-        className={styles.sourceFavicon}
-        src={`https://icons.duckduckgo.com/ip3/${host}.ico`}
-        alt=""
-        loading="lazy"
-        onError={() => setFailed(true)}
-      />
-    )
+    return <img className={styles.sourceFavicon} src={`https://icons.duckduckgo.com/ip3/${host}.ico`} alt="" loading="lazy" onError={() => setFailed(true)} />
   }
 
   return <span className={`material-symbols-outlined ${styles.sourceIcon}`}>{SOURCE_ICON[type] ?? "description"}</span>
@@ -1047,10 +1021,7 @@ function SourceStatus({ status, error }: { status: string; error?: string | null
   if (status === "ready") return null
   if (status === "failed") {
     return (
-      <span
-        className={`material-symbols-outlined ${styles.statusFailed}`}
-        title={error || "Verarbeitung fehlgeschlagen"}
-      >
+      <span className={`material-symbols-outlined ${styles.statusFailed}`} title={error || "Verarbeitung fehlgeschlagen"}>
         error
       </span>
     )
