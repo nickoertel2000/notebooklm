@@ -1,4 +1,4 @@
-import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3"
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
 import type { S3Handler } from "aws-lambda"
 import { and, asc, eq, inArray } from "drizzle-orm"
 import { drizzle } from "drizzle-orm/postgres-js"
@@ -15,7 +15,6 @@ import {
 import { chunkText } from "../../../lib/chunk"
 import { synthesizeSpeech } from "../../../lib/gemini"
 import { buildReportSystemPrompt, deriveReportTitle } from "../../../lib/reports"
-import { audioKey, deleteObject, putBinary } from "../../../lib/s3"
 import { embedTexts } from "../../../lib/voyage"
 
 const s3 = new S3Client({})
@@ -155,11 +154,13 @@ async function processJob(bucket: string, key: string) {
     if (job.kind === "report") {
       await processReportJob(job)
     } else if (job.kind === "audio") {
-      await processAudioJob(job)
+      await processAudioJob(bucket, job)
     }
   } finally {
     // Abgearbeitete Job-Datei aufräumen (ObjectRemoved triggert keinen erneuten Lauf).
-    await deleteObject(key).catch((err) => console.error("Job-Datei löschen fehlgeschlagen:", key, err))
+    await s3
+      .send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+      .catch((err) => console.error("Job-Datei löschen fehlgeschlagen:", key, err))
   }
 }
 
@@ -226,7 +227,7 @@ async function processReportJob(job: ReportJob) {
   }
 }
 
-async function processAudioJob(job: AudioJob) {
+async function processAudioJob(bucket: string, job: AudioJob) {
   try {
     const format = getAudioFormat(job.formatId)
     if (!format) throw new Error(`Unbekanntes Audio-Format: ${job.formatId}`)
@@ -251,10 +252,11 @@ async function processAudioJob(job: AudioJob) {
     const { title, script } = parseScript(rawScript, format.label)
     if (!script) throw new Error("Leeres Skript erzeugt")
 
-    // 2) Vertonen via Gemini TTS und nach S3 laden.
+    // 2) Vertonen via Gemini TTS und in denselben Bucket laden (Event-Bucket,
+    // kein S3_BUCKET_NAME-Env nötig — vermeidet Stack-Zyklus storage↔function).
     const { wav, durationSeconds } = await synthesizeSpeech(script, format.speakers)
-    const audioS3Key = audioKey(job.notebookId, job.audioId)
-    await putBinary(audioS3Key, wav, "audio/wav")
+    const audioS3Key = `notebooks/${job.notebookId}/audio/${job.audioId}.wav`
+    await s3.send(new PutObjectCommand({ Bucket: bucket, Key: audioS3Key, Body: wav, ContentType: "audio/wav" }))
 
     await db
       .update(schema.audioOverviews)
