@@ -90,9 +90,8 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   const [reportOpen, setReportOpen] = useState(false)
   const [audioOpen, setAudioOpen] = useState(false)
   // Web-Quellensuche (Discover): Inline-Karte in „Quellen".
-  const [webMode, setWebMode] = useState<"web" | "news">("web")
   const [searchDepth, setSearchDepth] = useState<"quick" | "deep">("quick")
-  const [searchMenu, setSearchMenu] = useState<"web" | "depth" | null>(null)
+  const [searchMenu, setSearchMenu] = useState<"depth" | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [searching, setSearching] = useState(false)
   const [searchResults, setSearchResults] = useState<WebResult[] | null>(null)
@@ -317,7 +316,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       const res = await fetch(`/api/notebooks/${notebookId}/discover`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q, depth: searchDepth, mode: webMode })
+        body: JSON.stringify({ query: q, depth: searchDepth })
       })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Suche fehlgeschlagen")
       const data = await res.json()
@@ -565,38 +564,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
                 disabled={searching}
               />
               <div className={styles.searchRow}>
-                <div className={styles.searchSelectWrap} onClick={(e) => e.stopPropagation()}>
-                  <button className={styles.chip} onClick={() => setSearchMenu((m) => (m === "web" ? null : "web"))}>
-                    <span className="material-symbols-outlined">language</span>
-                    {webMode === "news" ? "Nachrichten" : "Web"}
-                    <span className="material-symbols-outlined">expand_more</span>
-                  </button>
-                  {searchMenu === "web" && (
-                    <div className={styles.searchMenu} role="menu">
-                      <button
-                        className={`${styles.searchMenuItem} ${webMode === "web" ? styles.searchMenuItemActive : ""}`}
-                        onClick={() => {
-                          setWebMode("web")
-                          setSearchMenu(null)
-                        }}
-                      >
-                        <span className="material-symbols-outlined">language</span>
-                        Web
-                      </button>
-                      <button
-                        className={`${styles.searchMenuItem} ${webMode === "news" ? styles.searchMenuItemActive : ""}`}
-                        onClick={() => {
-                          setWebMode("news")
-                          setSearchMenu(null)
-                        }}
-                      >
-                        <span className="material-symbols-outlined">newspaper</span>
-                        Nachrichten
-                      </button>
-                    </div>
-                  )}
-                </div>
-
                 <div className={styles.searchSelectWrap} onClick={(e) => e.stopPropagation()}>
                   <button className={styles.chip} onClick={() => setSearchMenu((m) => (m === "depth" ? null : "depth"))}>
                     <span className="material-symbols-outlined">travel_explore</span>

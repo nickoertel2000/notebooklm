@@ -48,7 +48,7 @@ Der Text wird in ~3200-Zeichen-Chunks mit Overlap zerteilt, getrennt an Absatz-/
 
 ### 🔎 Web-Quellensuche (Discover)
 
-Claude recherchiert über das **`web_search`-Server-Tool** automatisch passende Web-Quellen zum Notebook-Thema — mit optionalem News-Modus (Whitelist deutschsprachiger Nachrichtenquellen) und einstellbarer Suchtiefe.
+Claude recherchiert über das **`web_search`-Server-Tool** automatisch passende Web-Quellen zum Notebook-Thema.
 → [`app/api/notebooks/[notebookId]/discover/route.ts`](app/api/notebooks/%5BnotebookId%5D/discover/route.ts)
 
 ### 🎙️ Studio – Audio-Übersicht (KI-Podcast)

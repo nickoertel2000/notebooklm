@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAnthropic, REPORT_MODEL } from "@/lib/anthropic"
 import { getSessionUser } from "@/lib/auth/session"
-import { NEWS_DOMAINS } from "@/lib/newsDomains"
 import { getNotebookForUser } from "@/lib/notebooks"
 
 export const runtime = "nodejs"
@@ -51,13 +50,8 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
   // Tiefe steuert, wie viele Suchanfragen Claude maximal stellen darf.
   const maxUses = body.depth === "deep" ? 8 : 3
-  // Modus „news": Suche hart auf seriöse deutschsprachige Nachrichtenquellen
-  // beschränken (allowed_domains) + Prompt-Hinweis auf Aktualität.
-  const newsMode = body.mode === "news"
-  const recencyHint = newsMode ? " Priorisiere möglichst aktuelle Nachrichten und neue Veröffentlichungen." : ""
 
   const tool: Record<string, unknown> = { type: "web_search_20250305", name: "web_search", max_uses: maxUses }
-  if (newsMode) tool.allowed_domains = NEWS_DOMAINS
 
   const system = `Du hilfst Nutzern, neue, seriöse Web-Quellen zu einem Thema zu finden. Nutze die Websuche, um relevante Webseiten zu recherchieren.
 Gib am Ende AUSSCHLIESSLICH ein JSON-Array zurück – ohne weiteren Text, ohne Code-Fences – im Format:
@@ -72,7 +66,7 @@ Gib am Ende AUSSCHLIESSLICH ein JSON-Array zurück – ohne weiteren Text, ohne 
       max_tokens: 2500,
       system,
       tools: [tool],
-      messages: [{ role: "user", content: `Finde neue Web-Quellen zum Thema: ${query}.${recencyHint}` }]
+      messages: [{ role: "user", content: `Finde neue Web-Quellen zum Thema: ${query}.` }]
     } as unknown as Parameters<ReturnType<typeof getAnthropic>["messages"]["create"]>[0])
 
     const text =
