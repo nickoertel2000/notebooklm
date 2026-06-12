@@ -10,7 +10,7 @@ import { getAudioFormat } from "@/lib/audio"
 import { DEFAULT_NOTEBOOK_TITLE } from "@/lib/notebookTitle"
 import { getReportType } from "@/lib/reports"
 import { useDictation } from "@/lib/useDictation"
-import "material-symbols/outlined.css"
+import "material-symbols"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import styles from "../notebook.module.scss"
 

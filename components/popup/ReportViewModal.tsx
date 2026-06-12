@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import "material-symbols/outlined.css"
+import "material-symbols"
 import Markdown from "@/components/Markdown/Markdown"
 import styles from "./ReportModal.module.scss"
 

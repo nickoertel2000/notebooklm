@@ -1,6 +1,6 @@
 import Image from "next/image"
 import Link from "next/link"
-import "material-symbols/outlined.css"
+import "material-symbols"
 import { headers } from "next/headers"
 import { auth } from "@/auth"
 import AccountMenu from "./AccountMenu"

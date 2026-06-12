@@ -1,6 +1,6 @@
 import Image from "next/image"
 import Link from "next/link"
-import "material-symbols/outlined.css"
+import "material-symbols"
 import AccountMenu from "@/components/Header/AccountMenu"
 import { createNotebook, renameNotebook } from "@/app/(app)/actions"
 import NotebookTitle from "./NotebookTitle"

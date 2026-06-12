@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import "material-symbols/outlined.css"
+import "material-symbols"
 import { REPORT_TYPES } from "@/lib/reports"
 import styles from "./ReportModal.module.scss"
 
@@ -73,9 +73,7 @@ export default function ReportModal({ notebookId, sourceIds, onClose, onGenerate
             <div className={styles.formatGrid}>
               <button type="button" className={styles.formatCard} onClick={() => setMode("custom")}>
                 <span className={styles.formatCardTitle}>Eigenen Bericht erstellen</span>
-                <span className={styles.formatCardDesc}>
-                  Berichte nach eigenen Vorstellungen erstellen und Angaben zu Aufbau, Stil, Ton machen
-                </span>
+                <span className={styles.formatCardDesc}>Berichte nach eigenen Vorstellungen erstellen und Angaben zu Aufbau, Stil, Ton machen</span>
               </button>
               {REPORT_TYPES.map((t) => (
                 <button key={t.id} type="button" className={styles.formatCard} onClick={() => onGenerate({ type: t.id })}>
@@ -100,12 +98,7 @@ export default function ReportModal({ notebookId, sourceIds, onClose, onGenerate
             ) : (
               <div className={styles.formatGrid}>
                 {suggestions.map((s, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    className={styles.formatCard}
-                    onClick={() => onGenerate({ instruction: s.prompt, title: s.title })}
-                  >
+                  <button key={i} type="button" className={styles.formatCard} onClick={() => onGenerate({ instruction: s.prompt, title: s.title })}>
                     <span className={styles.formatCardTitle}>{s.title}</span>
                     <span className={styles.formatCardDesc}>{s.description}</span>
                   </button>

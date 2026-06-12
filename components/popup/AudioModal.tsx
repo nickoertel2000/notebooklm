@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import "material-symbols/outlined.css"
+import "material-symbols"
 import { AudioFormat, AudioLength, AUDIO_FORMATS } from "@/lib/audio"
 import styles from "./AudioModal.module.scss"
 
@@ -77,12 +77,7 @@ export default function AudioModal({ onClose, onCreate }: AudioModalProps) {
               <p className={styles.sectionLabel}>Länge</p>
               <div className={styles.lengthToggle}>
                 {(["kurz", "standard"] as AudioLength[]).map((l) => (
-                  <button
-                    key={l}
-                    type="button"
-                    className={`${styles.lengthBtn} ${length === l ? styles.lengthBtnActive : ""}`}
-                    onClick={() => setLength(l)}
-                  >
+                  <button key={l} type="button" className={`${styles.lengthBtn} ${length === l ? styles.lengthBtnActive : ""}`} onClick={() => setLength(l)}>
                     {length === l && <span className="material-symbols-outlined">check</span>}
                     {l === "kurz" ? "Kurz" : "Standard"}
                   </button>

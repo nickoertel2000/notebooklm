@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import "material-symbols/outlined.css"
+import "material-symbols"
 import styles from "./AudioPlayer.module.scss"
 
 // Auswählbare Wiedergabegeschwindigkeiten (siehe Vorgabe).
@@ -130,11 +130,7 @@ export default function AudioPlayer({ title, src, onClose, onPlayingChange }: Au
           {speedOpen && (
             <div className={styles.speedMenu} role="menu">
               {SPEEDS.map((s) => (
-                <button
-                  key={s}
-                  className={`${styles.speedItem} ${s === rate ? styles.speedItemActive : ""}`}
-                  onClick={() => changeRate(s)}
-                >
+                <button key={s} className={`${styles.speedItem} ${s === rate ? styles.speedItemActive : ""}`} onClick={() => changeRate(s)}>
                   <span className="material-symbols-outlined">play_circle</span>
                   {speedLabel(s)}
                 </button>

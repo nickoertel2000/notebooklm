@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import "material-symbols/outlined.css"
+import "material-symbols"
 import { authClient } from "@/auth-client"
 import styles from "./accountMenu.module.scss"
 
