@@ -1,6 +1,7 @@
 "use client"
 
 import AudioPlayer from "@/components/AudioPlayer/AudioPlayer"
+import Markdown from "@/components/Markdown/Markdown"
 import AddSourceModal, { AddSourcePayload } from "@/components/popup/AddSourceModal"
 import AudioModal, { AudioOptions } from "@/components/popup/AudioModal"
 import ReportModal, { ReportGeneratePayload } from "@/components/popup/ReportModal"
@@ -800,7 +801,13 @@ export default function NotebookView({ notebookId, title, initialSources, initia
             <div className={styles.messageList}>
               {messages.map((m) => (
                 <div key={m.id} className={`${styles.message} ${m.role === "user" ? styles.messageUser : styles.messageAssistant}`}>
-                  <div className={styles.messageContent}>{m.content || (streaming ? "…" : "")}</div>
+                  <div className={styles.messageContent}>
+                    {m.role === "assistant" ? (
+                      m.content ? <Markdown>{m.content}</Markdown> : (streaming ? "…" : "")
+                    ) : (
+                      m.content
+                    )}
+                  </div>
                   {m.role === "assistant" && m.citations && m.citations.length > 0 && (
                     <div className={styles.citations}>
                       {m.citations.map((c, i) => (
