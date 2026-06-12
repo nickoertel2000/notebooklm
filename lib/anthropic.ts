@@ -9,9 +9,9 @@ export function getAnthropic(): Anthropic {
   return client
 }
 
-// Günstigstes Modell als Standard: Claude Haiku 4.5 ($1/$5 pro 1M Tokens).
+// Standardmodell für den Chat: Claude Sonnet 4.6 — bessere Antwortqualität.
 // Über CLAUDE_MODEL überschreibbar.
-export const CHAT_MODEL = process.env.CLAUDE_MODEL ?? "claude-haiku-4-5"
+export const CHAT_MODEL = process.env.CLAUDE_MODEL ?? "claude-sonnet-4-6"
 
 // Berichte synthetisieren über viele Quellen — dafür das stärkere Sonnet-Modell.
 // Über CLAUDE_REPORT_MODEL überschreibbar.
