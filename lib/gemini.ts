@@ -15,6 +15,10 @@ export function getGemini(): GoogleGenAI {
 // Gemini 2.5 Flash TTS – günstig, controllable. Über GEMINI_TTS_MODEL überschreibbar.
 export const TTS_MODEL = process.env.GEMINI_TTS_MODEL ?? "gemini-2.5-flash-preview-tts"
 
+// Gemini 2.5 Flash Image („Nano Banana") – Bildgenerierung über denselben Key wie
+// TTS. Free-Tier deckt einige Bilder/Tag. Über GEMINI_IMAGE_MODEL überschreibbar.
+export const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL ?? "gemini-2.5-flash-image"
+
 // Deutschtaugliche Prebuilt-Stimmen. Index 0/1 entsprechen SPEAKER_LABELS.
 const VOICES = ["Kore", "Puck"] as const
 
@@ -42,10 +46,7 @@ export async function synthesizeSpeech(script: string, speakers: 1 | 2): Promise
 
   // Bei Dialog eine kurze Anweisung voranstellen, damit das Modell die Labels
   // als Sprecher erkennt statt sie vorzulesen.
-  const prompt =
-    speakers === 2
-      ? `Lies das folgende Gespräch zwischen ${SPEAKER_LABELS[0]} und ${SPEAKER_LABELS[1]} vor:\n\n${script}`
-      : script
+  const prompt = speakers === 2 ? `Lies das folgende Gespräch zwischen ${SPEAKER_LABELS[0]} und ${SPEAKER_LABELS[1]} vor:\n\n${script}` : script
 
   const response = await getGemini().models.generateContent({
     model: TTS_MODEL,
@@ -60,6 +61,23 @@ export async function synthesizeSpeech(script: string, speakers: 1 | 2): Promise
   const wav = pcmToWav(pcm)
   const durationSeconds = Math.round(pcm.length / (SAMPLE_RATE * CHANNELS * (BITS / 8)))
   return { wav, durationSeconds }
+}
+
+// Erzeugt eine Hintergrund-Illustration via Gemini 2.5 Flash Image und liefert
+// die rohen PNG-Bytes. Genutzt für die Folien der Video-Übersicht (lib/video.ts).
+export async function generateImage(prompt: string): Promise<Buffer> {
+  const response = await getGemini().models.generateContent({
+    model: IMAGE_MODEL,
+    contents: [{ parts: [{ text: prompt }] }],
+    config: { responseModalities: ["IMAGE"] }
+  })
+
+  // Das Modell kann mehrere Parts liefern (Text + Bild) – das erste inlineData nehmen.
+  const parts = response.candidates?.[0]?.content?.parts ?? []
+  const imagePart = parts.find((p) => p.inlineData?.data)
+  const data = imagePart?.inlineData?.data
+  if (!data) throw new Error("Gemini Image lieferte keine Bilddaten")
+  return Buffer.from(data, "base64")
 }
 
 // Verpackt rohes PCM in einen WAV-Container (44-Byte-Header). Kein externer

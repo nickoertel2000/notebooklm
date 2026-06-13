@@ -10,7 +10,7 @@
 ![AWS](https://img.shields.io/badge/AWS-Amplify_·_S3_·_Lambda-FF9900?logo=amazonwebservices&logoColor=white)
 ![Claude](https://img.shields.io/badge/Anthropic-Claude-D97757?logo=anthropic&logoColor=white)
 
-Der NotebookLM Klon ist ein **KI-gestützter Recherche-Assistent**: Man lädt eigene Quellen hoch (PDF, Web-URLs oder Text), und die App macht daraus durchsuchbares Wissen. Darauf aufbauend lassen sich ein **RAG-Chat mit echten Quellen-Zitaten** führen, **Audio-Übersichten** und strukturierte **Berichte** generieren — jeweils ausschließlich auf Basis der hochgeladenen Quellen.
+Der NotebookLM Klon ist ein **KI-gestützter Recherche-Assistent**: Man lädt eigene Quellen hoch (PDF, Web-URLs oder Text), und die App macht daraus durchsuchbares Wissen. Darauf aufbauend lassen sich ein **RAG-Chat mit echten Quellen-Zitaten** führen, **Audio-Übersichten**, **Video-Übersichten** und strukturierte **Berichte** generieren — jeweils ausschließlich auf Basis der hochgeladenen Quellen.
 
 ---
 
@@ -18,13 +18,13 @@ Der NotebookLM Klon ist ein **KI-gestützter Recherche-Assistent**: Man lädt ei
 
 Ein vollständiges, realistisches Produkt — vom Datenmodell bis zum Deployment. Was das Projekt technisch ausmacht:
 
-| Schwerpunkt                         | Wie es im Projekt sichtbar wird                                                                                           |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| **Echte RAG-Pipeline**              | Embeddings, Vektorsuche und quellenbelegte LLM-Antworten — keine Blackbox, sondern Zitate bis auf die Textstelle.         |
-| **Full-Stack in einer Codebase**    | Frontend, API-Routes, Server Actions, Datenbank und Cloud-Infrastruktur (Next.js 15, React 19, TypeScript).               |
-| **Produktionsnahe Infrastruktur**   | AWS Amplify Gen 2, S3-Storage und eine event-getriggerte Lambda für die rechenintensive Ingestion — als Code versioniert. |
-| **Durchdachtes Datenmodell**        | Relationales Schema mit Cascade-Deletes und PostgreSQL-Vektorsuche (`pgvector`) statt separater Vektor-DB.                |
-| **Nachvollziehbare Entscheidungen** | Begründungen zu Technologie- und Modellwahl sind dokumentiert ([Tech-Entscheidungen](#-tech-entscheidungen)).             |
+| Schwerpunkt                         | Wie es im Projekt sichtbar wird                                                                                                                                               |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Echte RAG-Pipeline**              | Embeddings, Vektorsuche und quellenbelegte LLM-Antworten — keine Blackbox, sondern Zitate bis auf die Textstelle.                                                             |
+| **Full-Stack in einer Codebase**    | Frontend, API-Routes, Server Actions, Datenbank und Cloud-Infrastruktur (Next.js 15, React 19, TypeScript).                                                                   |
+| **Produktionsnahe Infrastruktur**   | AWS Amplify Gen 2, S3-Storage und ein event-getriggerter Lambda-Worker für rechenintensive, langlaufende Aufgaben (Ingestion, Berichte, Audio, Video) — als Code versioniert. |
+| **Durchdachtes Datenmodell**        | Relationales Schema mit Cascade-Deletes und PostgreSQL-Vektorsuche (`pgvector`) statt separater Vektor-DB.                                                                    |
+| **Nachvollziehbare Entscheidungen** | Begründungen zu Technologie- und Modellwahl sind dokumentiert ([Tech-Entscheidungen](#-tech-entscheidungen)).                                                                 |
 
 Als Einstieg in den Code lohnen sich [`app/api/notebooks/[notebookId]/chat/route.ts`](app/api/notebooks/%5BnotebookId%5D/chat/route.ts) (RAG + Citations), [`lib/audio.ts`](lib/audio.ts) (Skript- und TTS-Pipeline) und [`db/schema.ts`](db/schema.ts) (Datenmodell).
 
@@ -53,12 +53,19 @@ Claude recherchiert über das **`web_search`-Server-Tool** automatisch passende 
 
 ### 🎙️ Studio – Audio-Übersicht (KI-Podcast)
 
-Claude generiert ein sprechbares Skript, das **Google Gemini 2.5 TTS** mit **Multi-Speaker-Stimmen** in eine WAV-Datei vertont (→ S3). Vier Formate: **Deep Dive** (Dialog), **Brief** (Zusammenfassung), **Critique** (kritische Bewertung) und **Debate** (Streitgespräch), in zwei Längen.
+Claude generiert ein sprechbares Skript, das **Google Gemini 2.5 TTS** mit **Multi-Speaker-Stimmen** in eine WAV-Datei vertont (→ S3). Vier Formate: **Detaillierte Analyse**, **Zusammenfassung**, **Kritische Bewertung** und **Diskussion**, in zwei Längen. Die Generierung läuft **asynchron im Lambda-Worker** (siehe [Architektur](#-architektur)): Die Route legt nur einen Job an, das Frontend pollt den Status.
 → [`lib/audio.ts`](lib/audio.ts) · [`app/api/notebooks/[notebookId]/audio/route.ts`](app/api/notebooks/%5BnotebookId%5D/audio/route.ts)
+
+### 🎬 Studio – Video-Übersicht (vertonte Slideshow)
+
+Wie bei NotebookLM ist die „Video-Übersicht" **kein** echtes KI-Video, sondern eine **vertonte Slideshow**. Claude erzeugt aus den Quellen ein **strukturiertes Skript** (Folien mit Titel, Stichpunkten und Narration), **Gemini 2.5 TTS** vertont jede Folie, **Gemini 2.5 Flash Image („Nano Banana")** malt pro Folie einen passenden Hintergrund, und **ffmpeg** brennt Titel/Stichpunkte per `drawtext` darüber und fügt alles zu einer **MP4** zusammen (→ S3). Zwei Formate (**Erklärvideo**, **Zusammenfassung**) und fünf visuelle Stile (**Automatisch, Benutzerdefiniert, Klassisch, Whiteboard, Kawaii**). Wie bei Audio läuft die Generierung **asynchron im Lambda-Worker**; das Frontend pollt.
+→ [`lib/video.ts`](lib/video.ts) · [`lib/videoRender.ts`](lib/videoRender.ts) · [`app/api/notebooks/[notebookId]/video/route.ts`](app/api/notebooks/%5BnotebookId%5D/video/route.ts)
+
+> **Deployment-Hinweis:** Der Lambda-Runtime bringt kein `ffmpeg` mit, und Amplifys esbuild-Bundling kopiert die `ffmpeg-static`-Binary nicht. Daher per **Lambda-Layer** bereitstellen und dessen ARN über die Build-Env `FFMPEG_LAYER_ARN` setzen; `FFMPEG_PATH` zeigt standardmäßig auf `/opt/bin/ffmpeg`. Ohne Layer funktionieren Quellen/Chat/Berichte/Audio weiterhin – nur die Video-Erstellung schlägt fehl. **Keine neuen API-Keys nötig:** Nano Banana nutzt denselben `GEMINI_API_KEY` wie die TTS-Stimmen. Der Folien-Font (Noto Sans, SIL OFL) ist als Base64 eingebettet ([`lib/fontData.ts`](lib/fontData.ts)), braucht also keinen Layer.
 
 ### 📄 Studio – Berichte
 
-Vordefinierte Formate (**Überblick / Briefing**, **Lernplan** mit Glossar & Quiz, **Blogpost**) sowie frei formulierbare Reports. Dazu **KI-Formatvorschläge**: Claude analysiert die Quellen und schlägt vier passende Berichtsformate vor.
+Vordefinierte Formate (**Überblick / Briefing**, **Lernplan** mit Glossar & Quiz, **Blogpost**) sowie frei formulierbare Reports. Dazu **KI-Formatvorschläge**: Claude analysiert die Quellen und schlägt vier passende Berichtsformate vor. Wie beim Audio läuft die Synthese **asynchron im Lambda-Worker** — so sind auch lange Berichte über viele Quellen nicht an das Request-Timeout gebunden.
 → [`lib/reports.ts`](lib/reports.ts)
 
 ### 🪄 Automatik
@@ -74,29 +81,51 @@ Browser-basiertes Diktat für Chat-Eingaben ([`lib/useDictation.ts`](lib/useDict
 
 ## 🛠️ Tech-Stack
 
-| Bereich             | Technologie                                                                                        |
-| ------------------- | -------------------------------------------------------------------------------------------------- |
-| **Frontend**        | Next.js 15.5 (App Router), React 19.2, TypeScript 5, SCSS-Module, Material Symbols                 |
-| **Backend**         | Next.js API Routes & Server Actions (Node.js Runtime)                                              |
-| **Datenbank**       | PostgreSQL (Supabase) + Drizzle ORM 0.45 + `pgvector` (1024-Dim, HNSW-Index)                       |
-| **KI**              | Anthropic Claude (Chat, Berichte, Audio-Skript) · Google Gemini 2.5 (TTS) · Voyage AI (Embeddings) |
-| **Infrastruktur**   | AWS Amplify Gen 2, S3 (Quellen & Audio), Lambda (`ingest`)                                         |
-| **Quellen-Parsing** | `unpdf` (PDF), `@mozilla/readability` + `linkedom` (Web)                                           |
-| **Tooling**         | pnpm, ESLint 9, Prettier, 1Password CLI (Secret-Management)                                        |
+| Bereich             | Technologie                                                                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Frontend**        | Next.js 15.5 (App Router), React 19.2, TypeScript 5, SCSS-Module, Material Symbols                                                       |
+| **Backend**         | Next.js API Routes & Server Actions (Node.js Runtime)                                                                                    |
+| **Datenbank**       | PostgreSQL (Supabase) + Drizzle ORM 0.45 + `pgvector` (1024-Dim, HNSW-Index)                                                             |
+| **KI**              | Anthropic Claude (Chat, Berichte, Skripte) · Google Gemini 2.5 (TTS + Flash Image „Nano Banana") · Voyage AI (Embeddings)                |
+| **Infrastruktur**   | AWS Amplify Gen 2, S3 (Quellen, Audio & Video), Lambda-Worker (`ingest`: Ingestion + Berichte + Audio + Video) · `ffmpeg` (Lambda-Layer) |
+| **Quellen-Parsing** | `unpdf` (PDF), `@mozilla/readability` + `linkedom` (Web)                                                                                 |
+| **Tooling**         | pnpm, ESLint 9, Prettier, 1Password CLI (Secret-Management)                                                                              |
 
 ---
 
 ## 🏗️ Architektur
 
+Rechenintensive **und** langlaufende Aufgaben laufen nicht in der Web-Route, sondern im **Lambda-Worker** ([`amplify/functions/ingest`](amplify/functions/ingest/handler.ts)). Er wird durch S3-Uploads getriggert und verzweigt anhand des Object-Key-Prefixes: `…/sources/…` → Ingestion, `…/jobs/report/…`, `…/jobs/audio/…` und `…/jobs/video/…` → Generierung. So gilt für alle Aufgaben dasselbe robuste Muster (`processing` → `ready`/`failed`, Frontend pollt) — und keine ist an das Request-Timeout des Web-Runtimes gebunden (siehe [Tech-Entscheidungen](#-tech-entscheidungen)).
+
 **Ingestion-Pipeline (asynchron):**
 
 ```
-Upload (PDF/URL/Text) ──▶ S3 ──▶ Lambda (ingest) ──▶ Text-Extraktion
+Upload (PDF/URL/Text) ──▶ S3 ──▶ Worker (ingest) ──▶ Text-Extraktion
                                                           │
                               Voyage-Embeddings ◀── Chunking (~3200 Zeichen)
                                        │
                                        ▼
                             PostgreSQL + pgvector  (Status: processing → ready)
+```
+
+**Studio-Generierung – Berichte, Audio & Video (asynchron):**
+
+```
+Klick „Erstellen" ──▶ API-Route legt 'processing'-Zeile an
+                              │
+                              ▼
+                   Job-Datei nach S3 (…/jobs/report|audio|video/…)  ──▶  202 (sofort)
+                              │
+                              ▼
+                   Worker (ingest) ──▶ Claude (Bericht- bzw. Skript-Synthese)
+                              │                        │
+                              │                        ▼ (Audio + Video)
+                              │              Gemini 2.5 TTS ──▶ WAV
+                              │                        │
+                              │                        ▼ (nur Video)
+                              │       Gemini Image (Folien) + ffmpeg-drawtext ──▶ MP4 ──▶ S3
+                              ▼
+                   PostgreSQL (Status: processing → ready)  ◀── Frontend pollt
 ```
 
 **RAG-Chat (synchron, gestreamt):**
@@ -118,8 +147,14 @@ app/         Next.js App Router — Seiten, Server Actions, API-Routes (app/api/
 components/  Wiederverwendbare React-Komponenten (je Ordner mit .module.scss)
 lib/         Business-Logik — Anthropic, Voyage, Gemini, Chunking, Extraktion, S3
 db/          Drizzle-Schema (db/schema.ts) + Migrationen
-amplify/     AWS-Infrastruktur als Code — S3-Bucket + ingest-Lambda
+amplify/     AWS-Infrastruktur als Code — S3-Bucket + ingest-Worker-Lambda
 styles/      Globale SCSS-Basis (styles/globals.scss)
+```
+
+**Lokale Entwicklung – Studio-Worker:** Der ingest-Worker wird in der Cloud per S3-Event getriggert; lokal (`pnpm dev`) gibt es diesen Trigger nicht, sodass Audio-/Video-/Bericht-Jobs sonst unbearbeitet blieben (und nach Timeout als „fehlgeschlagen" enden). Parallel zum Dev-Server daher den lokalen Worker starten — er pollt S3 nach Jobs und ruft denselben echten Handler auf (ffmpeg via `ffmpeg-static`, kein Layer nötig):
+
+```bash
+pnpm worker:local      # zweites Terminal, neben „pnpm dev"
 ```
 
 ---
@@ -128,16 +163,17 @@ styles/      Globale SCSS-Basis (styles/globals.scss)
 
 Der spannendere Teil für eine Code-Beurteilung — nicht nur _was_, sondern _warum_:
 
-| Entscheidung                                                    | Begründung                                                                                                                                                                                                                                                                                                                                                      |
-| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Claude Sonnet 4.6 als Standardmodell**                        | Sonnet liefert über alle Funktionen — Chat, Berichte, Audio-Skript — die nötige Antwortqualität und Synthese über viele Quellen. Die Modelle sind über `CLAUDE_MODEL` / `CLAUDE_REPORT_MODEL` austauschbar — kein Modell ist hart verdrahtet, sodass sich bei Bedarf pro Use-Case ein günstigeres Modell setzen lässt. ([`lib/anthropic.ts`](lib/anthropic.ts)) |
-| **`pgvector` statt dedizierter Vektor-DB**                      | Eine einzige Datenquelle statt zwei Systeme synchron zu halten — weniger Infrastruktur, ACID-Garantien und Vektorsuche im selben Postgres. HNSW-Index liefert schnelle Cosine-Similarity.                                                                                                                                                                       |
-| **Native Claude Citations** statt selbstgebautem Zitat-Matching | Belege sind präzise und verifizierbar, inklusive Sprung zur exakten Originalstelle (Seite, `charStart`/`charEnd`) — statt fragiler String-Heuristiken im Nachhinein.                                                                                                                                                                                            |
-| **AWS Lambda für die Ingestion**                                | PDF-Extraktion und Embedding sind rechenintensiv und stoßweise. Per S3-Event entkoppelt belasten sie nicht den Web-Server und skalieren unabhängig.                                                                                                                                                                                                             |
-| **Drizzle ORM**                                                 | Typsicheres Schema direkt in TypeScript, nah an SQL, mit nachvollziehbaren Migrationen statt Magie.                                                                                                                                                                                                                                                             |
-| **Better Auth statt Amplify Auth**                              | Volle Kontrolle über das Auth-Modell und nahtlose Integration in dieselbe Drizzle/Postgres-Schicht.                                                                                                                                                                                                                                                             |
-| **SCSS-Module statt Tailwind / CSS-in-JS**                      | Scoped Styles pro Komponente, klare Konventionen (`components/<Name>/<Name>.module.scss`), kein Utility-Class-Rauschen im Markup.                                                                                                                                                                                                                               |
-| **1Password CLI für Secrets**                                   | Secrets werden per `op inject` zur Laufzeit aus dem Vault geladen — kein Klartext-`.env` im Repo oder auf der Platte.                                                                                                                                                                                                                                           |
+| Entscheidung                                                    | Begründung                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Claude Sonnet 4.6 als Standardmodell**                        | Sonnet liefert über alle Funktionen — Chat, Berichte, Audio-Skript — die nötige Antwortqualität und Synthese über viele Quellen. Die Modelle sind über `CLAUDE_MODEL` / `CLAUDE_REPORT_MODEL` austauschbar — kein Modell ist hart verdrahtet, sodass sich bei Bedarf pro Use-Case ein günstigeres Modell setzen lässt. ([`lib/anthropic.ts`](lib/anthropic.ts))                                                                                                                                                                                                                          |
+| **`pgvector` statt dedizierter Vektor-DB**                      | Eine einzige Datenquelle statt zwei Systeme synchron zu halten — weniger Infrastruktur, ACID-Garantien und Vektorsuche im selben Postgres. HNSW-Index liefert schnelle Cosine-Similarity.                                                                                                                                                                                                                                                                                                                                                                                                |
+| **Native Claude Citations** statt selbstgebautem Zitat-Matching | Belege sind präzise und verifizierbar, inklusive Sprung zur exakten Originalstelle (Seite, `charStart`/`charEnd`) — statt fragiler String-Heuristiken im Nachhinein.                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| **Lambda-Worker für Ingestion & Studio-Generierung**            | PDF-Extraktion und Embedding sind rechenintensiv und stoßweise; Bericht-, Audio- und Video-Synthese können über viele Quellen lange laufen. Das Web-Runtime (Amplify SSR) bricht Requests aber nach **30 s hart** ab — Streaming ändert daran nichts (hartes Lambda-Timeout, kein Time-to-first-byte-Limit). Beide Arten von Arbeit laufen daher S3-Event-entkoppelt im selben Worker (Timeout 600 s, Dispatch per Key-Prefix): Die Route legt nur einen Job an und antwortet sofort, das Frontend pollt. ([`amplify/functions/ingest/handler.ts`](amplify/functions/ingest/handler.ts)) |
+| **Video-Übersicht als vertonte Slideshow** statt KI-Video       | Googles echtes Video-Modell (Veo) ist kostenpflichtig und liefert nur kurze Clips — kein Erklärvideo. NotebookLMs „Video-Übersicht" ist tatsächlich eine vertonte Slideshow; nachgebaut aus Bausteinen, die das Projekt schon hat (Claude-Skript + Gemini-TTS) plus Gemini-Bildern und ffmpeg. So bleibt es über den Gemini-Free-Tier praktisch kostenlos. Folientext wird bewusst per ffmpeg-`drawtext` (gestochen scharf) statt vom Bildmodell gerendert, da Bildmodelle bei präzisem Text unzuverlässig sind. ([`lib/videoRender.ts`](lib/videoRender.ts))                            |
+| **Drizzle ORM**                                                 | Typsicheres Schema direkt in TypeScript, nah an SQL, mit nachvollziehbaren Migrationen statt Magie.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **Better Auth statt Amplify Auth**                              | Volle Kontrolle über das Auth-Modell und nahtlose Integration in dieselbe Drizzle/Postgres-Schicht.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **SCSS-Module statt Tailwind / CSS-in-JS**                      | Scoped Styles pro Komponente, klare Konventionen (`components/<Name>/<Name>.module.scss`), kein Utility-Class-Rauschen im Markup.                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **1Password CLI für Secrets**                                   | Secrets werden per `op inject` zur Laufzeit aus dem Vault geladen — kein Klartext-`.env` im Repo oder auf der Platte.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ---
 
@@ -153,8 +189,9 @@ Definiert in [`db/schema.ts`](db/schema.ts) (Drizzle ORM). Kerntabellen:
 | `messages`        | Chat-Verlauf inkl. Zitate (JSONB)                                               |
 | `reports`         | Generierte Berichte                                                             |
 | `audio_overviews` | Audio-Übersichten (Format, Dauer, S3-Key)                                       |
+| `video_overviews` | Video-Übersichten (Format, visueller Stil, Dauer, S3-Key)                       |
 
-Dazu die Better-Auth-Tabellen (`user`, `session`, `account`, `verification`). Alle Inhalte hängen per **Cascade-Delete** am Notebook bzw. User: Wird ein User gelöscht, verschwinden Notebooks → Quellen → Chunks, Nachrichten, Berichte und Audios automatisch.
+Dazu die Better-Auth-Tabellen (`user`, `session`, `account`, `verification`). Alle Inhalte hängen per **Cascade-Delete** am Notebook bzw. User: Wird ein User gelöscht, verschwinden Notebooks → Quellen → Chunks, Nachrichten, Berichte, Audios und Videos automatisch.
 
 ---
 

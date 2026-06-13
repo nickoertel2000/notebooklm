@@ -112,10 +112,7 @@ export const sourceChunks = pgTable(
     charEnd: integer("char_end"),
     createdAt: timestamp("created_at").defaultNow().notNull()
   },
-  (table) => [
-    index("source_chunks_notebook_idx").on(table.notebookId),
-    index("source_chunks_embedding_idx").using("hnsw", table.embedding.op("vector_cosine_ops"))
-  ]
+  (table) => [index("source_chunks_notebook_idx").on(table.notebookId), index("source_chunks_embedding_idx").using("hnsw", table.embedding.op("vector_cosine_ops"))]
 )
 
 // ── Chat-Nachrichten ──────────────────────────────────────────────────────────
@@ -179,6 +176,38 @@ export const audioOverviews = pgTable("audio_overviews", {
   durationSeconds: integer("duration_seconds"),
   // 'kurz' | 'standard'
   length: text("length").notNull().default("standard"),
+  language: text("language").notNull().default("de"),
+  focus: text("focus"),
+  sourceCount: integer("source_count").notNull().default(0),
+  // 'processing' | 'ready' | 'failed'
+  status: text("status").notNull().default("processing"),
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+})
+
+// ── Studio-Video ──────────────────────────────────────────────────────────────
+// Video-Übersichten (NotebookLM-Stil): vertonte Slideshow. Claude erzeugt ein
+// strukturiertes Skript (Folien + Narration), Gemini TTS vertont jede Folie,
+// Gemini 2.5 Flash Image („Nano Banana") malt pro Folie einen Hintergrund, und
+// der ingest-Worker brennt Titel/Stichpunkte per ffmpeg-drawtext darüber und
+// fügt alles zu einer MP4 unter s3Key zusammen. Während der Erzeugung
+// 'processing', danach 'ready' mit s3Key; bei Fehler 'failed'.
+
+export const videoOverviews = pgTable("video_overviews", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  notebookId: uuid("notebook_id")
+    .notNull()
+    .references(() => notebooks.id, { onDelete: "cascade" }),
+  // Format aus lib/video.ts: 'explainer' | 'summary'
+  format: text("format").notNull(),
+  title: text("title").notNull().default("Video-Übersicht"),
+  // Visueller Stil aus lib/video.ts: 'auto' | 'custom' | 'classic' | 'whiteboard' | 'kawaii'
+  visualStyle: text("visual_style").notNull().default("auto"),
+  // Freitext bei visualStyle = 'custom' (eigener Stil-Prompt)
+  customStyle: text("custom_style"),
+  // S3-Key der erzeugten MP4-Datei (null bis fertig)
+  s3Key: text("s3_key"),
+  durationSeconds: integer("duration_seconds"),
   language: text("language").notNull().default("de"),
   focus: text("focus"),
   sourceCount: integer("source_count").notNull().default(0),

@@ -774,7 +774,8 @@
 
 .reportIconBusy {
   color: var(--text);
-  animation: nlm-spin 1s linear infinite; // im Uhrzeigersinn
+  // „autorenew"-Icon: Pfeile zeigen im Uhrzeigersinn → normale Drehung passt.
+  animation: nlm-spin 1s linear infinite;
 }
 
 .reportText {

@@ -14,6 +14,9 @@
 # testing
 /coverage
 
+# lokale Render-Artefakte (scripts/video-local.ts)
+/tmp
+
 # next.js
 /.next/
 /out/

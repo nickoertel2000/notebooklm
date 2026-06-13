@@ -1,12 +1,4 @@
-import {
-  CopyObjectCommand,
-  DeleteObjectCommand,
-  DeleteObjectsCommand,
-  GetObjectCommand,
-  ListObjectsV2Command,
-  PutObjectCommand,
-  S3Client
-} from "@aws-sdk/client-s3"
+import { CopyObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 
 // Credentials kommen aus der Umgebung (lokal AWS_*; im Amplify-Hosting via IAM-Rolle).
@@ -63,9 +55,7 @@ export async function deleteObject(key: string) {
 export async function deleteByPrefix(prefix: string) {
   let token: string | undefined
   do {
-    const list = await s3.send(
-      new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix, ContinuationToken: token })
-    )
+    const list = await s3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix, ContinuationToken: token }))
     const objects = list.Contents ?? []
     if (objects.length > 0) {
       await s3.send(
@@ -88,4 +78,9 @@ export function sourceKey(notebookId: string, sourceId: string, filename: string
 // Pfadschema für erzeugte Audio-Übersichten (WAV).
 export function audioKey(notebookId: string, audioId: string) {
   return `notebooks/${notebookId}/audio/${audioId}.wav`
+}
+
+// Pfadschema für erzeugte Video-Übersichten (MP4).
+export function videoKey(notebookId: string, videoId: string) {
+  return `notebooks/${notebookId}/video/${videoId}.mp4`
 }

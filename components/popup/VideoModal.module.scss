@@ -1,0 +1,280 @@
+$modal-bg: #1d1e20;
+$modal-radius: 16px;
+$border-subtle: rgba(255, 255, 255, 0.1);
+$surface: #2a2b2d;
+$surface-hover: #323335;
+$text-primary: #e3e3e3;
+$text-secondary: #9aa0a6;
+$accent: #a8c7fa;
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 880px;
+  max-height: 88vh;
+  background: $modal-bg;
+  border: 1px solid $border-subtle;
+  border-radius: $modal-radius;
+  color: $text-primary;
+  overflow: hidden;
+}
+
+/* ---------- Kopf -------------------------------------------------------- */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  border-bottom: 1px solid $border-subtle;
+}
+
+.headerIcon {
+  font-size: 22px;
+  color: $accent;
+}
+
+.title {
+  flex: 1;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: $text-secondary;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  span {
+    font-size: 20px;
+  }
+
+  &:hover {
+    background: $surface-hover;
+    color: $text-primary;
+  }
+}
+
+/* ---------- Körper ------------------------------------------------------ */
+.body {
+  flex: 1;
+  min-height: 0;
+  padding: 18px;
+  overflow-y: auto;
+}
+
+.sectionLabel {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: $text-secondary;
+}
+
+/* ---------- Format-Karten (2) ------------------------------------------- */
+.formatGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.formatCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid $border-subtle;
+  border-radius: 12px;
+  background: $surface;
+  color: $text-primary;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover {
+    background: $surface-hover;
+  }
+}
+
+.formatCardActive {
+  border-color: $accent;
+  background: rgba(168, 199, 250, 0.12);
+}
+
+.formatHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+
+  span[class*="material-symbols"] {
+    font-size: 18px;
+    color: $accent;
+  }
+}
+
+.formatLabel {
+  flex: 1;
+}
+
+.formatDesc {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: $text-secondary;
+}
+
+/* ---------- Sprache ----------------------------------------------------- */
+.select {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  margin-bottom: 22px;
+  border: 1px solid $border-subtle;
+  border-radius: 10px;
+  background: $surface;
+  color: $text-primary;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* ---------- Visuelle Stile (5, kein Scroll) ----------------------------- */
+.styleHeading {
+  margin-top: 0;
+}
+
+.styleGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.styleCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 8px;
+  border: 1px solid $border-subtle;
+  border-radius: 12px;
+  background: $surface;
+  color: $text-primary;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover {
+    background: $surface-hover;
+  }
+}
+
+.styleCardActive {
+  border-color: $accent;
+  background: rgba(168, 199, 250, 0.12);
+}
+
+.styleCheck {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 18px;
+  color: $accent;
+}
+
+.styleIcon {
+  font-size: 26px;
+  color: $accent;
+}
+
+.styleLabel {
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: center;
+  color: $text-secondary;
+}
+
+.customInput {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  margin-bottom: 22px;
+  border: 1px solid $border-subtle;
+  border-radius: 10px;
+  background: $surface;
+  color: $text-primary;
+  font-size: 14px;
+  font-family: inherit;
+
+  &::placeholder {
+    color: $text-secondary;
+  }
+}
+
+/* ---------- Fokus ------------------------------------------------------- */
+.focus {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid $border-subtle;
+  border-radius: 10px;
+  background: $surface;
+  color: $text-primary;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+
+  &::placeholder {
+    color: $text-secondary;
+  }
+}
+
+/* ---------- Fuß --------------------------------------------------------- */
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 18px;
+  border-top: 1px solid $border-subtle;
+}
+
+.createBtn {
+  height: 40px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 20px;
+  background: $accent;
+  color: #0b1320;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+
+  &:hover {
+    filter: brightness(1.05);
+  }
+}

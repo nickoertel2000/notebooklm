@@ -2,7 +2,7 @@ import { asc, desc, eq } from "drizzle-orm"
 import { notFound, redirect } from "next/navigation"
 import NotebookHeader from "@/components/NotebookHeader/NotebookHeader"
 import { db } from "@/db"
-import { audioOverviews, messages, reports, sources } from "@/db/schema"
+import { audioOverviews, messages, reports, sources, videoOverviews } from "@/db/schema"
 import { getSessionUser } from "@/lib/auth/session"
 import { getNotebookForUser } from "@/lib/notebooks"
 import NotebookView from "./NotebookView"
@@ -16,7 +16,7 @@ export default async function NotebookPage({ params }: { params: Promise<{ noteb
   const notebook = await getNotebookForUser(notebookId, user.id)
   if (!notebook) notFound()
 
-  const [sourceRows, messageRows, reportRows, audioRows] = await Promise.all([
+  const [sourceRows, messageRows, reportRows, audioRows, videoRows] = await Promise.all([
     db
       .select({
         id: sources.id,
@@ -64,7 +64,21 @@ export default async function NotebookPage({ params }: { params: Promise<{ noteb
       })
       .from(audioOverviews)
       .where(eq(audioOverviews.notebookId, notebookId))
-      .orderBy(desc(audioOverviews.createdAt))
+      .orderBy(desc(audioOverviews.createdAt)),
+    db
+      .select({
+        id: videoOverviews.id,
+        format: videoOverviews.format,
+        title: videoOverviews.title,
+        visualStyle: videoOverviews.visualStyle,
+        durationSeconds: videoOverviews.durationSeconds,
+        sourceCount: videoOverviews.sourceCount,
+        status: videoOverviews.status,
+        createdAt: videoOverviews.createdAt
+      })
+      .from(videoOverviews)
+      .where(eq(videoOverviews.notebookId, notebookId))
+      .orderBy(desc(videoOverviews.createdAt))
   ])
 
   return (
@@ -77,6 +91,7 @@ export default async function NotebookPage({ params }: { params: Promise<{ noteb
         initialMessages={messageRows}
         initialReports={reportRows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }))}
         initialAudios={audioRows.map((a) => ({ ...a, createdAt: a.createdAt.toISOString() }))}
+        initialVideos={videoRows.map((v) => ({ ...v, createdAt: v.createdAt.toISOString() }))}
       />
     </>
   )

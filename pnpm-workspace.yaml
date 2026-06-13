@@ -3,6 +3,7 @@ allowBuilds:
   "@parcel/watcher": true
   core-js: false
   esbuild: true
+  ffmpeg-static: true
   protobufjs: false
   sharp: true
   unrs-resolver: true

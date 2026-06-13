@@ -6,15 +6,12 @@ import postgres from "postgres"
 import { extractText } from "unpdf"
 import * as schema from "../../../db/schema"
 import { getAnthropic, REPORT_MODEL } from "../../../lib/anthropic"
-import {
-  AudioLength,
-  buildScriptSystemPrompt,
-  getAudioFormat,
-  parseScript
-} from "../../../lib/audio"
+import { AudioLength, buildScriptSystemPrompt, getAudioFormat, parseScript } from "../../../lib/audio"
 import { chunkText } from "../../../lib/chunk"
 import { synthesizeSpeech } from "../../../lib/gemini"
 import { buildReportSystemPrompt, deriveReportTitle } from "../../../lib/reports"
+import { buildVideoScriptSystemPrompt, getVideoFormat, getVisualStyle, parseVideoScript } from "../../../lib/video"
+import { buildRenderSegments, composeVideo } from "../../../lib/videoRender"
 import { embedTexts } from "../../../lib/voyage"
 
 const s3 = new S3Client({})
@@ -104,10 +101,7 @@ async function processSource(bucket: string, key: string, notebookId: string, so
       await db.insert(schema.sourceChunks).values(rows)
     }
 
-    await db
-      .update(schema.sources)
-      .set({ status: "ready", charCount: text.length, updatedAt: new Date() })
-      .where(eq(schema.sources.id, sourceId))
+    await db.update(schema.sources).set({ status: "ready", charCount: text.length, updatedAt: new Date() }).where(eq(schema.sources.id, sourceId))
   } catch (err) {
     console.error("Ingestion fehlgeschlagen für", key, err)
     await db
@@ -140,8 +134,20 @@ type AudioJob = {
   sourceIds: string[] | null
 }
 
+type VideoJob = {
+  kind: "video"
+  videoId: string
+  notebookId: string
+  formatId: string
+  visualStyleId: string
+  customStyle: string | null
+  language: string
+  focus: string | null
+  sourceIds: string[] | null
+}
+
 async function processJob(bucket: string, key: string) {
-  let job: ReportJob | AudioJob
+  let job: ReportJob | AudioJob | VideoJob
   try {
     const obj = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }))
     job = JSON.parse(await obj.Body!.transformToString("utf-8"))
@@ -155,12 +161,12 @@ async function processJob(bucket: string, key: string) {
       await processReportJob(job)
     } else if (job.kind === "audio") {
       await processAudioJob(bucket, job)
+    } else if (job.kind === "video") {
+      await processVideoJob(bucket, job)
     }
   } finally {
     // Abgearbeitete Job-Datei aufräumen (ObjectRemoved triggert keinen erneuten Lauf).
-    await s3
-      .send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
-      .catch((err) => console.error("Job-Datei löschen fehlgeschlagen:", key, err))
+    await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })).catch((err) => console.error("Job-Datei löschen fehlgeschlagen:", key, err))
   }
 }
 
@@ -214,10 +220,7 @@ async function processReportJob(job: ReportJob) {
       .trim()
 
     const title = deriveReportTitle(content, job.reportLabel)
-    await db
-      .update(schema.reports)
-      .set({ title, content, status: "ready" })
-      .where(eq(schema.reports.id, job.reportId))
+    await db.update(schema.reports).set({ title, content, status: "ready" }).where(eq(schema.reports.id, job.reportId))
   } catch (err) {
     console.error("Bericht-Erstellung fehlgeschlagen:", job.reportId, err)
     await db
@@ -258,15 +261,54 @@ async function processAudioJob(bucket: string, job: AudioJob) {
     const audioS3Key = `notebooks/${job.notebookId}/audio/${job.audioId}.wav`
     await s3.send(new PutObjectCommand({ Bucket: bucket, Key: audioS3Key, Body: wav, ContentType: "audio/wav" }))
 
-    await db
-      .update(schema.audioOverviews)
-      .set({ title, s3Key: audioS3Key, durationSeconds, status: "ready" })
-      .where(eq(schema.audioOverviews.id, job.audioId))
+    await db.update(schema.audioOverviews).set({ title, s3Key: audioS3Key, durationSeconds, status: "ready" }).where(eq(schema.audioOverviews.id, job.audioId))
   } catch (err) {
     console.error("Audio-Erstellung fehlgeschlagen:", job.audioId, err)
     await db
       .update(schema.audioOverviews)
       .set({ status: "failed", error: stripNul(String(err)).slice(0, 500) })
       .where(eq(schema.audioOverviews.id, job.audioId))
+  }
+}
+
+async function processVideoJob(bucket: string, job: VideoJob) {
+  try {
+    const format = getVideoFormat(job.formatId)
+    if (!format) throw new Error(`Unbekanntes Video-Format: ${job.formatId}`)
+    const style = getVisualStyle(job.visualStyleId)
+    if (!style) throw new Error(`Unbekannter visueller Stil: ${job.visualStyleId}`)
+
+    const context = await buildContext(job.notebookId, job.sourceIds)
+
+    // 1) Strukturiertes Skript (Folien + Narration) via Claude.
+    const userContent = `Hier sind die Quellen des Notebooks:\n${context}\n\n---\n\nErzeuge daraus eine Video-Übersicht.`
+    const message = await getAnthropic().messages.create({
+      model: REPORT_MODEL,
+      max_tokens: 4000,
+      system: buildVideoScriptSystemPrompt(format, job.language, job.focus),
+      messages: [{ role: "user", content: userContent }]
+    })
+    const rawScript = message.content
+      .map((b) => (b.type === "text" ? b.text : ""))
+      .join("")
+      .trim()
+    const { title, segments } = parseVideoScript(rawScript)
+
+    // 2) Pro Folie: Vertonung (Gemini TTS) + Hintergrund (Gemini Image) – parallel
+    // und über die Folien hinweg nebenläufig (siehe buildRenderSegments).
+    const renderSegments = await buildRenderSegments(segments, style, job.customStyle)
+
+    // 3) ffmpeg: Folien zur MP4 zusammensetzen und in den Event-Bucket laden.
+    const { mp4, durationSeconds } = await composeVideo(renderSegments)
+    const videoS3Key = `notebooks/${job.notebookId}/video/${job.videoId}.mp4`
+    await s3.send(new PutObjectCommand({ Bucket: bucket, Key: videoS3Key, Body: mp4, ContentType: "video/mp4" }))
+
+    await db.update(schema.videoOverviews).set({ title, s3Key: videoS3Key, durationSeconds, status: "ready" }).where(eq(schema.videoOverviews.id, job.videoId))
+  } catch (err) {
+    console.error("Video-Erstellung fehlgeschlagen:", job.videoId, err)
+    await db
+      .update(schema.videoOverviews)
+      .set({ status: "failed", error: stripNul(String(err)).slice(0, 500) })
+      .where(eq(schema.videoOverviews.id, job.videoId))
   }
 }

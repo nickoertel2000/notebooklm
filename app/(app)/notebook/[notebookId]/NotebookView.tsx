@@ -2,13 +2,16 @@
 
 import AudioPlayer from "@/components/AudioPlayer/AudioPlayer"
 import Markdown from "@/components/Markdown/Markdown"
+import VideoPlayer from "@/components/VideoPlayer/VideoPlayer"
 import AddSourceModal, { AddSourcePayload } from "@/components/popup/AddSourceModal"
 import AudioModal, { AudioOptions } from "@/components/popup/AudioModal"
 import ReportModal, { ReportGeneratePayload } from "@/components/popup/ReportModal"
 import ReportViewModal from "@/components/popup/ReportViewModal"
+import VideoModal, { VideoOptions } from "@/components/popup/VideoModal"
 import { getAudioFormat } from "@/lib/audio"
 import { DEFAULT_NOTEBOOK_TITLE } from "@/lib/notebookTitle"
 import { getReportType } from "@/lib/reports"
+import { getVideoFormat } from "@/lib/video"
 import { useDictation } from "@/lib/useDictation"
 import "material-symbols"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -59,12 +62,24 @@ export type AudioItem = {
   createdAt: string
 }
 
+export type VideoItem = {
+  id: string
+  format: string
+  title: string
+  visualStyle: string
+  durationSeconds: number | null
+  sourceCount: number
+  status: string
+  createdAt: string
+}
+
 type WebResult = { title: string; url: string; description: string }
 
 const SOURCE_ICON: Record<string, string> = { pdf: "picture_as_pdf", url: "link", text: "description" }
 
 const studioTools = [
   { label: "Audio-Übersicht", icon: "graphic_eq", tint: "#8ab4f8" },
+  { label: "Videoübersicht", icon: "movie", tint: "#81c995" },
   { label: "Berichte", icon: "summarize", tint: "#fdd663" }
 ]
 
@@ -75,9 +90,10 @@ type Props = {
   initialMessages: ChatMessage[]
   initialReports: ReportItem[]
   initialAudios: AudioItem[]
+  initialVideos: VideoItem[]
 }
 
-export default function NotebookView({ notebookId, title, initialSources, initialMessages, initialReports, initialAudios }: Props) {
+export default function NotebookView({ notebookId, title, initialSources, initialMessages, initialReports, initialAudios, initialVideos }: Props) {
   // Lokal verfolgter Notebook-Titel – Basis für die Auto-Benennung.
   const [notebookTitle, setNotebookTitle] = useState(title)
   const autoTitlingRef = useRef(false)
@@ -85,9 +101,11 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [reports, setReports] = useState<ReportItem[]>(initialReports)
   const [audios, setAudios] = useState<AudioItem[]>(initialAudios)
+  const [videos, setVideos] = useState<VideoItem[]>(initialVideos)
   const [modalOpen, setModalOpen] = useState(initialSources.length === 0)
   const [reportOpen, setReportOpen] = useState(false)
   const [audioOpen, setAudioOpen] = useState(false)
+  const [videoOpen, setVideoOpen] = useState(false)
   // Web-Quellensuche (Discover): Inline-Karte in „Quellen".
   const [searchDepth, setSearchDepth] = useState<"quick" | "deep">("quick")
   const [searchMenu, setSearchMenu] = useState<"depth" | null>(null)
@@ -100,10 +118,13 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   const [viewReport, setViewReport] = useState<ReportItem | null>(null)
   const [menuReportId, setMenuReportId] = useState<string | null>(null)
   const [menuAudioId, setMenuAudioId] = useState<string | null>(null)
+  const [menuVideoId, setMenuVideoId] = useState<string | null>(null)
   // Aktuell abgespielte Audio-Übersicht inkl. presigned URL und Titel.
   const [playingAudio, setPlayingAudio] = useState<{ id: string; url: string; title: string } | null>(null)
   // Echter Play/Pause-Status des Players (für das Listen-Icon).
   const [audioPlaying, setAudioPlaying] = useState(false)
+  // Aktuell abgespielte Video-Übersicht (presigned URL) – Overlay-Player.
+  const [playingVideo, setPlayingVideo] = useState<{ id: string; url: string; title: string } | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(initialSources.map((s) => s.id)))
   const [input, setInput] = useState("")
   const [streaming, setStreaming] = useState(false)
@@ -184,6 +205,20 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     return () => clearInterval(id)
   }, [audios, refreshAudios])
 
+  const refreshVideos = useCallback(async () => {
+    const res = await fetch(`/api/notebooks/${notebookId}/video`)
+    if (!res.ok) return
+    const data = await res.json()
+    setVideos((prev) => [...prev.filter((v) => v.id.startsWith("temp-")), ...data.videos])
+  }, [notebookId])
+
+  // Noch laufende Video-Übersichten pollen (Generierung dauert länger: Bilder + ffmpeg).
+  useEffect(() => {
+    if (!videos.some((v) => v.status === "processing" && !v.id.startsWith("temp-"))) return
+    const id = setInterval(refreshVideos, 5000)
+    return () => clearInterval(id)
+  }, [videos, refreshVideos])
+
   // ⋮-Menü bei Klick außerhalb schließen.
   useEffect(() => {
     if (!menuReportId) return
@@ -198,6 +233,13 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     document.addEventListener("click", close)
     return () => document.removeEventListener("click", close)
   }, [menuAudioId])
+
+  useEffect(() => {
+    if (!menuVideoId) return
+    const close = () => setMenuVideoId(null)
+    document.addEventListener("click", close)
+    return () => document.removeEventListener("click", close)
+  }, [menuVideoId])
 
   useEffect(() => {
     if (!searchMenu) return
@@ -476,6 +518,61 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     if (!res.ok) return
     const { audio } = await res.json()
     if (audio.url) setPlayingAudio({ id: audioId, url: audio.url, title: audio.title })
+  }
+
+  // Video-Übersicht im Hintergrund erstellen: Modal schließen, Ladekarte zeigen,
+  // dann das fertige Video eintragen (oder als fehlgeschlagen markieren).
+  async function handleCreateVideo(options: VideoOptions) {
+    setVideoOpen(false)
+    const tempId = `temp-${crypto.randomUUID()}`
+    const placeholder: VideoItem = {
+      id: tempId,
+      format: options.format.id,
+      title: options.format.label,
+      visualStyle: options.visualStyle.id,
+      durationSeconds: null,
+      sourceCount: selectedReadyIds.length,
+      status: "processing",
+      createdAt: new Date().toISOString()
+    }
+    setVideos((prev) => [placeholder, ...prev])
+
+    try {
+      const res = await fetch(`/api/notebooks/${notebookId}/video`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          format: options.format.id,
+          language: options.language,
+          visualStyle: options.visualStyle.id,
+          customStyle: options.customStyle,
+          focus: options.focus,
+          sourceIds: selectedReadyIds
+        })
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Video fehlgeschlagen")
+      const { video } = await res.json()
+      setVideos((prev) => prev.map((v) => (v.id === tempId ? video : v)))
+    } catch {
+      setVideos((prev) => prev.map((v) => (v.id === tempId ? { ...v, status: "failed" } : v)))
+    }
+  }
+
+  async function handleDeleteVideo(videoId: string) {
+    setMenuVideoId(null)
+    setVideos((prev) => prev.filter((v) => v.id !== videoId))
+    if (playingVideo?.id === videoId) setPlayingVideo(null)
+    if (!videoId.startsWith("temp-")) {
+      await fetch(`/api/notebooks/${notebookId}/video/${videoId}`, { method: "DELETE" })
+    }
+  }
+
+  // Beim Anklicken eines fertigen Videos die presigned URL laden und im Overlay abspielen.
+  async function handlePlayVideo(videoId: string) {
+    const res = await fetch(`/api/notebooks/${notebookId}/video/${videoId}`)
+    if (!res.ok) return
+    const { video } = await res.json()
+    if (video.url) setPlayingVideo({ id: videoId, url: video.url, title: video.title })
   }
 
   async function sendMessage(text: string) {
@@ -839,8 +936,9 @@ export default function NotebookView({ notebookId, title, initialSources, initia
               {studioTools.map((tool) => {
                 const isReports = tool.label === "Berichte"
                 const isAudio = tool.label === "Audio-Übersicht"
-                const interactive = isReports || isAudio
-                const onClick = isReports ? () => setReportOpen(true) : isAudio ? () => setAudioOpen(true) : undefined
+                const isVideo = tool.label === "Videoübersicht"
+                const interactive = isReports || isAudio || isVideo
+                const onClick = isReports ? () => setReportOpen(true) : isAudio ? () => setAudioOpen(true) : isVideo ? () => setVideoOpen(true) : undefined
                 return (
                   <button
                     key={tool.label}
@@ -857,6 +955,52 @@ export default function NotebookView({ notebookId, title, initialSources, initia
               })}
             </div>
 
+            {videos.length > 0 && (
+              <ul className={styles.reportList}>
+                {videos.map((v) => {
+                  const meta = getVideoFormat(v.format)
+                  const processing = v.status === "processing"
+                  const failed = v.status === "failed"
+                  return (
+                    <li key={v.id} className={styles.audioEntry}>
+                      <div
+                        className={`${styles.reportItem} ${processing ? styles.reportItemBusy : ""}`}
+                        onClick={() => !processing && !failed && handlePlayVideo(v.id)}
+                      >
+                        <span className={`material-symbols-outlined ${styles.reportIcon} ${processing ? styles.reportIconBusy : ""}`}>
+                          {processing ? "autorenew" : failed ? "error" : "play_circle"}
+                        </span>
+                        <div className={styles.reportText}>
+                          <p className={styles.reportTitle}>{processing ? "Video wird erstellt…" : failed ? "Erstellung fehlgeschlagen" : v.title}</p>
+                          <p className={styles.reportMeta}>
+                            {processing
+                              ? `basierend auf ${v.sourceCount} ${v.sourceCount === 1 ? "Quelle" : "Quellen"}`
+                              : `${meta?.label ?? "Video"} · ${v.sourceCount} ${v.sourceCount === 1 ? "Quelle" : "Quellen"}${v.durationSeconds ? ` · ${formatDuration(v.durationSeconds)}` : ""} · ${relativeTime(v.createdAt)}`}
+                          </p>
+                        </div>
+
+                        {!processing && (
+                          <div className={styles.reportMenuWrap} onClick={(e) => e.stopPropagation()}>
+                            <button className={styles.reportMenuBtn} aria-label="Optionen" onClick={() => setMenuVideoId((cur) => (cur === v.id ? null : v.id))}>
+                              <span className="material-symbols-outlined">more_vert</span>
+                            </button>
+                            {menuVideoId === v.id && (
+                              <div className={styles.reportMenu} role="menu">
+                                <button className={styles.reportMenuItem} onClick={() => handleDeleteVideo(v.id)}>
+                                  <span className="material-symbols-outlined">delete</span>
+                                  Löschen
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+
             {audios.length > 0 && (
               <ul className={styles.reportList}>
                 {audios.map((a) => {
@@ -872,7 +1016,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
                         onClick={() => !processing && !failed && handlePlayAudio(a.id)}
                       >
                         <span className={`material-symbols-outlined ${styles.reportIcon} ${processing ? styles.reportIconBusy : ""}`}>
-                          {processing ? "sync" : failed ? "error" : active && audioPlaying ? "pause_circle" : "play_circle"}
+                          {processing ? "autorenew" : failed ? "error" : active && audioPlaying ? "pause_circle" : "play_circle"}
                         </span>
                         <div className={styles.reportText}>
                           <p className={styles.reportTitle}>{processing ? "Audio wird erstellt…" : failed ? "Erstellung fehlgeschlagen" : a.title}</p>
@@ -918,7 +1062,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
                       onClick={() => !processing && !failed && setViewReport(r)}
                     >
                       <span className={`material-symbols-outlined ${styles.reportIcon} ${processing ? styles.reportIconBusy : ""}`}>
-                        {processing ? "sync" : failed ? "error" : (meta?.icon ?? "description")}
+                        {processing ? "autorenew" : failed ? "error" : (meta?.icon ?? "description")}
                       </span>
                       <div className={styles.reportText}>
                         <p className={styles.reportTitle}>{processing ? "Bericht wird erstellt…" : failed ? "Erstellung fehlgeschlagen" : r.title}</p>
@@ -970,7 +1114,9 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       {modalOpen && <AddSourceModal onClose={() => setModalOpen(false)} onAdd={handleAddSource} />}
       {reportOpen && <ReportModal notebookId={notebookId} sourceIds={selectedReadyIds} onClose={() => setReportOpen(false)} onGenerate={handleCreateReport} />}
       {audioOpen && <AudioModal onClose={() => setAudioOpen(false)} onCreate={handleCreateAudio} />}
+      {videoOpen && <VideoModal onClose={() => setVideoOpen(false)} onCreate={handleCreateVideo} />}
       {viewReport && <ReportViewModal notebookId={notebookId} reportId={viewReport.id} title={viewReport.title} onClose={() => setViewReport(null)} />}
+      {playingVideo && <VideoPlayer title={playingVideo.title} src={playingVideo.url} onClose={() => setPlayingVideo(null)} />}
     </div>
   )
 }
