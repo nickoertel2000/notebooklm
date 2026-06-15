@@ -9,6 +9,10 @@ export const auth = betterAuth({
     provider: "pg",
     schema: { user, session, account, verification }
   }),
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: false
+  },
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID as string,

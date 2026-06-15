@@ -2,15 +2,60 @@
 
 import { authClient } from "@/auth-client"
 import Image from "next/image"
+import { useState } from "react"
 import styles from "./login.module.scss"
 
+type Mode = "signin" | "signup"
+
 export default function LoginPage() {
+  const [mode, setMode] = useState<Mode>("signin")
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
   async function handleGoogleLogin() {
     try {
       await authClient.signIn.social({ provider: "google", callbackURL: "/" })
-    } catch (error) {
-      console.error("Google-Anmeldung fehlgeschlagen:", error)
+    } catch (err) {
+      console.error("Google-Anmeldung fehlgeschlagen:", err)
+      setError("Google-Anmeldung fehlgeschlagen. Bitte erneut versuchen.")
     }
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError(null)
+    setLoading(true)
+
+    try {
+      const { error: authError } =
+        mode === "signup"
+          ? await authClient.signUp.email({ name, email, password })
+          : await authClient.signIn.email({ email, password })
+
+      if (authError) {
+        setError(
+          mode === "signup"
+            ? "Registrierung fehlgeschlagen. E-Mail evtl. bereits vergeben oder Passwort zu kurz (mind. 8 Zeichen)."
+            : "Anmeldung fehlgeschlagen. Bitte E-Mail und Passwort prüfen."
+        )
+        return
+      }
+
+      window.location.href = "/"
+    } catch (err) {
+      console.error("Anmeldung fehlgeschlagen:", err)
+      setError("Etwas ist schiefgelaufen. Bitte erneut versuchen.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function toggleMode() {
+    setMode((prev) => (prev === "signin" ? "signup" : "signin"))
+    setError(null)
   }
 
   return (
@@ -19,6 +64,53 @@ export default function LoginPage() {
         <Image src="/notebook-logo.svg" alt="NotebookLM" width={1253} height={132} priority className={styles.logo} />
 
         <p className={styles.tagline}>Dein persönlicher KI-Assistent für Notizen</p>
+
+        <form className={styles.form} onSubmit={handleSubmit}>
+          {mode === "signup" && (
+            <input
+              className={styles.input}
+              type="text"
+              placeholder="Nutzername"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoComplete="name"
+              required
+            />
+          )}
+          <input
+            className={styles.input}
+            type="email"
+            placeholder="E-Mail"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            required
+          />
+          <input
+            className={styles.input}
+            type="password"
+            placeholder="Passwort"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete={mode === "signup" ? "new-password" : "current-password"}
+            minLength={8}
+            required
+          />
+
+          {error && <p className={styles.error}>{error}</p>}
+
+          <button type="submit" className={styles.submitBtn} disabled={loading}>
+            {loading ? "Bitte warten …" : mode === "signup" ? "Konto erstellen" : "Anmelden"}
+          </button>
+        </form>
+
+        <button type="button" className={styles.toggle} onClick={toggleMode}>
+          {mode === "signup" ? "Schon registriert? Anmelden" : "Noch kein Konto? Registrieren"}
+        </button>
+
+        <div className={styles.divider}>
+          <span>oder</span>
+        </div>
 
         <button type="button" className={styles.googleBtn} onClick={handleGoogleLogin}>
           <svg className={styles.googleLogo} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">

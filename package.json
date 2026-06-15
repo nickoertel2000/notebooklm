@@ -2,7 +2,7 @@
   "name": "notebooklm",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@11.5.2",
+  "packageManager": "pnpm@11.6.0",
   "scripts": {
     "dev": "next dev",
     "worker:local": "tsx scripts/worker-local.ts",
