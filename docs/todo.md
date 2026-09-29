@@ -6,23 +6,23 @@ Erledigt: Workers Paid ist aktiv, R2-Bucket `notebooklm` (Jurisdiction `eu`) ist
 
 ## 1. Datenbank (Neon)
 
-Details und Begründung: [`umstellung-neon.md`](umstellung-neon.md).
+Begründung für Neon: README, Tech-Entscheidungen. Hyperdrive ist als „public“ angelegt (Neon ist öffentlich erreichbar, kein Workers VPC / Access).
 
-- [ ] Neon-Projekt `notebooklm` anlegen, Region Frankfurt (`aws-eu-central-1`), direkte Verbindung ohne `-pooler`, `sslmode=require`.
-- [ ] Connection-String in 1Password unter `Development → NotebookLM → DATABASE_URL` eintragen. `.env.template` nutzt denselben Eintrag für `DATABASE_URL` und `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`.
-- [ ] `pnpm env:pull`
-- [ ] `pnpm db:migrate`. `0000_enable_pgvector` legt die Extension an, `0001_init` das komplette Schema. Danach prüfen, ob der HNSW-Index `source_chunks_embedding_idx` existiert.
+- [x] Neon-Projekt `notebooklm` anlegen, Region Frankfurt (`aws-eu-central-1`), direkte Verbindung ohne `-pooler`, `sslmode=require`.
+- [x] Connection-String in 1Password unter `Development → NotebookLM → DATABASE_URL` eintragen. `.env.template` nutzt denselben Eintrag für `DATABASE_URL` und `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`.
+- [x] `pnpm env:pull`
+- [x] `pnpm db:migrate`. `0000_enable_pgvector` legt die Extension an, `0001_init` das komplette Schema. Danach prüfen, ob der HNSW-Index `source_chunks_embedding_idx` existiert.
 
 ## 2. Hyperdrive
 
-- [ ] Hyperdrive anlegen, ohne dass der Connection-String im Terminal erscheint:
+- [x] Hyperdrive anlegen, ohne dass der Connection-String im Terminal erscheint:
 
   ```sh
   pnpm exec wrangler hyperdrive create notebooklm-db --connection-string="$(op read op://Development/NotebookLM/DATABASE_URL)"
   ```
 
-- [ ] Die zurückgegebene ID ersetzt `HYPERDRIVE_ID` in `wrangler.jsonc` **und** `workers/jobs/wrangler.jsonc`. Das Placement (`aws:eu-central-1`, passend zu Neon Frankfurt) ist dort bereits eingetragen. Falls Neon in einer anderen Region landet, dort anpassen.
-- [ ] `pnpm cf-typegen`, `pnpm typecheck`.
+- [x] Die zurückgegebene ID ersetzt `HYPERDRIVE_ID` in `wrangler.jsonc` **und** `workers/jobs/wrangler.jsonc`. Das Placement (`aws:eu-central-1`, passend zu Neon Frankfurt) ist dort bereits eingetragen. Falls Neon in einer anderen Region landet, dort anpassen.
+- [x] `pnpm cf-typegen`, `pnpm typecheck`.
 
 ## 3. Lokal testen
 
@@ -39,6 +39,9 @@ Die App bindet die Workflows des Jobs-Workers per `script_name`, und beide Worke
 - [ ] `pnpm build`
 - [ ] `pnpm cf:first-deploy`
 - [ ] Smoke-Test auf der workers.dev-URL: Login, Quelle, Chat, Bericht, Audio. Video funktioniert erst nach Schritt 6.
+- [ ] Neon-Dashboard: Geht die Compute bei Inaktivität auf „Idle“? Hyperdrive hält einen eigenen Connection-Pool, ob der Scale-to-Zero verhindert, ist nicht dokumentiert. Wichtig, weil die 100 CU-Stunden im Free-Tarif nur für rund 400 Stunden mit 0,25 CU reichen, nicht für Dauerbetrieb.
+- [ ] Neon: Autoscaling-Maximum auf 0,25 CU begrenzen.
+- [ ] README: erwähnen, dass die Demo bei aufgebrauchten CU-Stunden bis zum Monatsende offline ist (Neon suspendiert die Compute, Daten bleiben erhalten).
 
 Später geänderte Secrets überträgt `pnpm cf:secrets`. Die Secret-Listen stehen in `scripts/cf.mjs` und müssen nach der Gemini-Umstellung angepasst werden (siehe [`umstellung-gemini.md`](umstellung-gemini.md)).
 

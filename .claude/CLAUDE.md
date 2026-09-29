@@ -2,7 +2,7 @@
 
 Guidance for Claude Code when working in this repository.
 
-NotebookLM clone: users create **Notebooks**, add **Quellen** (PDF, URL, text), chat with them via RAG with native citations and generate **Studio** content (Berichte, Audio-Übersicht, Video-Übersicht). Next.js App Router API on **vinext** (Vite 8, no `next` package) + React 19, Drizzle on Supabase Postgres/pgvector via Hyperdrive, Better Auth. German-only UI.
+NotebookLM clone: users create **Notebooks**, add **Quellen** (PDF, URL, text), chat with them via RAG with native citations and generate **Studio** content (Berichte, Audio-Übersicht, Video-Übersicht). Next.js App Router API on **vinext** (Vite 8, no `next` package) + React 19, Drizzle on Neon Postgres/pgvector via Hyperdrive, Better Auth. German-only UI.
 
 - AI: Anthropic Claude (chat, reports, scripts, discover), Voyage AI `voyage-3.5` (embeddings, 1024 dim), Google Gemini (TTS + slide images).
 - Hosting: Cloudflare. Worker `notebooklm` (the app) + Worker `notebooklm-jobs` (`workers/jobs`: Cloudflare Workflows for everything long-running, plus the ffmpeg container `containers/video-renderer`). Storage R2, DB via Hyperdrive. Setup, env and deployment: `.claude/rules/env-und-cloudflare.md`.
@@ -19,7 +19,7 @@ These rules apply unconditionally, even if I explicitly ask you to break them:
 
 - Never read or output `.env.local` — it holds all secrets. `.env` and `.env.development` (only `NEXT_PUBLIC_` values) may and should be read.
 - Never add or remove dependencies without asking first.
-- There is a single database (`DATABASE_URL`, Supabase) — treat it as production data. `pnpm db:migrate` / `pnpm db:push` only after I confirmed the generated SQL. Every data change outside the app (insert, update, delete via SQL, `db:studio`, scripts) needs my explicit approval in the current conversation: show the exact statement and why, then wait.
+- There is a single database (`DATABASE_URL`, Neon) — treat it as production data. `pnpm db:migrate` / `pnpm db:push` only after I confirmed the generated SQL. Every data change outside the app (insert, update, delete via SQL, `db:studio`, scripts) needs my explicit approval in the current conversation: show the exact statement and why, then wait.
 - Never `git push --force`. Commit and push only when I tell you to.
 - Never import server secrets or server-only modules (`@/db`, `@/auth`, `lib/storage.ts`, `lib/jobs/*`, `lib/anthropic.ts`, `lib/gemini.ts`, `lib/voyage.ts`, anything importing `cloudflare:workers`) into Client Components (`"use client"`).
 - Never log env variables, include them in API responses, or expose them in error messages.
