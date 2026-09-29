@@ -1,5 +1,36 @@
 {
   "permissions": {
-    "deny": ["Read(.env.local)", "Bash(cat .env.local)", "Bash(cat ./.env.local)"]
+    "deny": [
+      "Read(./.env.local)",
+      "Bash(cat .env.local)",
+      "Bash(cat ./.env.local)",
+      "Bash(type .env.local)",
+      "Bash(more .env.local)",
+      "Bash(less .env.local)",
+      "Bash(head * .env.local)",
+      "Bash(tail * .env.local)",
+      "Bash(Get-Content .env.local)",
+      "Bash(gc .env.local)"
+    ],
+    "ask": [
+      "Bash(pnpm db:migrate*)",
+      "Bash(pnpm db:push*)",
+      "Bash(pnpm db:studio*)",
+      "Bash(node node_modules/drizzle-kit/bin.cjs migrate*)",
+      "Bash(node node_modules/drizzle-kit/bin.cjs push*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/format.sh\""
+          }
+        ]
+      }
+    ]
   }
 }
