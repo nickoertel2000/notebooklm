@@ -17,7 +17,7 @@ UI strings, error messages, prompts and comments are German. Domain terms used i
 
 These rules apply unconditionally, even if I explicitly ask you to break them:
 
-- Never read or output `.env.local` — it holds all secrets. `.env` and `.env.development` (only `NEXT_PUBLIC_` values) may and should be read.
+- Never read or output `.env.local` — it holds all secrets. `.env.production` and `.env.development` (only `NEXT_PUBLIC_` values) may and should be read.
 - Never add or remove dependencies without asking first.
 - There is a single database (`DATABASE_URL`, Neon) — treat it as production data. `pnpm db:migrate` / `pnpm db:push` only after I confirmed the generated SQL. Every data change outside the app (insert, update, delete via SQL, `db:studio`, scripts) needs my explicit approval in the current conversation: show the exact statement and why, then wait.
 - Never `git push --force`. Commit and push only when I tell you to.

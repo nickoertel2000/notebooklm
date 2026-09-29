@@ -1,6 +1,6 @@
 ---
 paths:
-  - ".env"
+  - ".env.production"
   - ".env.development"
   - ".env.template"
   - "wrangler.jsonc"
@@ -31,7 +31,7 @@ paths:
 - Local dev: `pnpm dev` = one Vite dev server; the jobs Worker runs as `auxiliaryWorkers` in `vite.config.ts`. Containers are only enabled locally when `docker info` succeeds. The `AI` binding (Workers AI, slide images) always runs against Cloudflare, also locally, and uses the same daily free allocation.
 - Deployment: Cloudflare Workers Builds, production branch `I-######-I-PRODUKTION-I-######-I` (merge = deploy), builds for other branches off. App: root dir = repo root, `pnpm build` / `pnpm run deploy:app`. Jobs: root dir `workers/jobs` (Builds checks the Worker `name` in the root dir's wrangler config), commands `cd ../.. && …` because there is no package.json there. Both deploy the Vite build output (`dist/server/wrangler.json`, `dist/notebooklm_jobs/wrangler.json`) with plain `wrangler deploy`; never use `pnpm deploy` (pnpm builtin).
 - No Docker needed locally: the container image is built by Workers Builds during the jobs Worker's `wrangler deploy`. `pnpm cf:first-deploy` (`scripts/cf.mjs`) does the very first deploy of both Workers with `--secrets-file` (required secrets are validated at deploy, so they must ship with the first version) and `--containers-rollout=none` for the jobs Worker. Order matters: jobs before app (Workflow bindings need the target script).
-- Production URL: `https://notebooklm.fancy-cherry-09d8.workers.dev` (= `NEXT_PUBLIC_APP_URL` in `.env`, Google OAuth redirect URI).
+- Production URL: `https://notebooklm.fancy-cherry-09d8.workers.dev` (= `NEXT_PUBLIC_APP_URL` in `.env.production`, Google OAuth redirect URI).
 
 ## Reading env in code
 
@@ -52,7 +52,7 @@ Local secrets live in `.env.local` (off-limits to you, generated from 1Password 
 
 | Kind of value                                  | Where                                                                           |
 | ---------------------------------------------- | ------------------------------------------------------------------------------- |
-| Public, needed in the browser                  | `NEXT_PUBLIC_…` in `.env` (override in `.env.development` if needed)            |
+| Public, needed in the browser                  | `NEXT_PUBLIC_…` in `.env.production` and `.env.development` (both committed)    |
 | Non-secret config (model ID, limit)            | `vars` in the Worker config(s), then `pnpm cf-typegen`                          |
 | Secret (key, token, password, connection str.) | `.env.template` as `NAME=op://Development/NotebookLM/NAME` + `secrets.required` |
 | Cloudflare resource (R2, Workflow, …)          | Binding in the Worker config, then `pnpm cf-typegen`                            |
