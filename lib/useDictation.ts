@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 
 // Diktat per Web Speech API (Browser-nativ, kostenlos, Echtzeit). Funktioniert
 // in Chrome/Edge; wird der Konstruktor nicht gefunden, ist `supported` false.
@@ -34,15 +34,21 @@ function getCtor(): SpeechRecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
 }
 
+const noopSubscribe = () => () => {}
+
 export function useDictation(lang = "de-DE") {
-  const [supported, setSupported] = useState(false)
+  // Server-Snapshot false, damit Server- und erstes Client-Rendering übereinstimmen.
+  const supported = useSyncExternalStore(
+    noopSubscribe,
+    () => getCtor() !== null,
+    () => false
+  )
   const [listening, setListening] = useState(false)
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const onUpdateRef = useRef<(text: string) => void>(() => {})
   const finalRef = useRef("")
 
   useEffect(() => {
-    setSupported(getCtor() !== null)
     return () => recognitionRef.current?.abort()
   }, [])
 

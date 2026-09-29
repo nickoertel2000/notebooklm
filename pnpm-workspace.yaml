@@ -1,4 +1,5 @@
 allowBuilds:
+  '@aws-amplify/hosting': false
   '@google/genai': false
   "@parcel/watcher": true
   core-js: false
@@ -11,7 +12,7 @@ ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
 overrides:
-  # better-auth@1.6.14 importiert Migration-Konstanten, die kysely 0.29.2 nicht
-  # exportiert (Turbopack-Build bricht sonst). 0.28.x liegt in der akzeptierten
-  # Range von better-auth und hat die Exporte.
-  kysely: 0.28.7
+  # better-auth importiert Migration-Konstanten, die kysely 0.29.2 nicht
+  # exportiert (Turbopack-Build bricht sonst). better-auth 1.7 verlangt mindestens
+  # 0.28.17; 0.28.x hat die Exporte.
+  kysely: 0.28.17

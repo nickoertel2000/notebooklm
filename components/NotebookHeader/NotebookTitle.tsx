@@ -18,13 +18,12 @@ export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, 
   const [generating, setGenerating] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    setTitle(initialTitle)
-  }, [initialTitle])
-
-  useEffect(() => {
-    setEmoji(initialEmoji)
-  }, [initialEmoji])
+  const [prevInitial, setPrevInitial] = useState({ title: initialTitle, emoji: initialEmoji })
+  if (initialTitle !== prevInitial.title || initialEmoji !== prevInitial.emoji) {
+    setPrevInitial({ title: initialTitle, emoji: initialEmoji })
+    if (initialTitle !== prevInitial.title) setTitle(initialTitle)
+    if (initialEmoji !== prevInitial.emoji) setEmoji(initialEmoji)
+  }
 
   // Auto-Titel (inkl. Icon) aus dem NotebookView (anderer Teilbaum) live übernehmen.
   useEffect(() => {
@@ -135,9 +134,7 @@ export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, 
             onClick={generateTitle}
             disabled={generating}
           >
-            <span className={`material-symbols-outlined ${generating ? styles.titleAiSpin : ""}`}>
-              {generating ? "progress_activity" : "auto_awesome"}
-            </span>
+            <span className={`material-symbols-outlined ${generating ? styles.titleAiSpin : ""}`}>{generating ? "progress_activity" : "auto_awesome"}</span>
           </button>
         </span>
         <span className={styles.titleEmoji} role="img" aria-label="Notebook-Icon">
