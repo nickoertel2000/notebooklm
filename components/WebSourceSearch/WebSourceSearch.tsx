@@ -9,7 +9,6 @@ import styles from "./WebSourceSearch.module.scss"
 type WebResult = { title: string; url: string; description: string }
 type Depth = "quick" | "deep"
 
-// „deep" liefert mehr und breitere Suchen, aber keinen eigenen Bericht (siehe discover-Route).
 const DEPTH_OPTIONS: Record<Depth, { label: string; description: string; icon: string }> = {
   quick: { label: "Schnelle Recherche", description: "Ideal für schnelle Ergebnisse", icon: "travel_explore" },
   deep: { label: "Deep Research", description: "Gründlichere Suche und detaillierte Ergebnisse", icon: "network_intelligence" }
@@ -17,13 +16,11 @@ const DEPTH_OPTIONS: Record<Depth, { label: string; description: string; icon: s
 
 type Props = {
   notebookId: string
-  // Importiert die ausgewählten URLs als Quellen. Wirft nicht, einzelne Fehler überspringt der Aufrufer.
+  // Wirft nicht, fehlgeschlagene URLs überspringt der Aufrufer.
   onImport: (urls: string[]) => Promise<void>
-  // "modal": größeres Suchfeld mit Web-Chip und Pfeil, wie im Popup „Quellen hinzufügen".
   variant?: "panel" | "modal"
 }
 
-// Websuche nach neuen Quellen (Discover): Suchfeld, Recherche-Tiefe, Trefferauswahl, Import.
 export default function WebSourceSearch({ notebookId, onImport, variant = "panel" }: Props) {
   const isModal = variant === "modal"
   const [depth, setDepth] = useState<Depth>("quick")
@@ -57,7 +54,7 @@ export default function WebSourceSearch({ notebookId, onImport, variant = "panel
       if (!res.ok) throw new Error(await readError(res, "Suche fehlgeschlagen"))
       const found = (await readJson<{ results?: WebResult[] }>(res)).results ?? []
       setResults(found)
-      setSelected(new Set(found.map((r) => r.url))) // standardmäßig alle ausgewählt
+      setSelected(new Set(found.map((r) => r.url)))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {

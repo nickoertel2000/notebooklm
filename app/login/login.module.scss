@@ -149,7 +149,6 @@
     box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
   }
 
-  // Teaser ohne Funktion (siehe .claude/rules/auth.md).
   &:disabled {
     position: relative;
     background-color: #c4c7c5;

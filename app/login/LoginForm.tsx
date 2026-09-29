@@ -68,7 +68,7 @@ export default function LoginForm() {
       const { error: authError } = mode === "signup" ? await authClient.signUp.email({ name, email, password }) : await authClient.signIn.email({ email, password })
 
       if (authError) {
-        // Das gespeicherte Demo-Konto wurde nach der Inaktivitätsfrist gelöscht.
+        // Scheitert der Login mit dem gespeicherten Demo-Konto, wurde es nach Inaktivität gelöscht.
         if (mode === "signin" && storedDemo && email === storedDemo.email) {
           saveDemoAccount(null)
           setFilledDemo(null)

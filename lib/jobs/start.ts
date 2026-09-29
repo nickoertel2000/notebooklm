@@ -1,9 +1,8 @@
 import { env } from "cloudflare:workers"
 import type { AudioParams, IngestSourceParams, ReportParams, VideoParams } from "./types"
 
-// Instanz-ID = ID der DB-Zeile, damit Instanzen im Dashboard zuordenbar sind und
-// beim Löschen gezielt beendet werden können. Quellen können erneut importiert
-// werden, deshalb dort mit Zeitstempel (IDs sind pro Workflow eindeutig).
+// Instanz-ID = ID der DB-Zeile, damit cancelJob die Instanz findet. Quellen lassen sich
+// erneut importieren und Instanz-IDs sind pro Workflow eindeutig, daher dort mit Zeitstempel.
 
 export function startIngestSource(params: IngestSourceParams) {
   return env.INGEST_SOURCE_WORKFLOW.create({ id: `${params.sourceId}-${Date.now()}`, params })
@@ -27,13 +26,11 @@ const workflows = {
   video: () => env.VIDEO_WORKFLOW
 }
 
-// Bricht eine laufende Generierung ab. Fertige oder unbekannte Instanzen werfen
-// beim terminate() – das ist beim Löschen egal.
 export async function cancelJob(kind: keyof typeof workflows, id: string) {
   try {
     const instance = await workflows[kind]().get(id)
     await instance.terminate()
   } catch {
-    // Instanz bereits beendet oder nie gestartet.
+    // Fertige oder nie gestartete Instanzen werfen, beim Löschen egal.
   }
 }

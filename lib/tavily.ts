@@ -8,12 +8,11 @@ const EXCLUDED_DOMAINS = ["youtube.com", "youtu.be", "vimeo.com", "tiktok.com"]
 
 export type SearchHit = { title: string; url: string; content: string }
 
-// Gratis-Tarif (1.000 Credits pro Monat) aufgebraucht: Tavily antwortet mit 432.
+// Tavily meldet ein aufgebrauchtes Kontingent mit 432 bzw. 433 statt 429.
 export class SearchQuotaError extends Error {}
 
 type TavilyResponse = { results?: { title?: string; url?: string; content?: string }[] }
 
-// basic kostet 1 Credit, advanced 2.
 export async function webSearch(query: string, deep: boolean): Promise<SearchHit[]> {
   const res = await fetch(TAVILY_URL, {
     method: "POST",

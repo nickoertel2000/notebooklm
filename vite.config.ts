@@ -6,8 +6,7 @@ import vinext from "vinext"
 import { defineConfig } from "vite"
 import { patchCssModules } from "vite-css-modules"
 
-// Der Video-Renderer-Container braucht lokal einen Docker-Daemon. Ohne Docker
-// startet der Dev-Server trotzdem, nur das Rendern der Video-Übersicht schlägt fehl.
+// Ohne Docker startet der Dev-Server trotzdem, nur das Rendern der Video-Übersicht schlägt fehl.
 const dockerAvailable = spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0
 
 export default defineConfig({
@@ -19,7 +18,6 @@ export default defineConfig({
         name: "rsc",
         childEnvironments: ["ssr"]
       },
-      // Jobs-Worker läuft im selben Dev-Server, damit die Workflow-Bindings der App lokal funktionieren.
       auxiliaryWorkers: [
         {
           configPath: "./workers/jobs/wrangler.jsonc",

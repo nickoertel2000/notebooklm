@@ -1,15 +1,9 @@
-// Bericht-Typen für die Studio-Funktion „Berichte". Jeder Typ ist im Kern ein
-// fester Prompt, der über alle (ausgewählten) Quellen des Notebooks läuft.
-
 export type ReportType = {
   id: string
   label: string
-  // Kurzbezeichnung für die Meta-Zeile im Studio.
   metaLabel: string
   icon: string
-  // Kurzbeschreibung für die Karte im Bericht-Popup.
   description: string
-  // Beschreibt dem Modell, welche Art von Dokument es erzeugen soll.
   instruction: string
 }
 
@@ -47,8 +41,6 @@ export function getReportType(id: string): ReportType | undefined {
   return REPORT_TYPES.find((t) => t.id === id)
 }
 
-// System-Prompt für die Bericht-Erstellung. `language` ist der Anzeigename der
-// gewählten Sprache (z. B. „Deutsch (Standard)", „English"); ohne Angabe Deutsch.
 export function buildReportSystemPrompt(language?: string): string {
   const isGerman = !language || /deutsch|german|standard/i.test(language)
   const langLine = isGerman ? "- Antworte auf Deutsch." : `- Schreibe den gesamten Bericht auf: ${language}.`
@@ -60,8 +52,6 @@ ${langLine}
 - Formatiere die Ausgabe als einfaches Markdown: Überschriften mit #/##/###, Aufzählungen mit "- ", Nummerierungen mit "1.", Hervorhebungen mit **fett**. Verwende keine Tabellen und keinen Code.`
 }
 
-// Leitet aus dem erzeugten Markdown einen kurzen Titel ab: erste H1/H2,
-// sonst die erste nichtleere Zeile. Fällt auf das Label zurück.
 export function deriveReportTitle(markdown: string, fallback: string): string {
   for (const raw of markdown.split("\n")) {
     const line = raw.trim()

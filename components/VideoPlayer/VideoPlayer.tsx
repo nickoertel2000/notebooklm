@@ -9,7 +9,6 @@ type VideoPlayerProps = {
   onClose: () => void
 }
 
-// Vollbild-Overlay, das die erzeugte MP4-Video-Übersicht abspielt.
 export default function VideoPlayer({ title, src, onClose }: VideoPlayerProps) {
   return (
     <div className={styles.overlay} onClick={onClose}>

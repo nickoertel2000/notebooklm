@@ -16,9 +16,6 @@ const SYSTEM_PROMPT = `Du erzeugst einen kurzen, prägnanten Titel für ein Note
 - 2 bis 6 Wörter, auf Deutsch.
 - Beschreibe das übergreifende Thema, nicht eine einzelne Quelle.`
 
-// Generiert aus den vorhandenen Quellen und Chat-Nachrichten automatisch einen
-// Titel. Standardmäßig nur, wenn das Notebook noch den Standardtitel trägt –
-// mit `{ force: true }` auch für bereits benannte Notebooks (manueller Neu-Vorschlag).
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
 
@@ -30,12 +27,10 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const body = await readJsonBody(req)
   const force = body.force === true
 
-  // Bereits benannt und kein erzwungener Neu-Vorschlag → nichts tun.
   if (!force && notebook.title !== DEFAULT_NOTEBOOK_TITLE) {
     return NextResponse.json({ title: notebook.title, generated: false })
   }
 
-  // Kontext sammeln: Quellentitel, ein paar Textausschnitte, erste Nutzerfragen.
   const [sourceRows, chunkRows, userMessages] = await Promise.all([
     db.select({ title: sources.title }).from(sources).where(eq(sources.notebookId, notebookId)).limit(20),
     db.select({ content: sourceChunks.content }).from(sourceChunks).where(eq(sourceChunks.notebookId, notebookId)).orderBy(asc(sourceChunks.createdAt)).limit(3),
@@ -58,7 +53,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     parts.push("Fragen des Nutzers:\n" + userMessages.map((m) => `- ${m.content}`).join("\n"))
   }
 
-  // Keine Grundlage für einen Titel → Default beibehalten.
   if (parts.length === 0) {
     return NextResponse.json({ title: notebook.title, generated: false })
   }
@@ -72,7 +66,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       minimalThinking: true
     })
 
-    // Erste nichtleere Zeile, ohne Anführungszeichen/Umrandung.
     const title = (raw.split("\n").find((l) => l.trim()) ?? "")
       .replace(/^["'„“”]+|["'„“”.]+$/g, "")
       .trim()
@@ -80,11 +73,9 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
     if (!title) return NextResponse.json({ title: notebook.title, generated: false })
 
-    // Passendes Icon aus der Bibliothek zum erzeugten Titel wählen.
     const emoji = await pickNotebookEmoji(title)
 
-    // Ohne force nur überschreiben, wenn der Titel zwischenzeitlich nicht manuell
-    // geändert wurde; mit force (manueller Neu-Vorschlag) immer.
+    // Ohne force nicht überschreiben, falls der Nutzer den Titel während der Generierung umbenannt hat.
     await db
       .update(notebooks)
       .set({ title, ...(emoji ? { emoji } : {}), updatedAt: new Date() })

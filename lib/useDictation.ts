@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 
-// Diktat per Web Speech API (Browser-nativ, kostenlos, Echtzeit). Funktioniert
-// in Chrome/Edge; wird der Konstruktor nicht gefunden, ist `supported` false.
-
-// Minimaltypen – die Web Speech API ist nicht in den Standard-DOM-Typen enthalten.
+// Die Web Speech API fehlt in den Standard-DOM-Typen.
 interface SpeechRecognitionResultLike {
   isFinal: boolean
   0: { transcript: string }
@@ -52,8 +49,6 @@ export function useDictation(lang = "de-DE") {
     return () => recognitionRef.current?.abort()
   }, [])
 
-  // Startet das Diktat. `onUpdate` erhält fortlaufend den aktuellen Transkript-
-  // Text (finale + vorläufige Teile) dieser Sitzung.
   const start = useCallback(
     (onUpdate: (text: string) => void) => {
       const Ctor = getCtor()

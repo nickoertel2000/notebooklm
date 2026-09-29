@@ -1,7 +1,3 @@
-// Zerlegt einen Text in überlappende Chunks an möglichst natürlichen Grenzen
-// (Absatz/Satz). charStart/charEnd erlauben später den Sprung zur Zitatstelle.
-// Heuristik: ~800 Tokens ≈ 3200 Zeichen, ~100 Tokens Überlappung ≈ 400 Zeichen.
-
 export type Chunk = {
   idx: number
   content: string
@@ -16,6 +12,7 @@ type ChunkOptions = {
 }
 
 export function chunkText(text: string, options: ChunkOptions = {}): Chunk[] {
+  // Etwa 800 Tokens pro Chunk und 100 Tokens Überlappung.
   const maxChars = options.maxChars ?? 3200
   const overlapChars = options.overlapChars ?? 400
   const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
@@ -27,7 +24,6 @@ export function chunkText(text: string, options: ChunkOptions = {}): Chunk[] {
   while (start < normalized.length) {
     let end = Math.min(start + maxChars, normalized.length)
 
-    // An einer Absatz-/Satzgrenze in der hinteren Hälfte des Fensters trennen.
     if (end < normalized.length) {
       const slice = normalized.slice(start, end)
       const boundary = Math.max(slice.lastIndexOf("\n\n"), slice.lastIndexOf("\n"), slice.lastIndexOf(". "))

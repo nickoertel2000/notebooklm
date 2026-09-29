@@ -6,18 +6,16 @@ import styles from "./AddSourceModal.module.scss"
 
 const ROTATING_WORDS = ["Deine Dokumente", "Websites", "Deine Notizen"] as const
 
-const HOLD_DURATION = 3000 // ms sichtbar
-const EXIT_DURATION = 280 // ms (muss zur SCSS-Keyframe-Dauer passen)
+const HOLD_DURATION = 3000
+const EXIT_DURATION = 280 // muss zu $exit-duration in der SCSS passen
 
 export type AddSourcePayload = { type: "pdf"; file: File } | { type: "url"; url: string } | { type: "text"; title?: string; text: string }
 
 interface AddSourceModalProps {
   notebookId: string
-  /** Wird beim Klick auf das X bzw. den Overlay-Hintergrund aufgerufen. */
   onClose?: () => void
-  /** Legt eine neue Quelle an. Wirft bei Fehler. */
+  /** Wirft bei Fehler. */
   onAdd: (payload: AddSourcePayload) => Promise<void>
-  /** Importiert die in der Websuche ausgewählten URLs. */
   onImportUrls: (urls: string[]) => Promise<void>
 }
 

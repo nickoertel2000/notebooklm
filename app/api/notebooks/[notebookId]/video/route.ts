@@ -7,14 +7,11 @@ import { startVideo } from "@/lib/jobs/start"
 import { getVideoFormat, getVisualStyle } from "@/lib/video"
 import { readJsonBody, optionalString, parseSourceIds } from "@/lib/api/body"
 
-// Video-Übersichten, die länger als das hier in 'processing' hängen, gelten als
-// abgebrochen und werden beim Auflisten auf 'failed' gesetzt — sonst pollt das
-// Studio-Panel endlos. Großzügig: Skript + mehrere TTS-/Bild-Calls + ffmpeg.
+// Großzügig: Skript, TTS und Bild pro Folie, danach das Rendern.
 const STALE_PROCESSING_MS = 20 * 60 * 1000
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
 
-// Persistierte Video-Übersichten des Notebooks auflisten (ohne storageKey) – fürs Studio-Panel.
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
   const auth = await authorizeNotebook(notebookId)
@@ -51,8 +48,6 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   return NextResponse.json({ videos: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })) })
 }
 
-// Video-Übersicht erstellen: 'processing'-Zeile anlegen und den VideoWorkflow
-// starten (Skript, TTS + Bild pro Folie, Rendern im Container), das Frontend pollt.
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
   const auth = await authorizeNotebook(notebookId)

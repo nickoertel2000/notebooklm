@@ -11,7 +11,6 @@ import { getNotebookForUser } from "@/lib/notebooks"
 import { cancelJob } from "@/lib/jobs/start"
 import { deleteByPrefix, notebookPrefix } from "@/lib/storage"
 
-// Legt ein neues Notebook für den aktuellen User an und leitet darauf weiter.
 export async function createNotebook() {
   const user = await getSessionUser()
   if (!user) redirect("/login")
@@ -21,7 +20,6 @@ export async function createNotebook() {
   redirect(`/notebook/${row.id}`)
 }
 
-// Löscht ein Notebook samt aller Daten (Quellen + Chunks via FK-Kaskade, Dateien per Prefix).
 export async function deleteNotebook(notebookId: string) {
   const user = await getSessionUser()
   if (!user) redirect("/login")
@@ -53,7 +51,6 @@ export async function deleteNotebook(notebookId: string) {
   revalidatePath("/")
 }
 
-// Ändert den Titel eines Notebooks.
 export async function renameNotebook(notebookId: string, title: string) {
   const user = await getSessionUser()
   if (!user) redirect("/login")
@@ -61,7 +58,6 @@ export async function renameNotebook(notebookId: string, title: string) {
   const trimmed = title.trim()
   if (!trimmed) return null
 
-  // Zum neuen Titel automatisch ein passendes Icon aus der Bibliothek wählen.
   const emoji = await pickNotebookEmoji(trimmed)
 
   await getDb()
@@ -70,6 +66,5 @@ export async function renameNotebook(notebookId: string, title: string) {
     .where(and(eq(notebooks.id, notebookId), eq(notebooks.userId, user.id)))
 
   revalidatePath("/")
-  // Das gewählte Emoji zurückgeben, damit der Header es sofort anzeigen kann.
   return emoji
 }

@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react"
 
-// Zugangsdaten des eigenen Demo-Kontos, damit Besucher innerhalb der Frist zurückkommen.
-// Nur eine Komfortfunktion: Ohne Browser-Speicher bleibt der Demo-Zugang nutzbar.
+// Reiner Komfort, damit Besucher innerhalb der Frist zurückkommen: Ohne Browser-Speicher
+// muss der Demo-Zugang trotzdem funktionieren.
 const STORAGE_KEY = "notebooklm-demo-account"
 const CHANGE_EVENT = "notebooklm-demo-account-change"
 

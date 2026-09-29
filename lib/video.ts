@@ -1,22 +1,10 @@
-// Video-Übersicht (NotebookLM-Stil): KEIN echtes KI-Video, sondern eine vertonte
-// Slideshow. Pipeline (VideoWorkflow in workers/jobs):
-//   1. Gemini erzeugt aus den Quellen ein strukturiertes Skript (Folien + Narration).
-//   2. Gemini TTS vertont jede Narration einzeln (lib/gemini.ts → synthesizeSpeech).
-//   3. FLUX über Workers AI malt pro Folie einen Hintergrund im gewählten
-//      visuellen Stil (workers/jobs/src/images.ts), begrenzt durch IMAGE_DAILY_LIMIT.
-//   4. Der Container containers/video-renderer brennt Titel + Stichpunkte per
-//      ffmpeg-drawtext darüber und fügt alle Folien zur MP4 zusammen.
-
 // ───────────────────────── Formate ─────────────────────────
-// Entspricht den zwei Karten im Popup („Erklärvideo" / „Zusammenfassung").
 
 export type VideoFormat = {
   id: string
   label: string
   description: string
-  // Steuert Folienanzahl + Länge der Narration je Folie.
   depth: "kurz" | "standard"
-  // Beschreibt Claude, welche Art Skript es erzeugen soll.
   instruction: string
 }
 
@@ -44,15 +32,12 @@ export function getVideoFormat(id: string): VideoFormat | undefined {
 }
 
 // ───────────────────────── Visuelle Stile ─────────────────────────
-// Entspricht der Stil-Reihe im Popup. Genau diese fünf passen ohne horizontales
-// Scrollen ins Modal (Vorgabe). `imageStyle` fließt in den Nano-Banana-Prompt ein;
-// `custom` nimmt stattdessen den Freitext des Nutzers.
+// Mehr als fünf Stile passen nicht ohne horizontales Scrollen ins Modal.
 
 export type VisualStyle = {
   id: string
   label: string
   icon: string
-  // Stil-Fragment für den Bild-Prompt (leer bei custom → Freitext).
   imageStyle: string
 }
 
@@ -95,20 +80,16 @@ export function getVisualStyle(id: string): VisualStyle | undefined {
 
 // ───────────────────────── Skript ─────────────────────────
 
-// Obergrenze pro Video. Die Tagesgrenze für Folienbilder rechnet mit diesem Wert.
+// Die Tagesgrenze für Folienbilder rechnet mit diesem Wert.
 export const MAX_SLIDES = 8
 
 // Dateiendung des Folienbilds im Render-Manifest, null = einfarbiger Hintergrund.
 export type SlideBackground = "png" | "jpg" | "webp" | null
 
 export type VideoSegment = {
-  // Folien-Überschrift (kurz, plakativ).
   slideTitle: string
-  // Stichpunkte auf der Folie (werden visuell gezeigt, nicht vorgelesen).
   bullets: string[]
-  // Sprechtext für diese Folie (Gemini TTS).
   narration: string
-  // Kurzer Bildmotiv-Hinweis (englisch) für die Hintergrund-Illustration.
   imageHint: string
 }
 
@@ -122,8 +103,6 @@ const SEGMENT_HINT: Record<VideoFormat["depth"], string> = {
   standard: "Erzeuge 5–7 Folien. Jede Narration ca. 70–110 Wörter (etwa 30–45 Sekunden)."
 }
 
-// System-Prompt für die Skript-Erzeugung. Fordert striktes JSON (Slide-Struktur).
-// `language` ist der Anzeigename der Sprache (z. B. „Deutsch").
 export function buildVideoScriptSystemPrompt(format: VideoFormat, language: string, focus: string | null): string {
   const focusLine = focus ? `\n- Lege den Fokus besonders auf: ${focus}` : ""
   return `Du erstellst das Skript für eine vertonte Video-Übersicht (Slideshow) eines Notebooks, ausschließlich auf Basis der bereitgestellten Quellen.
@@ -144,8 +123,7 @@ Antworte AUSSCHLIESSLICH mit gültigem JSON in exakt dieser Form, ohne Code-Fenc
 {"title":"<Gesamttitel der Video-Übersicht>","segments":[{"slideTitle":"...","bullets":["...","..."],"narration":"...","imageHint":"..."}]}`
 }
 
-// Parst die JSON-Antwort robust: entfernt evtl. Code-Fences und schneidet auf das
-// äußerste {...}-Objekt zu, falls das Modell doch Text drumherum schreibt.
+// Das Modell schreibt trotz Anweisung manchmal Code-Fences oder Text um das JSON.
 export function parseVideoScript(raw: string): VideoScript {
   let text = raw.trim()
   const fence = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(text)
@@ -194,9 +172,7 @@ export function parseVideoScript(raw: string): VideoScript {
 
 // ───────────────────────── Bild-Prompt ─────────────────────────
 
-// Baut den Prompt für die Hintergrund-Illustration einer Folie. `customStyle`
-// greift nur bei visualStyle === "custom". Wir verbieten explizit Text im Bild,
-// weil Titel/Stichpunkte sauber per ffmpeg-drawtext darübergelegt werden.
+// Kein Text im Bild: Titel und Stichpunkte legt der Renderer per drawtext darüber.
 export function buildSlideImagePrompt(style: VisualStyle, customStyle: string | null, segment: VideoSegment): string {
   const styleFragment = style.id === "custom" && customStyle ? customStyle : style.imageStyle
   const motif = segment.imageHint || segment.slideTitle
@@ -210,12 +186,10 @@ export function buildSlideImagePrompt(style: VisualStyle, customStyle: string | 
 
 // ───────────────────────── Layout-Helfer ─────────────────────────
 
-// 16:9 in 720p (gerade Maße für libx264).
+// libx264 braucht gerade Maße.
 export const SLIDE_WIDTH = 1280
 export const SLIDE_HEIGHT = 720
 
-// Bricht Text grob auf eine maximale Zeichenzahl je Zeile um (an Wortgrenzen).
-// Wird sowohl für die Titel- als auch die Stichpunkt-Umbrüche genutzt.
 export function wrapText(text: string, maxChars: number): string[] {
   const words = text.split(/\s+/).filter(Boolean)
   const lines: string[] = []
@@ -239,8 +213,6 @@ export type SlideLayout = {
   titleLines: number
 }
 
-// Textlayout einer Folie für den Renderer: Titel max. 2 Zeilen, max. 4 Stichpunkte
-// mit je max. 2 Zeilen (Folgezeilen eingerückt), Seitenzähler als Fußzeile.
 export function layoutSlide(segment: VideoSegment, index: number, total: number): SlideLayout {
   const titleLines = wrapText(segment.slideTitle, 26).slice(0, 2)
 

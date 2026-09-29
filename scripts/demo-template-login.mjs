@@ -1,11 +1,4 @@
-// Setzt E-Mail und Passwort des Demo-Vorlage-Kontos direkt in der Datenbank (ohne
-// Login nicht über Better Auth möglich). Das Passwort kommt aus 1Password und wird
-// nie ausgegeben.
-//
-//   node --env-file=.env.local scripts/demo-template-login.mjs --from <alte E-Mail> --to <neue E-Mail>
-//   … zusätzlich --apply schreibt die Änderung, ohne nur eine Vorschau.
-//
-// Danach DEMO_TEMPLATE_EMAIL in wrangler.jsonc auf die neue E-Mail setzen.
+// Direkt in der Datenbank, weil Better Auth E-Mail und Passwort nur mit Login ändern lässt.
 import { execFileSync } from "node:child_process"
 import { parseArgs } from "node:util"
 import { hashPassword } from "better-auth/crypto"
@@ -21,7 +14,6 @@ if (!from || !to) {
   console.error("Aufruf: --from <alte E-Mail> [--to <neue E-Mail>] [--apply]")
   process.exit(1)
 }
-// Die Aufräumroutine löscht alle Konten dieser Domain.
 if (to.endsWith(DEMO_DOMAIN)) {
   console.error(`Die Vorlage darf nicht auf ${DEMO_DOMAIN} enden, sonst wird sie nach 7 Tagen gelöscht.`)
   process.exit(1)

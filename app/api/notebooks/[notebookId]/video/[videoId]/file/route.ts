@@ -8,7 +8,6 @@ import { serveObject } from "@/lib/storage"
 
 type RouteContext = { params: Promise<{ notebookId: string; videoId: string }> }
 
-// Streamt die MP4-Datei aus R2 (inkl. Range-Requests fürs Spulen im Player).
 export async function GET(req: NextRequest, { params }: RouteContext) {
   const { notebookId, videoId } = await params
   const auth = await authorizeNotebook(notebookId)

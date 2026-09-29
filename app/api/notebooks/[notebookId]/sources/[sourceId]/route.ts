@@ -19,8 +19,6 @@ async function findSource(notebookId: string, sourceId: string) {
   return row ?? null
 }
 
-// Fehlgeschlagenen Import erneut versuchen: Die Datei liegt noch in R2, es wird
-// nur ein neuer Import-Workflow gestartet.
 export async function POST(_req: NextRequest, { params }: RouteContext) {
   const { notebookId, sourceId } = await params
   const auth = await authorizeNotebook(notebookId)
@@ -59,8 +57,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
     console.error("Dateien der Quelle konnten nicht gelöscht werden:", err)
   }
 
-  // Chunks werden per FK-Kaskade mitgelöscht. Ein laufender Import bricht beim
-  // nächsten Schritt selbst ab, weil die Quelle fehlt.
+  // Kein cancelJob nötig: Ein laufender Import bricht beim nächsten Schritt ab, weil die Quelle fehlt.
   await getDb().delete(sources).where(eq(sources.id, sourceId))
 
   return NextResponse.json({ ok: true })

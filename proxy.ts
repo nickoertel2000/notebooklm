@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSessionCookie } from "better-auth/cookies"
 
-// Nur ein Komfort-Redirect ohne Session-Cookie – die echte Prüfung macht jede Page/Route selbst.
+// Nur ein Komfort-Redirect, keine Sicherheitsgrenze: Jede Page und Route prüft die Session selbst.
 export function proxy(request: NextRequest) {
   const sessionCookie = getSessionCookie(request)
 

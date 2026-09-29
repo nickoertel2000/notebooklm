@@ -8,7 +8,6 @@ import { isUuid } from "@/lib/notebooks"
 
 type RouteContext = { params: Promise<{ notebookId: string; reportId: string }> }
 
-// Einzelnen Bericht inkl. content laden (für die Anzeige).
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const { notebookId, reportId } = await params
   const auth = await authorizeNotebook(notebookId)
@@ -26,7 +25,6 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   return NextResponse.json({ report: { ...row, createdAt: row.createdAt.toISOString() } })
 }
 
-// Bericht löschen, eine laufende Erstellung wird abgebrochen.
 export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const { notebookId, reportId } = await params
   const auth = await authorizeNotebook(notebookId)

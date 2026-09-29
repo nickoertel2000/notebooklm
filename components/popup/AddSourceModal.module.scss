@@ -1,5 +1,3 @@
-// AddSourceModal.module.scss
-
 // ---- Theme-Variablen (NotebookLM Dark) ----
 $modal-bg: #1d1e20;
 $modal-radius: 24px;
@@ -13,19 +11,16 @@ $search-border: #6b8cff;
 $pill-bg: #2a2b2d;
 $pill-border: rgba(255, 255, 255, 0.12);
 
-// Dauer der Textwechsel-Animation (exit muss zu EXIT_DURATION in der TSX passen)
+// $exit-duration muss zu EXIT_DURATION in AddSourceModal.tsx passen.
 $exit-duration: 0.28s;
 $enter-duration: 0.35s;
 
 // ---- Material Symbols ----
-// Liegt auf demselben <span> wie die globale Klasse .material-symbols-outlined,
-// daher greifen font-size und font-variation-settings hier direkt.
 .icon {
   font-size: 20px;
   line-height: 1;
   vertical-align: middle;
   flex-shrink: 0;
-  // FILL 0 = outlined; opsz an Pixelgröße angelehnt
   font-variation-settings:
     "FILL" 0,
     "wght" 400,
@@ -95,7 +90,6 @@ $enter-duration: 0.35s;
   color: $text-primary;
 }
 
-// Erste Zeile der Überschrift mit dem wechselnden Wort.
 .rotatingLine {
   display: block;
   margin-bottom: 2px;
@@ -104,19 +98,17 @@ $enter-duration: 0.35s;
 }
 
 .rotating {
-  // inline-block ist nötig, damit transform (translateY) greift
+  // transform greift nicht auf Inline-Elementen.
   display: inline-block;
   color: $accent-blue;
   white-space: nowrap;
   will-change: transform, opacity;
 }
 
-// Phase 1: alter Text fliegt nach oben weg und blendet aus
 .exit {
   animation: rotateWordOut $exit-duration cubic-bezier(0.4, 0, 1, 1) both;
 }
 
-// Phase 2: neuer Text wird von leicht unten hochgeschoben und eingeblendet
 .enter {
   animation: rotateWordIn $enter-duration cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -143,7 +135,6 @@ $enter-duration: 0.35s;
   }
 }
 
-// Barrierefreiheit: bei reduzierter Bewegung nur sanftes Ein-/Ausblenden
 @media (prefers-reduced-motion: reduce) {
   .exit,
   .enter {

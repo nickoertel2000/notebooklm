@@ -10,7 +10,6 @@ export type RenderSlide = {
   body: string
   footer: string
   titleLines: number
-  // Dateiendung des Hintergrundbilds, null = einfarbig.
   background: "png" | "jpg" | "webp" | null
 }
 
@@ -20,7 +19,7 @@ export type RenderManifest = {
   slides: RenderSlide[]
 }
 
-// Pfad zur Font-Datei im Image (siehe Dockerfile).
+// Das Dockerfile kopiert die Schrift ins WORKDIR.
 const FONT_FILE = path.resolve("font.ttf")
 
 function buildSlideFilter(manifest: RenderManifest, slide: RenderSlide, i: number): string {
@@ -31,7 +30,6 @@ function buildSlideFilter(manifest: RenderManifest, slide: RenderSlide, i: numbe
     parts.push(`scale=${width}:${height}:force_original_aspect_ratio=increase`)
     parts.push(`crop=${width}:${height}`)
   }
-  // Abdunkelnder Schleier, damit der Text unabhängig vom Bildmotiv lesbar bleibt.
   parts.push(`drawbox=x=0:y=0:w=${width}:h=${height}:color=black@0.42:t=fill`)
 
   const titleY = 120
@@ -46,9 +44,7 @@ function buildSlideFilter(manifest: RenderManifest, slide: RenderSlide, i: numbe
   return parts.join(",")
 }
 
-// Erwartet die Eingaben bereits in dir: slide{i}.wav und ggf. slide{i}.{background}.
-// Pro Folie ein Clip (Standbild + Vertonung, -shortest synchronisiert auf die Narration),
-// danach verlustfreies concat. 48 kHz Stereo, weil manche Player 24-kHz-Mono stumm abspielen.
+// 48 kHz Stereo, weil manche Player 24-kHz-Mono stumm abspielen.
 export async function composeVideo(dir: string, manifest: RenderManifest): Promise<string> {
   if (manifest.slides.length === 0) throw new Error("Keine Folien zum Rendern")
 

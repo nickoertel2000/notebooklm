@@ -9,8 +9,6 @@ import { deleteNotebookObject } from "@/lib/storage"
 
 type RouteContext = { params: Promise<{ notebookId: string; audioId: string }> }
 
-// Metadaten fürs Abspielen. Die Datei selbst liefert audio/[audioId]/file aus, der
-// Storage-Key verlässt den Server nie.
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const { notebookId, audioId } = await params
   const auth = await authorizeNotebook(notebookId)
@@ -37,7 +35,6 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   return NextResponse.json({ audio: { ...audio, url, createdAt: row.createdAt.toISOString() } })
 }
 
-// Audio löschen: laufende Erstellung abbrechen, Datei und DB-Zeile entfernen.
 export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const { notebookId, audioId } = await params
   const auth = await authorizeNotebook(notebookId)

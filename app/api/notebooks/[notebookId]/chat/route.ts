@@ -17,7 +17,6 @@ const SYSTEM_PROMPT = `Du bist der KI-Assistent eines Notebooks. Beantworte die 
 - Wenn die Antwort nicht aus den Auszügen hervorgeht, sage das offen und erfinde nichts.
 - Antworte auf Deutsch, klar und prägnant.`
 
-// [n] oder [n, m] im Antworttext.
 const MARKER_PATTERN = /\[(\d+(?:\s*,\s*\d+)*)\]/g
 
 type RetrievedChunk = {
@@ -43,10 +42,8 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const message = typeof body.message === "string" ? body.message : ""
   if (!message.trim()) return NextResponse.json({ error: "Nachricht fehlt" }, { status: 400 })
 
-  // Optional auf die vom Nutzer ausgewählten Quellen einschränken.
   const selectedIds = parseSourceIds(body.sourceIds)
 
-  // Frage einbetten + notebook-gefilterte Similarity-Suche (nur fertige Quellen).
   const queryVector = await embedQuery(message)
   const distance = cosineDistance(sourceChunks.embedding, queryVector)
   const retrieved: RetrievedChunk[] = await db
@@ -111,9 +108,8 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
         const citations = extractCitations(fullText, retrieved)
 
-        // Frage erst mit der fertigen Antwort speichern: Nach einem Fehler bliebe
-        // sonst eine unbeantwortete Frage im Verlauf, bei jedem neuen Versuch eine weitere.
-        // Getrennte Inserts, damit created_at die Reihenfolge eindeutig hält.
+        // Frage erst mit der fertigen Antwort speichern, sonst sammeln sich nach Fehlern
+        // unbeantwortete Fragen im Verlauf. Getrennte Inserts, damit created_at die Reihenfolge hält.
         await db.insert(messages).values({ notebookId, role: "user", content: message })
         const [row] = await db.insert(messages).values({ notebookId, role: "assistant", content: fullText, citations }).returning({ id: messages.id })
 
@@ -132,8 +128,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   })
 }
 
-// Marker [n] aus der Antwort auf die abgerufenen Chunks abbilden, in Reihenfolge
-// des ersten Auftretens, ein Zitat pro Marker.
 function extractCitations(text: string, retrieved: RetrievedChunk[]): MessageCitation[] {
   const byMarker = new Map<number, MessageCitation>()
 

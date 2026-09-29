@@ -8,8 +8,6 @@ export function isUuid(value: string) {
   return UUID_RE.test(value)
 }
 
-// Liefert das Notebook nur, wenn es existiert UND dem User gehört — sonst null.
-// Jeder notebook-gebundene Zugriff MUSS hierüber laufen.
 export async function getNotebookForUser(notebookId: string, userId: string) {
   if (!isUuid(notebookId)) return null
   const rows = await getDb()
@@ -20,7 +18,6 @@ export async function getNotebookForUser(notebookId: string, userId: string) {
   return rows[0] ?? null
 }
 
-// Liefert alle Notebooks des Users inkl. Quellen-Anzahl, neueste zuerst.
 export async function getNotebooksForUser(userId: string) {
   return getDb()
     .select({

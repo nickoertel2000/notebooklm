@@ -4,7 +4,6 @@ const NUL = String.fromCharCode(0)
 
 export const stripNul = (s: string) => s.split(NUL).join("")
 
-// Fehlertext für die error-Spalte: ohne NUL-Bytes, auf 500 Zeichen gekürzt.
 export function toErrorMessage(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err)
   return stripNul(message).slice(0, 500)

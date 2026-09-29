@@ -64,7 +64,6 @@
   outline: none;
 }
 
-// Edit-Feld mit KI-Button am Ende.
 .titleEditWrap {
   position: relative;
   display: inline-flex;
@@ -72,7 +71,6 @@
   min-width: 0;
 }
 
-// Platz für den KI-Button rechts schaffen.
 .titleInputAi {
   padding-right: 38px;
 }
@@ -116,7 +114,6 @@
   }
 }
 
-// Notebook-Icon hinter dem Titel.
 .titleEmoji {
   flex-shrink: 0;
   font-size: 22px;

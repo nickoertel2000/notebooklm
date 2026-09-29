@@ -7,14 +7,11 @@ import { startAudio } from "@/lib/jobs/start"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { readJsonBody, optionalString, parseSourceIds } from "@/lib/api/body"
 
-// Audio-Übersichten, die länger als das hier in 'processing' hängen, gelten als
-// abgebrochen und werden beim Auflisten auf 'failed' gesetzt — sonst pollt das
-// Studio-Panel endlos. Großzügig, da TTS einer 'standard'-Länge dauern kann.
+// Großzügig, weil die TTS einer 'standard'-Länge lange dauern kann.
 const STALE_PROCESSING_MS = 15 * 60 * 1000
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
 
-// Persistierte Audio-Übersichten des Notebooks auflisten (ohne storageKey) – fürs Studio-Panel.
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
   const auth = await authorizeNotebook(notebookId)
@@ -22,7 +19,6 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 
   const db = getDb()
 
-  // Hängengebliebene 'processing'-Audios aufräumen, bevor wir auflisten.
   await db
     .update(audioOverviews)
     .set({ status: "failed", error: "Zeitüberschreitung bei der Erstellung" })
@@ -51,8 +47,6 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   return NextResponse.json({ audios: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })) })
 }
 
-// Audio-Übersicht erstellen: 'processing'-Zeile anlegen und den AudioWorkflow
-// starten (Claude-Skript + Gemini-TTS im Jobs-Worker), das Frontend pollt.
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
   const auth = await authorizeNotebook(notebookId)
@@ -69,7 +63,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const focus = optionalString(body.focus)
   const selectedIds = parseSourceIds(body.sourceIds)
 
-  // Sicherstellen, dass es überhaupt fertige Quellen gibt (schnelle Prüfung).
   const ready = await db
     .select({ id: sources.id })
     .from(sources)

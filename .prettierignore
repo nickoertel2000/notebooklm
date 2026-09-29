@@ -8,11 +8,9 @@ build
 *.min.css
 .env*
 
-# Cloudflare
 **/worker-configuration.d.ts
 cloudflare-env.d.ts
 
-# Drizzle ORM – auto-generierte Migrations-Metadaten
 db/migrations/meta/
 
 .wrangler

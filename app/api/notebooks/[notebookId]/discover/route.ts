@@ -18,8 +18,7 @@ Gib AUSSCHLIESSLICH ein JSON-Array zurück – ohne weiteren Text, ohne Code-Fen
 - Lass Werbung, reine Linksammlungen, Videos und Seiten ohne zusammenhängenden Text weg: Importiert wird der Text der Seite.
 - description immer auf Deutsch, ein Satz.`
 
-// Auswahl und deutsche Beschreibungen von Gemini. Nur URLs aus den Treffern zählen,
-// damit keine erfundenen Links durchkommen.
+// Nur URLs aus den Treffern zulassen, damit keine von Gemini erfundenen Links durchkommen.
 function pickResults(text: string, hits: SearchHit[]): DiscoverResult[] {
   const byUrl = new Map(hits.map((h) => [h.url, h]))
   const match = text.match(/\[[\s\S]*\]/)
@@ -36,11 +35,9 @@ function pickResults(text: string, hits: SearchHit[]): DiscoverResult[] {
   }
 }
 
-// Ohne brauchbare Gemini-Antwort: Tavily-Reihenfolge, Auszug als Beschreibung.
 const fallbackResults = (hits: SearchHit[]): DiscoverResult[] =>
   hits.map((h) => ({ title: h.title.slice(0, 200), url: h.url, description: h.content.replace(/\s+/g, " ").slice(0, 200) }))
 
-// Im Web nach neuen Quellen suchen: Tavily liefert die Treffer, Gemini wählt aus und beschreibt.
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
   const auth = await authorizeNotebook(notebookId)

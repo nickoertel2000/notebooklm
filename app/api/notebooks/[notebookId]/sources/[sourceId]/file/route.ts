@@ -7,13 +7,11 @@ import { startIngestSource } from "@/lib/jobs/start"
 import { isUuid } from "@/lib/notebooks"
 import { putObject, sourceKey } from "@/lib/storage"
 
-// Der Worker hält beim Import das ganze PDF im Speicher (128 MB Limit).
+// Der Import hält das ganze PDF im Speicher, Worker-Limit 128 MB.
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 type RouteContext = { params: Promise<{ notebookId: string; sourceId: string }> }
 
-// PDF-Upload für eine zuvor per POST sources angelegte Quelle. Der Body wird
-// direkt nach R2 gestreamt, danach startet der Import-Workflow.
 export async function PUT(req: NextRequest, { params }: RouteContext) {
   const { notebookId, sourceId } = await params
   const auth = await authorizeNotebook(notebookId)
@@ -34,7 +32,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
     .limit(1)
   if (!row) return NextResponse.json({ error: "Quelle nicht gefunden oder bereits hochgeladen" }, { status: 404 })
 
-  // Fester Dateiname statt des Nutzer-Dateinamens: der landet sonst ungeprüft im R2-Key.
+  // Fester Dateiname, damit der Nutzer-Dateiname nie ungeprüft im R2-Key landet.
   const key = sourceKey(notebookId, sourceId, "original.pdf")
   try {
     await putObject(key, req.body, "application/pdf")

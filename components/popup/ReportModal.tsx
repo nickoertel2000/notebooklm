@@ -30,7 +30,6 @@ export default function ReportModal({ notebookId, sourceIds, onClose, onGenerate
   const [language, setLanguage] = useState(LANGUAGES[0])
   const [customText, setCustomText] = useState("")
 
-  // KI-Formatvorschläge beim Öffnen laden.
   useEffect(() => {
     let cancelled = false
     ;(async () => {

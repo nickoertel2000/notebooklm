@@ -7,15 +7,13 @@ import { extractFromUrl } from "@/lib/extract"
 import { startIngestSource } from "@/lib/jobs/start"
 import { putObject, sourceKey } from "@/lib/storage"
 
-// Quellen, die so lange in 'processing' hängen, gelten als abgebrochen (z. B. PDF
-// angelegt, Upload nie angekommen) – sonst pollt das Frontend endlos.
+// Fängt auch PDF-Quellen ab, deren Upload nie angekommen ist.
 const STALE_PROCESSING_MS = 15 * 60 * 1000
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
 
 type CreateSourceBody = { type: "pdf"; filename?: string } | { type: "url"; url?: string } | { type: "text"; text?: string; title?: string }
 
-// Quellen eines Notebooks auflisten (für Status-Polling).
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
   const auth = await authorizeNotebook(notebookId)
@@ -44,9 +42,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   return NextResponse.json({ sources: rows })
 }
 
-// Neue Quelle anlegen. PDF: nur die Zeile – die Datei folgt per PUT auf
-// sources/[sourceId]/file, das startet den Import. URL/Text: Inhalt wird direkt
-// gespeichert und der Import sofort gestartet.
+// PDF: nur die Zeile anlegen, den Import startet erst der Upload per PUT auf sources/[sourceId]/file.
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
   const auth = await authorizeNotebook(notebookId)

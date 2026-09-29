@@ -16,7 +16,6 @@ export function getGemini(): GoogleGenAI {
   return client
 }
 
-// Modell-IDs kommen aus den vars der Worker-Konfiguration (wrangler.jsonc).
 export const chatModel = () => env.GEMINI_CHAT_MODEL
 export const reportModel = () => env.GEMINI_REPORT_MODEL
 
@@ -51,7 +50,6 @@ type GenerateTextOptions = {
   // Gemini-3-Modelle denken, und Denk-Tokens zählen gegen maxOutputTokens. Bei
   // kleinen Budgets käme sonst eine leere Antwort zurück.
   minimalThinking?: boolean
-  // JSON-Schema: Gemini antwortet dann nur mit JSON in dieser Form.
   jsonSchema?: object
 }
 
@@ -71,18 +69,16 @@ export async function generateText({ model, system, prompt, maxOutputTokens, min
   return (response.text ?? "").trim()
 }
 
-// Deutschtaugliche Prebuilt-Stimmen. Index 0/1 entsprechen SPEAKER_LABELS.
 const VOICES = ["Kore", "Puck"] as const
 
-// Roh-Audio-Parameter von Gemini TTS: 16-bit PCM, 24 kHz, mono.
+// Vorgegeben durch Gemini TTS (Roh-PCM), keine Einstellung.
 const SAMPLE_RATE = 24000
 const CHANNELS = 1
 const BITS = 16
 
 export type SynthesisResult = { wav: Buffer; durationSeconds: number }
 
-// Vertont ein Skript. Bei speakers === 2 erwartet der Text Zeilen mit
-// „Sprecher 1:" / „Sprecher 2:" (siehe lib/audio.ts).
+// Bei speakers === 2 muss jede Zeile mit einem der SPEAKER_LABELS beginnen.
 export async function synthesizeSpeech(script: string, speakers: 1 | 2): Promise<SynthesisResult> {
   const speechConfig =
     speakers === 2
@@ -115,8 +111,7 @@ export async function synthesizeSpeech(script: string, speakers: 1 | 2): Promise
   return { wav, durationSeconds }
 }
 
-// Verpackt rohes PCM in einen WAV-Container (44-Byte-Header). Kein externer
-// Encoder nötig – MP3 würde ffmpeg erfordern.
+// WAV statt MP3, weil MP3 einen Encoder (ffmpeg) bräuchte.
 function pcmToWav(pcm: Buffer): Buffer {
   const byteRate = (SAMPLE_RATE * CHANNELS * BITS) / 8
   const blockAlign = (CHANNELS * BITS) / 8

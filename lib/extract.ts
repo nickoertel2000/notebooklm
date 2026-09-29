@@ -1,7 +1,6 @@
 import { Readability } from "@mozilla/readability"
 import { parseHTML } from "linkedom"
 
-// Holt eine URL serverseitig und extrahiert den Haupttext (Readability).
 export async function extractFromUrl(url: string): Promise<{ title: string; text: string }> {
   const res = await fetch(url, {
     headers: { "User-Agent": "Mozilla/5.0 (compatible; NotebookLM-Klon/1.0)" }

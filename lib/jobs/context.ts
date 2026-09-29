@@ -2,11 +2,8 @@ import { and, asc, eq, inArray } from "drizzle-orm"
 import type { Db } from "@/db"
 import { sourceChunks, sources } from "@/db/schema"
 
-// Obergrenze für den Quellen-Kontext (~150k Zeichen ≈ ~45k Tokens).
 const MAX_CONTEXT_CHARS = 150_000
 
-// Berichte, Audio und Video nutzen keine Vektorsuche, sondern alle Chunks der
-// ausgewählten fertigen Quellen in Reihenfolge – bis zum Zeichenbudget.
 export async function buildContext(db: Db, notebookId: string, sourceIds: string[] | null): Promise<string> {
   const rows = await db
     .select({ sourceTitle: sources.title, content: sourceChunks.content })

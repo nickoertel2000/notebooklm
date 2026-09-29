@@ -3,7 +3,6 @@ $radius-card: 16px;
 $transition: 0.15s ease;
 
 .nlm {
-  // Theme
   --bg: #1e1f22;
   --card: #2b2c30;
   --card-create: #202124;
@@ -21,8 +20,7 @@ $transition: 0.15s ease;
   min-height: 100vh;
   width: 100%;
   font-size: 15px;
-  // Größerer Abstand zu linkem/rechtem Bildschirmrand → Karten dadurch schmäler.
-  // Abstand zwischen den Karten (.nlm-grid gap) bleibt davon unberührt.
+  // Bei fester Spaltenzahl bestimmt dieses Padding die Kartenbreite.
   padding: 26px clamp(40px, 8vw, 160px) 64px;
 
   .material-symbols-outlined {
@@ -198,7 +196,6 @@ $transition: 0.15s ease;
     border-color $transition,
     filter $transition;
 
-  // Neues Notebook erstellen
   &.create {
     background: var(--card-create);
     border: 1px solid var(--border);
@@ -215,7 +212,6 @@ $transition: 0.15s ease;
     }
   }
 
-  // Notebook Karten – Icon oben, fester 30px-Abstand zum Textblock darunter.
   &.nb {
     display: flex;
     flex-direction: column;
@@ -290,7 +286,7 @@ $transition: 0.15s ease;
   font-weight: 400;
   margin: 0 0 6px;
   color: var(--text);
-  // Auf 2 Zeilen begrenzen (wie im Demo mit „…"), damit die feste Höhe passt.
+  // Zwei Zeilen, damit die feste Kartenhöhe passt.
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;

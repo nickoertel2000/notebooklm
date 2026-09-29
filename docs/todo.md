@@ -59,4 +59,4 @@ Es wird immer wieder angemerkt, dass die `.env` auf GitHub zu sehen ist. Klären
 
 Viele Kommentare im Projekt stammen aus der Zeit vor der Kommentar-Richtlinie in `.claude/CLAUDE.md` (Abschnitt „Kommentare“) und verstoßen dagegen: Sie wiederholen den Code, enthalten Anleitungen, Links oder Betriebshinweise oder beschreiben die Entstehung. Solange sie drinstehen, dienen sie beim Schreiben neuen Codes als Vorbild.
 
-- [ ] Alle Dateien mit Kommentaren durchgehen (Code, Konfiguration, Templates, SCSS, Skripte) und jeden Kommentar gegen die Richtlinie prüfen: behalten, kürzen oder löschen. Informationen, die woanders fehlen, vorher nach `README.md`, `docs/` oder `.claude/rules/` verschieben.
+- [x] Alle Dateien mit Kommentaren durchgehen (Code, Konfiguration, Templates, SCSS, Skripte) und jeden Kommentar gegen die Richtlinie prüfen: behalten, kürzen oder löschen. Informationen, die woanders fehlen, vorher nach `README.md`, `docs/` oder `.claude/rules/` verschieben.

@@ -11,7 +11,6 @@ ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
 overrides:
-  # better-auth importiert Migration-Konstanten, die kysely 0.29.2 nicht
-  # exportiert (Turbopack-Build bricht sonst). better-auth 1.7 verlangt mindestens
-  # 0.28.17; 0.28.x hat die Exporte.
+  # better-auth importiert Migration-Konstanten, die in kysely 0.29.x fehlen,
+  # verlangt aber mindestens 0.28.17.
   kysely: 0.28.17

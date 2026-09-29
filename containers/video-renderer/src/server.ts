@@ -9,8 +9,6 @@ import { composeVideo, type RenderManifest } from "./compose.ts"
 // Die Endung landet im Dateinamen, deshalb nur bekannte Werte zulassen.
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "webp"])
 
-// Nimmt multipart/form-data entgegen: "manifest" (JSON) plus "audio-{i}" (WAV) und
-// optional "background-{i}" (Bild, Endung in slide.background) je Folie. Antwortet mit der fertigen MP4.
 async function handleRender(req: IncomingMessage, res: ServerResponse) {
   const dir = await mkdtemp(path.join(os.tmpdir(), "render-"))
   const cleanup = () => rm(dir, { recursive: true, force: true }).catch(() => {})

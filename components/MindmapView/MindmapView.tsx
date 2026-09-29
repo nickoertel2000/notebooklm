@@ -5,7 +5,6 @@ import "material-symbols"
 import type { Mindmap, MindmapNode } from "@/lib/studio"
 import styles from "./MindmapView.module.scss"
 
-// Pfade der Knoten mit Kindern, z. B. "0", "0.2", "0.2.1".
 function collectPaths(node: MindmapNode, path: string, out: string[]) {
   if (!node.children.length) return out
   out.push(path)

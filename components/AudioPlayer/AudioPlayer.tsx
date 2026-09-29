@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react"
 import "material-symbols"
 import styles from "./AudioPlayer.module.scss"
 
-// Auswählbare Wiedergabegeschwindigkeiten (siehe Vorgabe).
 const SPEEDS = [0.5, 0.8, 1.0, 1.2, 1.5, 1.8, 2.0]
 
 function formatTime(s: number): string {
@@ -22,7 +21,6 @@ type AudioPlayerProps = {
   title: string
   src: string
   onClose: () => void
-  // Meldet den echten Play/Pause-Status nach außen (z. B. fürs Listen-Icon).
   onPlayingChange?: (playing: boolean) => void
 }
 
@@ -34,23 +32,19 @@ export default function AudioPlayer({ title, src, onClose, onPlayingChange }: Au
   const [rate, setRate] = useState(1.0)
   const [speedOpen, setSpeedOpen] = useState(false)
 
-  // Play/Pause-Status nach außen spiegeln.
   useEffect(() => {
     onPlayingChange?.(playing)
   }, [playing, onPlayingChange])
 
-  // Beim Wechsel der Quelle (anderes Audio gewählt) gewählte Geschwindigkeit
-  // wieder anwenden und von vorne starten.
   useEffect(() => {
     const a = audioRef.current
     if (!a) return
     a.playbackRate = rate
     a.play().catch(() => {})
-    // rate bewusst nicht in Deps: nur bei Quellenwechsel neu starten.
+    // rate bewusst nicht in den Deps: nur bei Quellenwechsel neu starten.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src])
 
-  // Geschwindigkeits-Menü bei Klick außerhalb schließen.
   useEffect(() => {
     if (!speedOpen) return
     const close = () => setSpeedOpen(false)

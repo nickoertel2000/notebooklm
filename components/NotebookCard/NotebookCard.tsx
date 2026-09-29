@@ -19,7 +19,6 @@ export default function NotebookCard({ id, title, emoji, meta }: Props) {
   const [pending, startTransition] = useTransition()
   const menuRef = useRef<HTMLDivElement>(null)
 
-  // Menü schließen, sobald außerhalb geklickt wird.
   useEffect(() => {
     if (!menuOpen) return
     function onDocClick(e: MouseEvent) {
@@ -59,7 +58,7 @@ export default function NotebookCard({ id, title, emoji, meta }: Props) {
         </div>
       </Link>
 
-      {/* Drei-Punkte-Menü (über der Karte, eigenständig klickbar) */}
+      {/* Außerhalb des Links, weil Buttons in <a> nicht erlaubt sind. */}
       <div className={styles.menuWrap} ref={menuRef}>
         <button type="button" className="nlm-menu" aria-label="Mehr Optionen" onClick={() => setMenuOpen((o) => !o)}>
           <span className="material-symbols-outlined">more_vert</span>
@@ -94,7 +93,6 @@ export default function NotebookCard({ id, title, emoji, meta }: Props) {
         )}
       </div>
 
-      {/* Löschen-Bestätigung */}
       {dialog === "delete" && (
         <div className={styles.overlay} onClick={() => !pending && setDialog(null)}>
           <div className={styles.dialog} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
@@ -114,7 +112,6 @@ export default function NotebookCard({ id, title, emoji, meta }: Props) {
         </div>
       )}
 
-      {/* Titel bearbeiten */}
       {dialog === "edit" && (
         <div className={styles.overlay} onClick={() => !pending && setDialog(null)}>
           <form className={styles.dialog} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} onSubmit={handleRename}>

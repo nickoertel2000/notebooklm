@@ -1,5 +1,3 @@
-// Listet die für GEMINI_API_KEY verfügbaren Flash-, Embedding- und TTS-Modelle.
-// Aufruf: node --env-file=.env.local scripts/gemini-models.mjs (gibt nie den Key aus)
 const key = process.env.GEMINI_API_KEY
 if (!key) {
   console.error("GEMINI_API_KEY fehlt (pnpm env:pull ausgeführt?)")

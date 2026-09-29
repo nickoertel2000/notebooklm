@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers"
 
-// Alles eines Notebooks liegt unter notebooks/{notebookId}/ – deleteNotebook entfernt genau diesen Prefix.
+// Jeder Key eines Notebooks muss unter diesem Prefix liegen, deleteNotebook löscht nur ihn.
 export const notebookPrefix = (notebookId: string) => `notebooks/${notebookId}/`
 export const sourcePrefix = (notebookId: string, sourceId: string) => `notebooks/${notebookId}/sources/${sourceId}/`
 export const sourceKey = (notebookId: string, sourceId: string, filename: string) => `${sourcePrefix(notebookId, sourceId)}${filename}`
@@ -31,8 +31,7 @@ export async function deleteByPrefix(prefix: string) {
   } while (cursor)
 }
 
-// Liefert ein Objekt als Response aus – mit Range-Support (206), damit Audio- und
-// Video-Player spulen können, und ETag-Validierung über If-None-Match (304).
+// Ohne Range-Support (206) können Audio- und Video-Player nicht spulen.
 export async function serveObject(request: Request, key: string, filename: string): Promise<Response> {
   const object = await env.BUCKET.get(key, { range: request.headers, onlyIf: request.headers })
   if (!object) return new Response("Datei nicht gefunden", { status: 404 })

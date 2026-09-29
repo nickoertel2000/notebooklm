@@ -43,7 +43,7 @@ export class VideoWorkflow extends WorkflowEntrypoint<JobsEnv, VideoParams> {
           model: reportModel(),
           system: buildVideoScriptSystemPrompt(format, job.language, job.focus),
           prompt: `Hier sind die Quellen des Notebooks:\n${context}\n\n---\n\nErzeuge daraus eine Video-Übersicht.`,
-          // Inklusive der Denk-Tokens von Gemini.
+          // Enthält auch die Denk-Tokens von Gemini.
           maxOutputTokens: 10000
         })
         const script = parseVideoScript(raw)
@@ -51,8 +51,6 @@ export class VideoWorkflow extends WorkflowEntrypoint<JobsEnv, VideoParams> {
         return script
       })
 
-      // Folienbilder nur im Gratis-Kontingent von Workers AI: Jede heute (UTC)
-      // angelegte Video-Übersicht zählt mit der Höchstzahl an Folien.
       const withImages = await step.do("image-budget", DB_STEP, async () => {
         const [row] = await getDb()
           .select({ n: count() })
@@ -61,8 +59,7 @@ export class VideoWorkflow extends WorkflowEntrypoint<JobsEnv, VideoParams> {
         return row.n * MAX_SLIDES + segments.length <= Number(this.env.IMAGE_DAILY_LIMIT)
       })
 
-      // Pro Folie ein eigener Step (Vertonung + Hintergrund parallel), damit ein
-      // Rate-Limit nur diese Folie wiederholt. Gruppenweise, um die APIs nicht zu fluten.
+      // Ein Step pro Folie, damit ein Fehler nur diese Folie wiederholt; gruppenweise, um die APIs nicht zu fluten.
       const concurrency = Math.max(1, Number(this.env.VIDEO_SLIDE_CONCURRENCY) || 3)
       const slides: { background: SlideBackground; seconds: number }[] = []
       for (let start = 0; start < segments.length; start += concurrency) {

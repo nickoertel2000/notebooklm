@@ -1,5 +1,4 @@
-// Lernformate des Studios. Sie liegen als Zeilen in `reports` (type = Format-ID),
-// `content` ist JSON statt Markdown.
+// Lernformate liegen als Zeilen in `reports` (type = Format-ID), `content` ist JSON statt Markdown.
 
 export type StudioFormatId = "flashcards" | "quiz" | "table" | "mindmap"
 export type StudioAmount = "fewer" | "standard" | "more"
@@ -21,7 +20,6 @@ export type StudioFormat = {
   label: string
   icon: string
   hasAmount: boolean
-  // Ohne Optionsdialog wird sofort erzeugt.
   hasOptions: boolean
   focusLabel: string
   focusPlaceholder: string
@@ -199,8 +197,7 @@ function parseNode(value: unknown, depth: number): MindmapNode | null {
   return { label: nodeLabel, children }
 }
 
-// Prüft und normalisiert die Modellantwort bzw. den gespeicherten Inhalt.
-// null heißt: unbrauchbar (kein JSON oder kein einziger gültiger Eintrag).
+// Ungültige Einträge werden verworfen, null erst ohne JSON oder ohne einen gültigen Eintrag.
 export function parseStudioContent(formatId: StudioFormatId, raw: string): StudioContent | null {
   let json: Record<string, unknown>
   try {

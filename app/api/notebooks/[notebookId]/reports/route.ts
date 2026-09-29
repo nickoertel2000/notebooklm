@@ -8,14 +8,10 @@ import { buildStudioInstruction, getAmount, getDifficulty, getStudioFormat } fro
 import { optionalString, parseSourceIds, readJsonBody } from "@/lib/api/body"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 
-// Berichte, die länger als das hier in 'processing' hängen, gelten als
-// abgebrochen und werden beim Auflisten auf 'failed' gesetzt — sonst pollt das
-// Studio-Panel endlos.
 const STALE_PROCESSING_MS = 10 * 60 * 1000
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
 
-// Persistierte Berichte des Notebooks auflisten (ohne content) – fürs Studio-Panel.
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
   const auth = await authorizeNotebook(notebookId)
@@ -23,7 +19,6 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 
   const db = getDb()
 
-  // Hängengebliebene 'processing'-Berichte aufräumen, bevor wir auflisten.
   await db
     .update(reports)
     .set({ status: "failed", error: "Zeitüberschreitung bei der Erstellung" })
@@ -45,8 +40,6 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   return NextResponse.json({ reports: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })) })
 }
 
-// Bericht erstellen: 'processing'-Zeile anlegen und den ReportWorkflow starten.
-// Die Generierung läuft im Jobs-Worker, das Frontend pollt den Status.
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
   const auth = await authorizeNotebook(notebookId)
@@ -56,8 +49,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
   const body = await readJsonBody(req)
 
-  // Ein Lernformat, ein bekannter Bericht-Typ ODER eine freie Anweisung (Eigener
-  // Bericht / KI-Formatvorschlag).
   const studioFormat = getStudioFormat(body.format)
   const reportType = getReportType(String(body.type))
   const instruction = studioFormat
@@ -76,7 +67,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
   const selectedIds = parseSourceIds(body.sourceIds)
 
-  // Sicherstellen, dass es überhaupt fertige Quellen gibt (schnelle Prüfung).
   const ready = await db
     .select({ id: sources.id })
     .from(sources)

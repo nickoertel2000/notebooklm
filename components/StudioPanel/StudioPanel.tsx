@@ -58,7 +58,6 @@ type StudioPanelProps = {
   reports: ReportItem[]
   audios: AudioItem[]
   videos: VideoItem[]
-  // Im Player geladenes Audio und ob es gerade läuft (Listen-Icon).
   activeAudioId: string | null
   audioPlaying: boolean
   onOpenTool: (tool: StudioTool) => void
@@ -192,14 +191,12 @@ export default function StudioPanel({ readyCount, reports, audios, videos, activ
   )
 }
 
-// "Karteikarten · 3 Quellen · Vor 2 Min.", während der Erstellung "Karteikarten · basierend auf 3 Quellen".
 function metaLine(item: { sourceCount: number; status: string; createdAt: string }, label: string, durationSeconds: number | null): string {
   const sources = `${item.sourceCount} ${item.sourceCount === 1 ? "Quelle" : "Quellen"}`
   if (item.status === "processing") return `${label} · basierend auf ${sources}`
   return [label, sources, durationSeconds ? formatDuration(durationSeconds) : null, relativeTime(item.createdAt)].filter(Boolean).join(" · ")
 }
 
-// "Vor 1 Min.", "Vor 2 Std.", "Vor 3 Tagen" – kurze relative Zeitangabe (de).
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
   const min = Math.floor(diff / 60000)
@@ -211,7 +208,6 @@ function relativeTime(iso: string): string {
   return `Vor ${days} ${days === 1 ? "Tag" : "Tagen"}`
 }
 
-// "1:05 Min." – Dauer in mm:ss.
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60

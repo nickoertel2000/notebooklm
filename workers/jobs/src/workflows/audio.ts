@@ -11,7 +11,7 @@ import type { AudioParams } from "@/lib/jobs/types"
 import { audioKey, putObject } from "@/lib/storage"
 import { API_STEP, DB_STEP } from "./shared"
 
-// Token-Budget für das Skript je nach Länge, inklusive der Denk-Tokens von Gemini.
+// Enthält auch die Denk-Tokens von Gemini.
 const SCRIPT_MAX_TOKENS: Record<AudioLength, number> = { kurz: 6000, standard: 10000 }
 
 export class AudioWorkflow extends WorkflowEntrypoint<JobsEnv, AudioParams> {

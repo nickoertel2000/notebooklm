@@ -36,7 +36,6 @@ function parseSuggestions(text: string): ReportSuggestion[] {
   }
 }
 
-// Schlägt – passend zu den Quellen – 4 Bericht-Formate vor (KI-Formatvorschläge).
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
 
@@ -47,7 +46,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const body = await readJsonBody(req)
   const selectedIds = parseSourceIds(body.sourceIds)
 
-  // Kontext: Quellentitel + ein paar Textausschnitte.
   const [sourceRows, chunkRows] = await Promise.all([
     db.select({ title: sources.title }).from(sources).where(eq(sources.notebookId, notebookId)).limit(20),
     db.select({ content: sourceChunks.content }).from(sourceChunks).where(eq(sourceChunks.notebookId, notebookId)).orderBy(asc(sourceChunks.createdAt)).limit(6)
@@ -57,7 +55,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const excerpts = chunkRows.map((c) => c.content.slice(0, 500)).join("\n---\n")
   if (!titles && !excerpts) return NextResponse.json({ suggestions: [] })
 
-  // selectedIds aktuell nur als Hinweis – Vorschläge beziehen sich aufs ganze Notebook.
+  // Vorschläge beziehen sich bewusst aufs ganze Notebook, nicht auf die Auswahl.
   void selectedIds
 
   try {

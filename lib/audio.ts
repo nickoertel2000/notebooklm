@@ -1,19 +1,11 @@
-// Audio-Formate für die Studio-Funktion „Audio-Übersicht". Jedes Format ist im
-// Kern ein Skript-Prompt, der über alle (ausgewählten) Quellen läuft. Claude
-// erzeugt das sprechbare Skript, Gemini TTS vertont es (siehe lib/gemini.ts).
-
 export type AudioLength = "kurz" | "standard"
 
 export type AudioFormat = {
   id: string
-  // Anzeigename im Modal (Screenshot-Layout).
   label: string
-  // Beschreibung unter dem Titel der Format-Karte.
   description: string
   icon: string
-  // 1 = Einzelsprecher-Erzählung, 2 = Dialog zwischen zwei Moderatoren.
   speakers: 1 | 2
-  // Beschreibt dem Modell, welche Art von Skript es erzeugen soll.
   instruction: string
 }
 
@@ -63,19 +55,14 @@ export function getAudioFormat(id: string): AudioFormat | undefined {
   return AUDIO_FORMATS.find((f) => f.id === id)
 }
 
-// Sprecher-Labels für den Dialog. Müssen exakt zu den Stimmen-Configs in
-// lib/gemini.ts passen.
 export const SPEAKER_LABELS = ["Sprecher 1", "Sprecher 2"] as const
 
-// Grobe Längen-Vorgaben (Wörter), klein genug für einen einzelnen TTS-Call.
+// Das Skript muss in einen einzelnen TTS-Call passen.
 const LENGTH_HINT: Record<AudioLength, string> = {
   kurz: "Halte es kurz: ca. 150–250 Wörter (etwa 1–2 Minuten gesprochen).",
   standard: "Mittlere Länge: ca. 450–700 Wörter (etwa 3–5 Minuten gesprochen)."
 }
 
-// System-Prompt für die Skript-Erzeugung durch Claude. Erzeugt sprechbaren
-// Text ohne Markdown – bei 2 Sprechern als beschrifteten Dialog. `language` ist
-// der Anzeigename der gewählten Sprache (z. B. „Deutsch", „English").
 export function buildScriptSystemPrompt(format: AudioFormat, length: AudioLength, language: string): string {
   const speakerRules =
     format.speakers === 2
@@ -97,7 +84,6 @@ ${speakerRules}
 - ${LENGTH_HINT[length]}`
 }
 
-// Trennt die „TITEL:"-Zeile vom eigentlichen Sprechtext ab.
 export function parseScript(raw: string, fallbackTitle: string): { title: string; script: string } {
   const lines = raw.split("\n")
   let title = fallbackTitle

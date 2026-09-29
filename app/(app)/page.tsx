@@ -19,7 +19,6 @@ export default async function NotebookLMHome() {
     <>
       <Header />
       <div className="nlm">
-        {/* Topbar */}
         <header className="nlm-topbar">
           <button className="nlm-chip">Alle</button>
 
@@ -56,10 +55,8 @@ export default async function NotebookLMHome() {
           </div>
         </header>
 
-        {/* Inhalt */}
         <h2 className="nlm-heading">Zuletzt geöffnete Notebooks</h2>
         <div className="nlm-grid">
-          {/* Neues Notebook */}
           <form action={createNotebook} style={{ display: "contents" }}>
             <button type="submit" className="nlm-card create">
               <div className="nlm-create-circle">
@@ -69,7 +66,6 @@ export default async function NotebookLMHome() {
             </button>
           </form>
 
-          {/* Notebooks aus der Datenbank */}
           {notebookList.map((nb) => (
             <NotebookCard
               key={nb.id}

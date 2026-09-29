@@ -31,7 +31,6 @@
       "jurisdiction": "eu"
     }
   ],
-  // Die Workflows leben im Jobs-Worker (workers/jobs), die App startet und beendet nur Instanzen.
   "workflows": [
     {
       "binding": "INGEST_SOURCE_WORKFLOW",
@@ -58,13 +57,13 @@
       "script_name": "notebooklm-jobs"
     }
   ],
-  // Demo-Zugang: Neue Demo-Konten pro IP begrenzen (Zeitfenster nur 10 oder 60 s möglich).
   "ratelimits": [
     {
       "name": "DEMO_RATE_LIMITER",
       "namespace_id": "1001",
       "simple": {
         "limit": 2,
+        // Cloudflare erlaubt nur 10 oder 60 s.
         "period": 60
       }
     }

@@ -5,7 +5,7 @@ import type { Citation } from "@/app/(app)/notebook/[notebookId]/NotebookView"
 import Markdown from "@/components/Markdown/Markdown"
 import styles from "./CitedMarkdown.module.scss"
 
-// [n] oder [n, m], wie von der Chat-Route verlangt. Die Klammer macht split() zum Tokenizer.
+// [n] oder [n, m] wie im Chat-Prompt verlangt. Die Capture-Gruppe lässt split() die Marker behalten.
 const MARKER_SPLIT = /(\[\d+(?:\s*,\s*\d+)*\])/g
 const MARKER = /^\[(\d+(?:\s*,\s*\d+)*)\]$/
 
@@ -19,8 +19,6 @@ type Props = {
   onSelect: (citation: Citation) => void
 }
 
-// Antworttext mit Zitat-Chips wie in NotebookLM: pro Antwort ab 1 nummeriert, in
-// der Reihenfolge des ersten Auftretens.
 export default function CitedMarkdown({ content, citations, sourceTitle, onSelect }: Props) {
   const byMarker = new Map((citations ?? []).map((c) => [c.marker, c]))
   const isKnown = (marker: number) => citations === null || byMarker.has(marker)

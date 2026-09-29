@@ -1,9 +1,7 @@
 import { Fragment, ReactNode } from "react"
 import styles from "./markdown.module.scss"
 
-// Minimaler Markdown-Renderer für die KI-erzeugten Berichte und Chat-Antworten.
-// Unterstützt: Überschriften (#/##/###), Aufzählungen (- / *), Nummerierungen
-// (1.), Absätze und **fett**. Bewusst klein gehalten — kein HTML, keine Tabellen.
+// Bewusst minimal gehalten: kein HTML, keine Tabellen.
 
 type TextRenderer = (text: string) => ReactNode
 
@@ -68,7 +66,6 @@ function parse(markdown: string): Block[] {
   return blocks
 }
 
-// **fett** in React-Nodes auflösen. renderText verarbeitet die reinen Textstücke weiter.
 function renderInline(text: string, renderText: TextRenderer): ReactNode {
   const parts = text.split(/(\*\*[^*]+\*\*)/g)
   return parts.map((part, i) => {

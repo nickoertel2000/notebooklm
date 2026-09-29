@@ -19,11 +19,7 @@ async function assertSourceExists(db: Db, sourceId: string) {
   if (!row) throw new NonRetryableError("Quelle wurde gelöscht")
 }
 
-// Import einer Quelle in drei Phasen:
-// 1. extract: Text holen, chunken, Chunks ohne Embedding speichern
-// 2. embed-n: pro 100er-Batch Embeddings nachtragen (idempotent über embedding IS NULL)
-// 3. finalize: Status auf ready
-// Solange die Quelle nicht ready ist, sehen Chat und Generierung die Chunks nicht.
+// Chunks ohne Embedding sind unkritisch: Chat und Generierung sehen sie erst, wenn die Quelle ready ist.
 export class IngestSourceWorkflow extends WorkflowEntrypoint<JobsEnv, IngestSourceParams> {
   async run(event: WorkflowEvent<IngestSourceParams>, step: WorkflowStep) {
     const { sourceId, key, isPdf } = event.payload

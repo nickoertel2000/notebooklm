@@ -1,10 +1,8 @@
 import { chatModel, generateText } from "@/lib/gemini"
 
-// Standard-Emoji neuer Notebooks (muss zum Default in db/schema.ts passen).
+// Muss zum Default in db/schema.ts passen.
 export const DEFAULT_NOTEBOOK_EMOJI = "📔"
 
-// Kuratierte Icon-Bibliothek. Für einen Notebook-Titel wird hieraus automatisch
-// genau EIN passendes Emoji gewählt. Bewusst breit über viele Themen gestreut.
 export const NOTEBOOK_ICON_LIBRARY = [
   "📔",
   "📚",
@@ -95,9 +93,6 @@ const SYSTEM_PROMPT = `Du wählst für einen Notebook-Titel das thematisch am be
 ${NOTEBOOK_ICON_LIBRARY.join(" ")}
 - Wähle das Emoji, das das Thema des Titels am treffendsten darstellt.`
 
-// Lässt Gemini aus der Bibliothek das passendste Emoji zum Titel wählen.
-// Gibt null zurück, wenn nichts Sinnvolles bestimmt werden konnte (leerer Titel,
-// API-Fehler, keine Übereinstimmung) — Aufrufer behalten dann das bisherige Emoji.
 export async function pickNotebookEmoji(title: string): Promise<string | null> {
   const clean = title.trim()
   if (!clean) return null
@@ -111,7 +106,6 @@ export async function pickNotebookEmoji(title: string): Promise<string | null> {
       minimalThinking: true
     })
 
-    // Nur ein Emoji aus der Bibliothek akzeptieren.
     return NOTEBOOK_ICON_LIBRARY.find((e) => raw.includes(e)) ?? null
   } catch (err) {
     console.error("Emoji-Auswahl fehlgeschlagen:", err)

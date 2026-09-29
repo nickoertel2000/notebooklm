@@ -6,8 +6,7 @@ import { getDb } from "@/db"
 import { user } from "@/db/schema"
 import { cloneTemplateNotebooks, countDemoAccounts, demoEmail } from "@/lib/demo"
 
-// Öffentlich (ohne Session, siehe proxy.ts): legt ein Demo-Konto mit zufälligen
-// Zugangsdaten an und kopiert die Vorlage hinein. Anmelden tut sich der Client selbst.
+// Bewusst ohne Session-Prüfung: öffentlich, im Matcher von proxy.ts ausgenommen.
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("cf-connecting-ip") ?? "local"
   const { success } = await env.DEMO_RATE_LIMITER.limit({ key: ip })
@@ -30,7 +29,6 @@ export async function POST(req: NextRequest) {
     await cloneTemplateNotebooks(userId)
   } catch (err) {
     console.error("Demo-Konto konnte nicht angelegt werden:", err)
-    // Kein halb befülltes Konto zurücklassen.
     if (userId) await getDb().delete(user).where(eq(user.id, userId))
     return NextResponse.json({ error: "Das Demo-Konto konnte nicht angelegt werden. Bitte versuche es erneut." }, { status: 500 })
   }

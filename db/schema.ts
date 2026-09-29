@@ -53,9 +53,6 @@ export const verification = pgTable("verification", {
 })
 
 // ── Notebooks ─────────────────────────────────────────────────────────────────
-// Jedes Notebook ist fest an einen better-auth-User geknüpft. Wird der User
-// gelöscht, verschwinden seine Notebooks (und über die FK-Kaskaden auch deren
-// Quellen, Chunks und Nachrichten).
 
 export const notebooks = pgTable("notebooks", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -78,9 +75,7 @@ export const sources = pgTable("sources", {
   // 'pdf' | 'url' | 'text'
   type: text("type").notNull(),
   title: text("title").notNull(),
-  // R2-Key des hochgeladenen PDFs bzw. des Textinhalts (URL/Text); null bis zum Upload
   storageKey: text("storage_key"),
-  // Ursprungs-URL bei type = 'url'
   sourceUrl: text("source_url"),
   // 'processing' | 'ready' | 'failed'
   status: text("status").notNull().default("processing"),
@@ -91,8 +86,7 @@ export const sources = pgTable("sources", {
 })
 
 // ── Chunks + Embeddings ───────────────────────────────────────────────────────
-// notebookId ist denormalisiert mitgeführt, damit die Similarity-Suche direkt
-// auf das Notebook gefiltert werden kann, ohne über sources zu joinen.
+// notebookId bewusst denormalisiert: Die Similarity-Suche filtert ohne Join über sources.
 
 export const sourceChunks = pgTable(
   "source_chunks",
@@ -118,7 +112,6 @@ export const sourceChunks = pgTable(
 // ── Chat-Nachrichten ──────────────────────────────────────────────────────────
 
 export type MessageCitation = {
-  // Nummer n des Markers [n] im Antworttext (Position des Chunks im Prompt, ab 1).
   marker: number
   sourceId: string
   chunkId: string
@@ -141,16 +134,14 @@ export const messages = pgTable("messages", {
 })
 
 // ── Studio-Berichte ───────────────────────────────────────────────────────────
-// Persistierte Studio-Artefakte (FAQ, Briefing-Dokument, …). Während der
-// Erstellung 'processing', danach 'ready' mit content; bei Fehler 'failed'.
 
 export const reports = pgTable("reports", {
   id: uuid("id").defaultRandom().primaryKey(),
   notebookId: uuid("notebook_id")
     .notNull()
     .references(() => notebooks.id, { onDelete: "cascade" }),
-  // Bericht-Typ aus lib/reports.ts ('briefing' | 'study-guide' | 'blogpost' | 'custom', content ist Markdown)
-  // oder Lernformat aus lib/studio.ts ('flashcards' | 'quiz' | 'table' | 'mindmap', content ist JSON)
+  // 'briefing' | 'study-guide' | 'blogpost' | 'custom' (lib/reports.ts): content ist Markdown
+  // 'flashcards' | 'quiz' | 'table' | 'mindmap' (lib/studio.ts): content ist JSON
   type: text("type").notNull(),
   title: text("title").notNull().default("Bericht"),
   content: text("content"),
@@ -162,19 +153,15 @@ export const reports = pgTable("reports", {
 })
 
 // ── Studio-Audio ──────────────────────────────────────────────────────────────
-// Audio-Übersichten (NotebookLM-Stil): Claude erzeugt ein sprechbares Skript aus
-// den Quellen, Gemini TTS vertont es. Die WAV-Datei liegt unter storageKey in R2.
-// Während der Erzeugung 'processing', danach 'ready' mit storageKey; bei Fehler 'failed'.
 
 export const audioOverviews = pgTable("audio_overviews", {
   id: uuid("id").defaultRandom().primaryKey(),
   notebookId: uuid("notebook_id")
     .notNull()
     .references(() => notebooks.id, { onDelete: "cascade" }),
-  // Format aus lib/audio.ts: 'brief' | 'deep-dive' | 'critique' | 'debate'
+  // 'brief' | 'deep-dive' | 'critique' | 'debate' (lib/audio.ts)
   format: text("format").notNull(),
   title: text("title").notNull().default("Audio-Übersicht"),
-  // R2-Key der erzeugten WAV-Datei (null bis fertig)
   storageKey: text("storage_key"),
   durationSeconds: integer("duration_seconds"),
   // 'kurz' | 'standard'
@@ -189,26 +176,18 @@ export const audioOverviews = pgTable("audio_overviews", {
 })
 
 // ── Studio-Video ──────────────────────────────────────────────────────────────
-// Video-Übersichten (NotebookLM-Stil): vertonte Slideshow. Claude erzeugt ein
-// strukturiertes Skript (Folien + Narration), Gemini TTS vertont jede Folie,
-// Gemini 2.5 Flash Image („Nano Banana") malt pro Folie einen Hintergrund, und
-// der Video-Renderer-Container brennt Titel/Stichpunkte per ffmpeg-drawtext
-// darüber und fügt alles zu einer MP4 unter storageKey zusammen. Während der
-// Erzeugung 'processing', danach 'ready' mit storageKey; bei Fehler 'failed'.
 
 export const videoOverviews = pgTable("video_overviews", {
   id: uuid("id").defaultRandom().primaryKey(),
   notebookId: uuid("notebook_id")
     .notNull()
     .references(() => notebooks.id, { onDelete: "cascade" }),
-  // Format aus lib/video.ts: 'explainer' | 'summary'
+  // 'explainer' | 'summary' (lib/video.ts)
   format: text("format").notNull(),
   title: text("title").notNull().default("Video-Übersicht"),
-  // Visueller Stil aus lib/video.ts: 'auto' | 'custom' | 'classic' | 'whiteboard' | 'kawaii'
+  // 'auto' | 'custom' | 'classic' | 'whiteboard' | 'kawaii' (lib/video.ts)
   visualStyle: text("visual_style").notNull().default("auto"),
-  // Freitext bei visualStyle = 'custom' (eigener Stil-Prompt)
   customStyle: text("custom_style"),
-  // R2-Key der erzeugten MP4-Datei (null bis fertig)
   storageKey: text("storage_key"),
   durationSeconds: integer("duration_seconds"),
   language: text("language").notNull().default("de"),

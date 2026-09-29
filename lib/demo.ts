@@ -19,10 +19,9 @@ export async function countDemoAccounts(): Promise<number> {
   return row.n
 }
 
-// Kopiert alle Notebooks des Vorlage-Kontos (DEMO_TEMPLATE_EMAIL) in das Konto userId.
 // Bewusst ohne getNotebookForUser: Die Vorlage gehört nicht dem neuen Konto, gelesen
-// wird ausschließlich über die userId der Vorlage. Kopiert werden nur fertige Inhalte,
-// die R2-Dateien bleiben bei der Vorlage (siehe deleteNotebookObject).
+// wird ausschließlich über die userId der Vorlage. Die R2-Dateien werden nicht kopiert,
+// die Kopien verweisen auf die der Vorlage (siehe deleteNotebookObject).
 export async function cloneTemplateNotebooks(userId: string): Promise<void> {
   const db = getDb()
   const [template] = await db.select({ id: user.id }).from(user).where(eq(user.email, env.DEMO_TEMPLATE_EMAIL))
@@ -65,7 +64,6 @@ export async function cloneTemplateNotebooks(userId: string): Promise<void> {
   const sourceNotebook = new Map(sourceRows.map((s) => [s.id, s.notebookId]))
   const chunks = chunkRows.filter((c) => sourceNotebook.has(c.sourceId))
 
-  // Zitate verweisen auf Quellen und Chunks, deshalb auf die neuen IDs umschreiben.
   const remapCitations = (citations: MessageCitation[] | null) =>
     citations?.filter((c) => newId.has(c.sourceId) && newId.has(c.chunkId)).map((c) => ({ ...c, sourceId: mapId(c.sourceId), chunkId: mapId(c.chunkId) })) ?? null
 
@@ -106,8 +104,7 @@ export async function cloneTemplateNotebooks(userId: string): Promise<void> {
   })
 }
 
-// Löscht Demo-Konten, deren letzte Session-Aktivität (ohne Session: Anlage) länger als
-// DEMO_INACTIVE_DAYS zurückliegt. Eigene R2-Dateien zuerst, der Rest per Cascade.
+// R2 kennt keinen Cascade: eigene Dateien zuerst löschen, die DB-Zeilen folgen per Cascade.
 export async function deleteInactiveDemoAccounts(): Promise<number> {
   const db = getDb()
   const stale = await db

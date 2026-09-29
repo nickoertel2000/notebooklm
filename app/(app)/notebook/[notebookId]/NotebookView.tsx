@@ -91,7 +91,6 @@ type Props = {
 }
 
 export default function NotebookView({ notebookId, title, initialSources, initialMessages, initialReports, initialAudios, initialVideos }: Props) {
-  // Lokal verfolgter Notebook-Titel – Basis für die Auto-Benennung.
   const [notebookTitle, setNotebookTitle] = useState(title)
   const autoTitlingRef = useRef(false)
   const [sources, setSources] = useState<SourceItem[]>(initialSources)
@@ -105,11 +104,8 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   const [videoOpen, setVideoOpen] = useState(false)
   const [viewReport, setViewReport] = useState<ReportItem | null>(null)
   const [studioOptions, setStudioOptions] = useState<StudioFormat | null>(null)
-  // Aktuell abgespielte Audio-Übersicht inkl. Datei-URL und Titel.
   const [playingAudio, setPlayingAudio] = useState<{ id: string; url: string; title: string } | null>(null)
-  // Echter Play/Pause-Status des Players (für das Listen-Icon).
   const [audioPlaying, setAudioPlaying] = useState(false)
-  // Aktuell abgespielte Video-Übersicht – Overlay-Player.
   const [playingVideo, setPlayingVideo] = useState<{ id: string; url: string; title: string } | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(initialSources.map((s) => s.id)))
   const [input, setInput] = useState("")
@@ -117,17 +113,14 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   const [activeSourceId, setActiveSourceId] = useState<string | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
-  // Spracheingabe (Diktat) für das Chat-Eingabefeld.
   const dictation = useDictation("de-DE")
   const dictationBaseRef = useRef("")
 
   function startDictation() {
-    // An bereits getippten Text anhängen.
     dictationBaseRef.current = input.trim() ? input.replace(/\s+$/, "") + " " : ""
     dictation.start((text) => setInput(dictationBaseRef.current + text))
   }
 
-  // Nur ausgewählte, fertige Quellen zählen für Chat & Berichte.
   const selectedReadyIds = useMemo(() => sources.filter((s) => s.status === "ready" && selectedIds.has(s.id)).map((s) => s.id), [sources, selectedIds])
   const readyCount = selectedReadyIds.length
   const allSelected = sources.length > 0 && sources.every((s) => selectedIds.has(s.id))
@@ -153,7 +146,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     }
   }, [notebookId])
 
-  // Solange Quellen verarbeitet werden, Status pollen.
   useEffect(() => {
     if (!sources.some((s) => s.status === "processing")) return
     const id = setInterval(refreshSources, 2500)
@@ -164,12 +156,10 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     const res = await fetch(`/api/notebooks/${notebookId}/reports`)
     if (!res.ok) return
     const data = await readJson<{ reports: ReportItem[] }>(res)
-    // Lokale Platzhalter (temp-…) behalten, übrige durch Server-Stand ersetzen.
+    // temp-Platzhalter gehören zu noch laufenden Anfragen und fehlen im Server-Stand.
     setReports((prev) => [...prev.filter((r) => r.id.startsWith("temp-")), ...data.reports])
   }, [notebookId])
 
-  // Persistierte, noch laufende Berichte pollen (z. B. nach Reload während der
-  // Erstellung). Live-Platzhalter werden über die laufende Anfrage aktualisiert.
   useEffect(() => {
     if (!reports.some((r) => r.status === "processing" && !r.id.startsWith("temp-"))) return
     const id = setInterval(refreshReports, 3000)
@@ -183,7 +173,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     setAudios((prev) => [...prev.filter((a) => a.id.startsWith("temp-")), ...data.audios])
   }, [notebookId])
 
-  // Noch laufende Audio-Übersichten pollen (z. B. nach Reload während der Erstellung).
   useEffect(() => {
     if (!audios.some((a) => a.status === "processing" && !a.id.startsWith("temp-"))) return
     const id = setInterval(refreshAudios, 4000)
@@ -197,7 +186,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     setVideos((prev) => [...prev.filter((v) => v.id.startsWith("temp-")), ...data.videos])
   }, [notebookId])
 
-  // Noch laufende Video-Übersichten pollen (Generierung dauert länger: Bilder + ffmpeg).
   useEffect(() => {
     if (!videos.some((v) => v.status === "processing" && !v.id.startsWith("temp-"))) return
     const id = setInterval(refreshVideos, 5000)
@@ -208,8 +196,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // Trägt das Notebook noch den Standardtitel, aus dem Kontext automatisch einen
-  // Titel generieren und im Header live aktualisieren.
   async function maybeAutoTitle() {
     if (notebookTitle !== DEFAULT_NOTEBOOK_TITLE || autoTitlingRef.current) return
     autoTitlingRef.current = true
@@ -220,12 +206,12 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       if (data.title) {
         setNotebookTitle(data.title)
         if (data.generated && data.title !== DEFAULT_NOTEBOOK_TITLE) {
-          // Header (separate Komponente) live aktualisieren – Titel inkl. Icon.
+          // Der Header ist eine eigene Komponente ohne gemeinsamen State.
           window.dispatchEvent(new CustomEvent("notebook-title", { detail: { title: data.title, emoji: data.emoji } }))
         }
       }
     } catch {
-      // Auto-Titel ist optional – Fehler still ignorieren.
+      // Auto-Titel ist optional.
     } finally {
       autoTitlingRef.current = false
     }
@@ -266,14 +252,12 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       if (!res.ok) throw new Error("Text fehlgeschlagen")
       newId = (await readJson<{ sourceId: string }>(res)).sourceId
     }
-    // Neue Quelle automatisch auswählen.
     if (newId) setSelectedIds((prev) => new Set(prev).add(newId!))
     setModalOpen(false)
     await refreshSources()
     maybeAutoTitle()
   }
 
-  // Im Web gefundene URLs als Quellen importieren (löst die normale Ingestion aus).
   async function handleImportSources(urls: string[]) {
     const newIds: string[] = []
     for (const url of urls) {
@@ -302,8 +286,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     maybeAutoTitle()
   }
 
-  // Fehlgeschlagenen Import erneut versuchen. Optimistisch auf „processing"
-  // setzen; das laufende Status-Polling übernimmt danach.
   async function handleRetrySource(sourceId: string) {
     setSources((prev) => prev.map((s) => (s.id === sourceId ? { ...s, status: "processing", error: null } : s)))
     try {
@@ -332,14 +314,11 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     startReport(payload, payload.type ?? "custom", title)
   }
 
-  // Lernformate laufen über dieselbe Route wie Berichte (lib/studio.ts).
   function handleCreateStudio(format: StudioFormat, options?: StudioOptions) {
     setStudioOptions(null)
     startReport({ format: format.id, ...options }, format.id, format.label)
   }
 
-  // Im Hintergrund erstellen: Ladekarte zeigen, dann den fertigen Eintrag
-  // übernehmen (oder als fehlgeschlagen markieren).
   async function startReport(body: object, type: string, title: string) {
     const tempId = `temp-${crypto.randomUUID()}`
     const placeholder: ReportItem = {
@@ -359,8 +338,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
         body: JSON.stringify({ ...body, sourceIds: selectedReadyIds })
       })
       if (!res.ok) throw new Error(await readError(res, "Bericht fehlgeschlagen"))
-      // 202: Bericht ist 'processing'; der Jobs-Worker generiert, das Polling
-      // (siehe useEffect) holt den fertigen Stand.
       const { report } = await readJson<{ report: ReportItem }>(res)
       setReports((prev) => prev.map((r) => (r.id === tempId ? report : r)))
     } catch {
@@ -375,8 +352,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     }
   }
 
-  // Audio-Übersicht im Hintergrund erstellen: Modal schließen, Ladekarte zeigen,
-  // dann das fertige Audio eintragen (oder als fehlgeschlagen markieren).
   async function handleCreateAudio(options: AudioOptions) {
     setAudioOpen(false)
     const tempId = `temp-${crypto.randomUUID()}`
@@ -404,8 +379,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
         })
       })
       if (!res.ok) throw new Error(await readError(res, "Audio fehlgeschlagen"))
-      // 202: Audio ist 'processing'; der Jobs-Worker generiert, das Polling
-      // (siehe useEffect) holt den fertigen Stand.
       const { audio } = await readJson<{ audio: AudioItem }>(res)
       setAudios((prev) => prev.map((a) => (a.id === tempId ? audio : a)))
     } catch {
@@ -424,7 +397,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     }
   }
 
-  // Beim Anklicken eines fertigen Audios die Datei-URL laden und abspielen.
   async function handlePlayAudio(audioId: string) {
     if (playingAudio?.id === audioId) {
       setPlayingAudio(null)
@@ -437,8 +409,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     if (audio.url) setPlayingAudio({ id: audioId, url: audio.url, title: audio.title })
   }
 
-  // Video-Übersicht im Hintergrund erstellen: Modal schließen, Ladekarte zeigen,
-  // dann das fertige Video eintragen (oder als fehlgeschlagen markieren).
   async function handleCreateVideo(options: VideoOptions) {
     setVideoOpen(false)
     const tempId = `temp-${crypto.randomUUID()}`
@@ -483,7 +453,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     }
   }
 
-  // Beim Anklicken eines fertigen Videos die Datei-URL laden und im Overlay abspielen.
   async function handlePlayVideo(videoId: string) {
     const res = await fetch(`/api/notebooks/${notebookId}/video/${videoId}`)
     if (!res.ok) return
@@ -810,8 +779,6 @@ function sourceTitleFor(sources: SourceItem[], sourceId: string) {
   return sources.find((s) => s.id === sourceId)?.title ?? "Quelle"
 }
 
-// Quellen-Icon: Bei URL-Quellen das Favicon der Website, sonst (oder bei
-// fehlendem/fehlerhaftem Favicon) das passende Material-Symbol.
 function SourceIcon({ type, url }: { type: string; url: string | null }) {
   const [failed, setFailed] = useState(false)
   const host = url ? hostOf(url) : null
@@ -824,7 +791,6 @@ function SourceIcon({ type, url }: { type: string; url: string | null }) {
 }
 
 function SourceStatus({ status, error }: { status: string; error?: string | null }) {
-  // Erfolgreicher Import: kein Symbol. Nur Fehler (und der laufende Vorgang) werden angezeigt.
   if (status === "ready") return null
   if (status === "failed") {
     return (

@@ -26,7 +26,7 @@ export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, 
     if (initialEmoji !== prevInitial.emoji) setEmoji(initialEmoji)
   }
 
-  // Auto-Titel (inkl. Icon) aus dem NotebookView (anderer Teilbaum) live übernehmen.
+  // NotebookView liegt in einem anderen Teilbaum und meldet den Auto-Titel per Event.
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<{ title?: string; emoji?: string }>).detail
@@ -40,7 +40,6 @@ export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, 
     return () => window.removeEventListener("notebook-title", handler)
   }, [])
 
-  // Beim Wechsel in den Edit-Modus den Text markieren.
   useLayoutEffect(() => {
     if (editing) {
       inputRef.current?.focus()
@@ -62,11 +61,9 @@ export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, 
     }
     setTitle(next)
     try {
-      // Der Rename wählt serverseitig ein passendes Icon und gibt es zurück.
       const nextEmoji = await onRename(notebookId, next)
       if (typeof nextEmoji === "string" && nextEmoji) setEmoji(nextEmoji)
     } catch {
-      // Bei Fehler auf den alten Titel zurücksetzen.
       setTitle(title)
       setDraft(title)
     }
@@ -77,8 +74,6 @@ export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, 
     setEditing(false)
   }
 
-  // Wie bei neuen Notebooks: Claude erzeugt aus dem Inhalt einen Titel (inkl.
-  // Icon) – hier per force auch, wenn das Notebook bereits einen Namen hat.
   async function generateTitle() {
     if (generating) return
     setGenerating(true)
@@ -97,7 +92,7 @@ export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, 
         setEditing(false)
       }
     } catch {
-      // KI-Vorschlag ist optional – Fehler still ignorieren.
+      // KI-Vorschlag ist optional.
     } finally {
       setGenerating(false)
     }

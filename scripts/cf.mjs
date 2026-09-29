@@ -1,9 +1,4 @@
-// Cloudflare-Hilfsbefehle, die Secrets aus 1Password brauchen. Die Werte landen nie
-// im Terminal: op read → stdin bzw. eine temporäre Datei, die sofort gelöscht wird.
-//
-//   pnpm cf:secrets        Secrets beider Worker aktualisieren (Worker müssen existieren)
-//   pnpm cf:first-deploy   Erster Deploy beider Worker inkl. Secrets, ohne Container-Image
-//                          (braucht kein Docker; das Image baut danach Workers Builds)
+// Secrets nie als Argument oder im Terminal: op read → stdin bzw. sofort gelöschte Temp-Datei.
 import { execFileSync } from "node:child_process"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import os from "node:os"
@@ -18,7 +13,6 @@ const WORKERS = [
     config: "workers/jobs/wrangler.jsonc",
     built: "dist/notebooklm_jobs/wrangler.json",
     secrets: ["GEMINI_API_KEY"],
-    // Worker-Code und Workflows deployen, Container-Image überspringen.
     deployArgs: ["--containers-rollout=none"]
   },
   {
