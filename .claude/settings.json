@@ -1,5 +1,6 @@
 {
   "permissions": {
+    "allow": ["mcp__plugin_cloudflare_cloudflare__docs", "mcp__plugin_cloudflare_cloudflare__search"],
     "deny": [
       "Read(./.env.local)",
       "Bash(cat .env.local)",
