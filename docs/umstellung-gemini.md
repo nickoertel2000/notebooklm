@@ -36,12 +36,12 @@ Vor der Umsetzung prüfen:
 ### `lib/gemini.ts` – Textgenerierung
 
 - `chatModel()` / `reportModel()` analog zu `lib/anthropic.ts`, aber aus `GEMINI_CHAT_MODEL` / `GEMINI_REPORT_MODEL`.
-- Kleiner Helfer `generateText({ model, system, prompt, maxOutputTokens })` → `Promise<string>`, über den bestehenden Lazy-Client `getGemini()`. Ersetzt das an allen Aufrufstellen wiederholte Muster `message.content.map((b) => (b.type === "text" ? b.text : "")).join("")`.
+- Kleiner Helfer `generateText({ model, system, prompt, maxOutputTokens })` → `Promise<string>`, über den bestehenden Lazy-Client `getGemini()`. Ersetzt das an allen Aufrufstellen wiederholte Muster `message.content.map((b) => (b.type === "text" ? b.text : "")).join("")` und den Helfer `joinText` in `workers/jobs/src/workflows/shared.ts`.
 - **Falle:** Gemini-3-Modelle „denken“, und Denk-Tokens zählen gegen `maxOutputTokens`. Bei kleinen Budgets (Auto-Titel: 40 Tokens, Icon-Auswahl) kommt sonst eine leere Antwort zurück. Dort Thinking auf minimal/niedrig stellen oder das Budget erhöhen.
 
 ### `lib/voyage.ts` → `lib/embeddings.ts`
 
-- **Gleiche Signaturen** behalten: `embedTexts(texts, inputType: "document" | "query")` und `embedQuery(text)`. Aufrufer (Chat-Route, Ingestion im Worker) tauschen nur den Import.
+- **Gleiche Signaturen** behalten: `embedTexts(texts, inputType: "document" | "query")` und `embedQuery(text)`. Aufrufer (Chat-Route, `IngestSourceWorkflow`) tauschen nur den Import.
 - `outputDimensionality: 1024` → DB-Spalte `vector(1024)` und HNSW-Index bleiben unverändert.
 - Task-Typ für Dokument vs. Suchanfrage setzen (Retrieval-Dokument / Retrieval-Query – genaue Parameter für Embedding 2 in der Doku prüfen).
 - Batches wie bisher (100 pro Aufruf), Reihenfolge der Vektoren muss der Eingabe entsprechen.
@@ -70,24 +70,23 @@ Größte Änderung, weil Gemini keine nativen Zitate für eigene Dokumente hat.
 
 Überall gleiches Muster: `getAnthropic().messages.create(...)` → `generateText(...)`, `max_tokens` → `maxOutputTokens`, `system` bleibt. Die Parser bleiben unverändert.
 
-| Stelle                     | Modell          | Parser                         |
-| -------------------------- | --------------- | ------------------------------ |
-| `auto-title`-Route         | `chatModel()`   | erste nichtleere Zeile         |
-| `lib/notebookIcons.ts`     | `chatModel()`   | –                              |
-| `report-suggestions`-Route | `reportModel()` | `parseSuggestions`             |
-| Worker: `processReportJob` | `reportModel()` | `deriveReportTitle`            |
-| Worker: `processAudioJob`  | `reportModel()` | `parseScript` (`TITEL:`-Zeile) |
-| Worker: `processVideoJob`  | `reportModel()` | `parseVideoScript`             |
-| `scripts/video-local.ts`   | `reportModel()` | `parseVideoScript`             |
+| Stelle                             | Modell          | Parser                         |
+| ---------------------------------- | --------------- | ------------------------------ |
+| `auto-title`-Route                 | `chatModel()`   | erste nichtleere Zeile         |
+| `lib/notebookIcons.ts`             | `chatModel()`   | –                              |
+| `report-suggestions`-Route         | `reportModel()` | `parseSuggestions`             |
+| `ReportWorkflow` (Step `generate`) | `reportModel()` | `deriveReportTitle`            |
+| `AudioWorkflow` (Step `script`)    | `reportModel()` | `parseScript` (`TITEL:`-Zeile) |
+| `VideoWorkflow` (Step `script`)    | `reportModel()` | `parseVideoScript`             |
 
 Optional: Für Video-Skript und Vorschläge `responseMimeType: "application/json"` mit `responseSchema` nutzen – robuster als das Herausparsen aus Freitext.
 
 ### Env und Secrets
 
-- Entfernen: `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `CLAUDE_MODEL`, `CLAUDE_REPORT_MODEL` aus `.env.template`, `wrangler.jsonc`, `workers/jobs/wrangler.jsonc` (`vars` und `secrets.required`) und den Key-Checks in `scripts/worker-local.ts` / `scripts/video-local.ts`.
+- Entfernen: `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `CLAUDE_MODEL`, `CLAUDE_REPORT_MODEL` aus `.env.template`, `wrangler.jsonc`, `workers/jobs/wrangler.jsonc` (`vars` und `secrets.required`) und der Secret-Liste in `scripts/cf-secrets.mjs`.
 - `GEMINI_API_KEY` in `wrangler.jsonc` (App) zu `secrets.required` hinzufügen – bisher braucht nur der Worker den Key, künftig auch Chat, Discover, Titel und Vorschläge.
 - Neue `vars`: `GEMINI_CHAT_MODEL`, `GEMINI_REPORT_MODEL`, `GEMINI_EMBEDDING_MODEL` (App und Worker, soweit genutzt).
-- Danach `pnpm cf-typegen`, damit `cloudflare-env.d.ts` die neuen Variablen kennt.
+- Danach `pnpm cf-typegen`, damit die `worker-configuration.d.ts`-Dateien die neuen Variablen kennen.
 - `lib/anthropic.ts` und `lib/voyage.ts` löschen.
 
 ### Abhängigkeit
@@ -97,7 +96,7 @@ Optional: Für Video-Skript und Vorschläge `responseMimeType: "application/json
 ### Datenbank
 
 - Schema bleibt unverändert, keine Migration.
-- **Alle vorhandenen Chunks müssen neu eingebettet werden** – Vektoren verschiedener Modelle sind nicht vergleichbar, eine Suche über gemischte Vektoren liefert Unsinn.
+- Die neue Neon-Datenbank startet leer. Wird vor dem ersten Import umgestellt, entfällt das Neu-Einbetten. Sonst gilt: **Alle vorhandenen Chunks müssen neu eingebettet werden** – Vektoren verschiedener Modelle sind nicht vergleichbar, eine Suche über gemischte Vektoren liefert Unsinn.
 - Weg A: Skript, das `source_chunks` batchweise liest, mit `embedTexts(..., "document")` neu einbettet und `embedding` aktualisiert. Das ist eine Datenänderung an der Produktions-DB → Statement vorher zeigen und ausdrücklich freigeben lassen.
 - Weg B (einfacher bei wenigen Demo-Notebooks): Quellen löschen und neu hochladen.
 
@@ -111,7 +110,7 @@ Optional: Für Video-Skript und Vorschläge `responseMimeType: "application/json
 
 ## Verifikation
 
-1. `pnpm lint` und `pnpm exec tsc --noEmit` ohne Fehler.
+1. `pnpm lint` und `pnpm typecheck` ohne Fehler.
 2. Neue PDF- und URL-Quelle hochladen → Status `ready`, Chunks haben Embeddings.
 3. Chat-Frage stellen → Antwort streamt, `[n]`-Marker passen zu den Zitat-Karten, Klick springt zur richtigen Stelle. Frage ohne Antwort in den Quellen → Modell sagt das offen.
 4. Discover (normal und „deep“), Auto-Titel mit Icon, Formatvorschläge, je ein Bericht, eine Audio- und eine Video-Übersicht durchspielen.
