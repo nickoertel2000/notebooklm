@@ -1,6 +1,6 @@
 # Demo-Notebooks
 
-Stand: 29.09.2026. Plan für die Notebooks im Vorlage-Konto `demo@notebooklm.invalid`. Jedes neue Demo-Konto bekommt eine Kopie davon (siehe [`anleitung-google-account.md`](anleitung-google-account.md), Schritt 4).
+Stand: 29.09.2026. Plan für die Notebooks im Vorlage-Konto `demo@notebooklm.invalid`. Jedes neue Demo-Konto bekommt eine Kopie davon (siehe [`anleitung-google-account.md`](anleitung-google-account.md), Abschnitt „Demo-Vorlage“).
 
 Ablauf: Notebook 1 lokal mit `pnpm dev` anlegen, danach Deploy in Produktion, Notebook 2 und 3 dort.
 

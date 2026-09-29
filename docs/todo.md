@@ -1,63 +1,21 @@
-# ToDo: Go-live auf Cloudflare
+# ToDo
 
-Stand: 29.09.2026. Der Code ist migriert (Branch `feat/cloudflare-migration`). Offen sind nur Infrastruktur- und Konto-Schritte. Reihenfolge einhalten, spätere Schritte bauen auf früheren auf.
+Stand: 30.09.2026. Beide Worker sind deployt (`pnpm cf:first-deploy` am 29.09.2026), die App läuft unter `https://notebooklm.fancy-cherry-09d8.workers.dev`. Offen sind Tests, das Video-Container-Image und ein paar Nacharbeiten.
 
-Erledigt: Workers Paid ist aktiv, R2-Bucket `notebooklm` (Jurisdiction `eu`) ist angelegt, die Migrationen sind neu aufgebaut (`db/migrations/0000_enable_pgvector.sql`, `0001_init.sql`).
+## 1. Testen
 
-## 1. Datenbank (Neon)
-
-Begründung für Neon: README, Tech-Entscheidungen. Hyperdrive ist als „public“ angelegt (Neon ist öffentlich erreichbar, kein Workers VPC / Access).
-
-- [x] Neon-Projekt `notebooklm` anlegen, Region Frankfurt (`aws-eu-central-1`), direkte Verbindung ohne `-pooler`, `sslmode=require`.
-- [x] Connection-String in 1Password unter `Development → NotebookLM → DATABASE_URL` eintragen. `.env.template` nutzt denselben Eintrag für `DATABASE_URL` und `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`.
-- [x] `pnpm env:pull`
-- [x] `pnpm db:migrate`. `0000_enable_pgvector` legt die Extension an, `0001_init` das komplette Schema. Danach prüfen, ob der HNSW-Index `source_chunks_embedding_idx` existiert.
-
-## 2. Hyperdrive
-
-- [x] Hyperdrive anlegen, ohne dass der Connection-String im Terminal erscheint:
-
-  ```sh
-  pnpm exec wrangler hyperdrive create notebooklm-db --connection-string="$(op read op://Development/NotebookLM/DATABASE_URL)"
-  ```
-
-- [x] Die zurückgegebene ID ersetzt `HYPERDRIVE_ID` in `wrangler.jsonc` **und** `workers/jobs/wrangler.jsonc`. Das Placement (`aws:eu-central-1`, passend zu Neon Frankfurt) ist dort bereits eingetragen. Falls Neon in einer anderen Region landet, dort anpassen.
-- [x] `pnpm cf-typegen`, `pnpm typecheck`.
-
-## 2a. Gemini- und Tavily-Key
-
-Die KI läuft komplett über Gemini (Gratis-Tarif), siehe [`umstellung-gemini.md`](umstellung-gemini.md). Anleitung: [`anleitung-google-account.md`](anleitung-google-account.md).
-
-- [x] Gemini-API-Key im neuen Google-Account anlegen, in 1Password eintragen, `pnpm env:pull`.
-- [x] Modell-IDs prüfen: `node --env-file=.env.local scripts/gemini-models.mjs`.
-- [x] Tavily-Konto anlegen, Key als `TAVILY_API_KEY` in 1Password, `pnpm env:pull` (Anleitung, Schritt 1b). Die Google-Suche von Gemini hat im Gratis-Tarif kein Kontingent.
-
-## 3. Lokal testen
-
-- [ ] `pnpm dev` → Registrieren, Notebook anlegen, PDF/URL/Text-Quelle (Status `ready`), Chat mit Zitaten, Bericht, Audio. Die Video-Übersicht wird erst in Produktion getestet (siehe unten).
-
-## 4. Demo-Vorlage
-
-Login mit Google gibt es nicht mehr, Besucher nutzen den Demo-Zugang (eigenes Konto mit Kopie der Vorlage, Löschung nach 7 Tagen ohne Login).
-
-- [ ] Vorlage-Konto `demo@notebooklm.invalid` anlegen und Beispiel-Notebooks aufbauen: [`anleitung-google-account.md`](anleitung-google-account.md), Schritt 4.
+- [ ] Smoke-Test in Produktion: Login, Quelle (PDF/URL/Text, Status `ready`), Chat mit Zitaten, Bericht, Audio. Video funktioniert erst nach Schritt 3.
+- [ ] Demo-Vorlage fertig aufbauen ([`demo-notebooks.md`](demo-notebooks.md), Anleitung in [`anleitung-google-account.md`](anleitung-google-account.md), Abschnitt „Demo-Vorlage“).
 - [ ] „Demo-Zugang erstellen“ testen: Kopie vollständig, Chat-Zitate klickbar, Audio und Video abspielbar.
 
-## 5. Erster Deploy
+## 2. Neon beobachten
 
-Die App bindet die Workflows des Jobs-Workers per `script_name`, und beide Worker verlangen ihre Secrets (`secrets.required`) schon beim Deploy. `pnpm cf:first-deploy` erledigt beides in der richtigen Reihenfolge: erst der Jobs-Worker, dann die App, jeweils mit den Secrets aus 1Password (`wrangler deploy --secrets-file`, die Werte erscheinen nicht im Terminal). Der Jobs-Worker wird dabei mit `--containers-rollout=none` deployt: Worker-Code und Workflows sind live, das Container-Image für die Video-Übersicht baut Cloudflare in Schritt 6. **Docker auf dem eigenen Rechner ist nicht nötig.**
+Hyperdrive hält einen eigenen Connection-Pool. Ob der Scale-to-Zero verhindert, ist nicht dokumentiert. Wichtig, weil die 100 CU-Stunden im Free-Tarif nur für rund 400 Stunden mit 0,25 CU reichen, nicht für Dauerbetrieb.
 
-- [ ] `pnpm build`
-- [ ] `pnpm cf:first-deploy`
-- [ ] Smoke-Test auf der workers.dev-URL: Login, Quelle, Chat, Bericht, Audio. Video funktioniert erst nach Schritt 6.
-- [ ] Neon-Dashboard: Geht die Compute bei Inaktivität auf „Idle“? Hyperdrive hält einen eigenen Connection-Pool, ob der Scale-to-Zero verhindert, ist nicht dokumentiert. Wichtig, weil die 100 CU-Stunden im Free-Tarif nur für rund 400 Stunden mit 0,25 CU reichen, nicht für Dauerbetrieb.
-- [x] Neon: Autoscaling auf 0,25 bis 0,5 CU begrenzt (Standard war 0,25 bis 2 CU).
-- [ ] Neon, 1 bis 2 Tage nach dem Deploy: Branch-Übersicht → Usage → Compute. Bei normaler Nutzung deutlich unter 3 CU-Stunden pro Tag. Etwa 6 oder mehr pro Tag heißt, die Compute läuft rund um die Uhr (vermutlich hält Hyperdrive sie wach).
-- [x] README: erwähnen, dass die Demo bei aufgebrauchten CU-Stunden bis zum Monatsende offline ist (Neon suspendiert die Compute, Daten bleiben erhalten).
+- [ ] Neon-Dashboard: Geht die Compute bei Inaktivität auf „Idle“?
+- [ ] Am 01.10. oder 02.10.2026: Branch-Übersicht → Usage → Compute. Bei normaler Nutzung deutlich unter 3 CU-Stunden pro Tag. Etwa 6 oder mehr pro Tag heißt, die Compute läuft rund um die Uhr (vermutlich hält Hyperdrive sie wach).
 
-Später geänderte Secrets überträgt `pnpm cf:secrets`. Die Secret-Listen stehen in `scripts/cf.mjs` (seit der Gemini-Umstellung nur noch `GEMINI_API_KEY` plus die Auth-Secrets).
-
-## 6. Workers Builds (baut auch das Video-Container-Image)
+## 3. Workers Builds (baut auch das Video-Container-Image)
 
 Im Dashboard unter Workers & Pages → jeweiliger Worker → Settings → Builds mit dem GitHub-Repo verbinden. Der Worker-Name muss zum `name` in der `wrangler.jsonc` im Root-Verzeichnis passen, deshalb hat der Jobs-Worker sein eigenes Root-Verzeichnis. Dort gibt es keine `package.json`, die Befehle wechseln daher selbst ins Repo-Root.
 
@@ -68,15 +26,23 @@ Im Dashboard unter Workers & Pages → jeweiliger Worker → Settings → Builds
 
 - [ ] Production-Branch bei beiden: `I-######-I-PRODUKTION-I-######-I`
 - [ ] Builds für andere Branches (Preview/Non-production) **deaktivieren**.
-- [ ] Ersten Merge in den Production-Branch auslösen. Der Jobs-Build führt `wrangler deploy` ohne `--containers-rollout=none` aus und baut dabei das Image aus `containers/video-renderer/Dockerfile` in Cloudflares Build-Umgebung.
+- [ ] Ersten Merge in den Production-Branch auslösen. Der Jobs-Build führt `wrangler deploy` ohne `--containers-rollout=none` aus und baut dabei das Image aus `containers/video-renderer/Dockerfile` in Cloudflares Build-Umgebung. Docker auf dem eigenen Rechner ist nicht nötig, ohne Docker schlägt lokal nur der Schritt `render` einer Video-Übersicht fehl.
 - [ ] Eine Video-Übersicht erstellen. Der allererste Container-Start kann einige Minuten dauern, während Cloudflare das Image verteilt.
 
-## 7. Aufräumen
+## 4. Gemini-Kontingente
+
+Die Free-Tier-Limits gelten pro Projekt und Modell (AI Studio → Rate Limits). Chat & Co. laufen deshalb auf Flash-Lite (500/Tag), Flash (20/Tag) nur für Studio-Inhalte, mit Ausweichmodell bei 429/5xx.
+
+- [ ] Embeddings: Gemini Embedding 2 erlaubt 30.000 Tokens pro Minute, der Import schickt 100 Chunks (rund 80.000 Tokens) pro Anfrage. Größere Quellen scheitern daran. Batches verkleinern (etwa 30 Chunks) und zwischen den Batches `step.sleep`.
+- [ ] TTS: Tageslimit von `gemini-3.8-flash-tts` in AI Studio prüfen. Ein Video braucht bis zu 8 TTS-Anfragen. Gegebenenfalls `gemini-3.8-flash-lite-tts` als Ausweichmodell.
+- [ ] Optional: `gemini-3.5-flash` (eigene 20/Tag) als Stufe zwischen Flash und Flash-Lite für Studio-Inhalte.
+
+## 5. Aufräumen
 
 - [ ] AWS: Amplify-App, S3-Bucket, Lambda, Lambda-Layer und IAM-Policies löschen (falls noch vorhanden).
-- [ ] 1Password: AWS-Felder (`AWS_REGION`, `S3_BUCKET_NAME`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) entfernen.
+- [ ] 1Password: AWS-Felder (`AWS_REGION`, `S3_BUCKET_NAME`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) sowie `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `GOOGLE_CLIENT_ID` und `GOOGLE_CLIENT_SECRET` entfernen, falls noch vorhanden.
 
-## 8. Später besprechen: Organisation der Env-Dateien
+## 6. Später besprechen: Organisation der Env-Dateien
 
 Aktueller Aufbau:
 
@@ -89,12 +55,8 @@ Es wird immer wieder angemerkt, dass die `.env` auf GitHub zu sehen ist. Klären
 
 - [ ] Env-Organisation mit Claude durchsprechen.
 
-## 9. Später: Kommentare aufräumen
+## 7. Später: Kommentare aufräumen
 
 Viele Kommentare im Projekt stammen aus der Zeit vor der Kommentar-Richtlinie in `.claude/CLAUDE.md` (Abschnitt „Kommentare“) und verstoßen dagegen: Sie wiederholen den Code, enthalten Anleitungen, Links oder Betriebshinweise oder beschreiben die Entstehung. Solange sie drinstehen, dienen sie beim Schreiben neuen Codes als Vorbild.
 
 - [ ] Alle Dateien mit Kommentaren durchgehen (Code, Konfiguration, Templates, SCSS, Skripte) und jeden Kommentar gegen die Richtlinie prüfen: behalten, kürzen oder löschen. Informationen, die woanders fehlen, vorher nach `README.md`, `docs/` oder `.claude/rules/` verschieben.
-
-## Warum kein Docker nötig ist
-
-Das `Dockerfile` ist nur das Rezept für das Image des Video-Renderers. Gebaut wird es von Cloudflare, sobald Workers Builds den Jobs-Worker deployt. Auf dem eigenen Rechner würde Docker nur gebraucht, um das Rendern lokal mit `pnpm dev` zu testen. Ohne Docker startet der Dev-Server trotzdem, nur der Schritt `render` einer Video-Übersicht schlägt lokal fehl.
