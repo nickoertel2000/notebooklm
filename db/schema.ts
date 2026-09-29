@@ -78,8 +78,8 @@ export const sources = pgTable("sources", {
   // 'pdf' | 'url' | 'text'
   type: text("type").notNull(),
   title: text("title").notNull(),
-  // S3-Key des hochgeladenen Originals bzw. der extrahierten .txt-Datei
-  s3Key: text("s3_key"),
+  // R2-Key des hochgeladenen PDFs bzw. des Textinhalts (URL/Text); null bis zum Upload
+  storageKey: text("storage_key"),
   // Ursprungs-URL bei type = 'url'
   sourceUrl: text("source_url"),
   // 'processing' | 'ready' | 'failed'
@@ -160,8 +160,8 @@ export const reports = pgTable("reports", {
 
 // ── Studio-Audio ──────────────────────────────────────────────────────────────
 // Audio-Übersichten (NotebookLM-Stil): Claude erzeugt ein sprechbares Skript aus
-// den Quellen, Gemini TTS vertont es. Die WAV-Datei liegt unter s3Key im Bucket.
-// Während der Erzeugung 'processing', danach 'ready' mit s3Key; bei Fehler 'failed'.
+// den Quellen, Gemini TTS vertont es. Die WAV-Datei liegt unter storageKey in R2.
+// Während der Erzeugung 'processing', danach 'ready' mit storageKey; bei Fehler 'failed'.
 
 export const audioOverviews = pgTable("audio_overviews", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -171,8 +171,8 @@ export const audioOverviews = pgTable("audio_overviews", {
   // Format aus lib/audio.ts: 'brief' | 'deep-dive' | 'critique' | 'debate'
   format: text("format").notNull(),
   title: text("title").notNull().default("Audio-Übersicht"),
-  // S3-Key der erzeugten WAV-Datei (null bis fertig)
-  s3Key: text("s3_key"),
+  // R2-Key der erzeugten WAV-Datei (null bis fertig)
+  storageKey: text("storage_key"),
   durationSeconds: integer("duration_seconds"),
   // 'kurz' | 'standard'
   length: text("length").notNull().default("standard"),
@@ -189,9 +189,9 @@ export const audioOverviews = pgTable("audio_overviews", {
 // Video-Übersichten (NotebookLM-Stil): vertonte Slideshow. Claude erzeugt ein
 // strukturiertes Skript (Folien + Narration), Gemini TTS vertont jede Folie,
 // Gemini 2.5 Flash Image („Nano Banana") malt pro Folie einen Hintergrund, und
-// der ingest-Worker brennt Titel/Stichpunkte per ffmpeg-drawtext darüber und
-// fügt alles zu einer MP4 unter s3Key zusammen. Während der Erzeugung
-// 'processing', danach 'ready' mit s3Key; bei Fehler 'failed'.
+// der Video-Renderer-Container brennt Titel/Stichpunkte per ffmpeg-drawtext
+// darüber und fügt alles zu einer MP4 unter storageKey zusammen. Während der
+// Erzeugung 'processing', danach 'ready' mit storageKey; bei Fehler 'failed'.
 
 export const videoOverviews = pgTable("video_overviews", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -205,8 +205,8 @@ export const videoOverviews = pgTable("video_overviews", {
   visualStyle: text("visual_style").notNull().default("auto"),
   // Freitext bei visualStyle = 'custom' (eigener Stil-Prompt)
   customStyle: text("custom_style"),
-  // S3-Key der erzeugten MP4-Datei (null bis fertig)
-  s3Key: text("s3_key"),
+  // R2-Key der erzeugten MP4-Datei (null bis fertig)
+  storageKey: text("storage_key"),
   durationSeconds: integer("duration_seconds"),
   language: text("language").notNull().default("de"),
   focus: text("focus"),

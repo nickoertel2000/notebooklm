@@ -12,10 +12,10 @@ Reference: `app/api/notebooks/[notebookId]/audio/route.ts` (list + create job), 
 
 ## Auth & Ownership
 
-- `middleware.ts` only checks that a session cookie exists and redirects to `/login` — it's not an auth check. Every handler checks itself:
+- `proxy.ts` only checks that a session cookie exists and redirects to `/login` — it's not an auth check. Every handler checks itself:
   - `getSessionUser()` (`lib/auth/session.ts`) → `401 { error: "Nicht angemeldet" }`
   - `getNotebookForUser(notebookId, user.id)` (`lib/notebooks.ts`, also validates the UUID) → `404 { error: "Notebook nicht gefunden" }`
-- Routes with several methods use a file-local `authorize(notebookId)` returning `{ error } | { user, notebook }`; copy that shape.
+- Use `authorizeNotebook(notebookId)` (`lib/auth/authorizeNotebook.ts`): returns `{ error }` (ready 401/404 response) or `{ user, notebook }`. Then `const db = getDb()`.
 - Child resources: `where(and(eq(x.id, id), eq(x.notebookId, notebookId)))`. Validate child IDs with `isUuid()` first, otherwise an invalid ID ends up as a Postgres error / 500.
 - `params` is a Promise: `type RouteContext = { params: Promise<{ notebookId: string }> }` → `const { notebookId } = await params`.
 
@@ -24,12 +24,12 @@ Reference: `app/api/notebooks/[notebookId]/audio/route.ts` (list + create job), 
 - Errors: `NextResponse.json({ error: "<deutscher Text>" }, { status })`. 400 invalid input, 401, 404, 422 extraction failed, 500. For 500 never pass through raw error objects that could contain env values or connection strings.
 - Job created: `202` with the new row (see `jobs-worker.md`).
 - Dates are serialized server-side with `.toISOString()`; client types use `string`.
-- No Zod in the project: validate manually (`typeof`, `Array.isArray(...).filter(...)`) and map enum values through the lookup helpers (`getAudioFormat`, `getReportType`, `getVideoFormat`) — unknown values fall back, they are never written to the DB unchecked.
+- No Zod in the project: read bodies with `readJsonBody(req)` and validate each field manually (`optionalString`, `parseSourceIds` from `lib/api/body.ts`, `typeof`), map enum values through the lookup helpers (`getAudioFormat`, `getReportType`, `getVideoFormat`) — unknown values fall back, they are never written to the DB unchecked.
 - Optional `sourceIds`: empty/missing means "all ready sources" (`sourceIds?.length ? inArray(...) : undefined` inside `and(...)`).
 
 ## Runtime
 
-- `export const runtime = "nodejs"` on every route. `maxDuration` only on synchronous LLM routes (`chat`, `discover` 60, `report-suggestions` 30) — both are Amplify-specific and will change with the Cloudflare migration.
+- Routes run on Cloudflare Workers via vinext. `runtime`/`maxDuration` exports have no effect there and are not used. Synchronous LLM calls (`chat`, `discover`, `report-suggestions`, `auto-title`) have no wall-clock limit while the client is connected; everything else longer than a few seconds is a Workflow (`jobs-worker.md`).
 
 ## Chat (RAG, streaming)
 

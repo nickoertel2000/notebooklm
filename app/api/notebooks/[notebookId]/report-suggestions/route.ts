@@ -1,13 +1,10 @@
 import { asc, eq } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
-import { db } from "@/db"
+import { getDb } from "@/db"
 import { sourceChunks, sources } from "@/db/schema"
-import { getAnthropic, REPORT_MODEL } from "@/lib/anthropic"
-import { getSessionUser } from "@/lib/auth/session"
-import { getNotebookForUser } from "@/lib/notebooks"
-
-export const runtime = "nodejs"
-export const maxDuration = 30
+import { getAnthropic, reportModel } from "@/lib/anthropic"
+import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
+import { readJsonBody, parseSourceIds } from "@/lib/api/body"
 
 export type ReportSuggestion = { title: string; description: string; prompt: string }
 
@@ -43,25 +40,17 @@ function parseSuggestions(text: string): ReportSuggestion[] {
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
 
-  const user = await getSessionUser()
-  if (!user) return NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 })
-  const notebook = await getNotebookForUser(notebookId, user.id)
-  if (!notebook) return NextResponse.json({ error: "Notebook nicht gefunden" }, { status: 404 })
+  const auth = await authorizeNotebook(notebookId)
+  if (auth.error) return auth.error
+  const db = getDb()
 
-  const body = await req.json().catch(() => ({}))
-  const selectedIds: string[] | null = Array.isArray(body.sourceIds)
-    ? body.sourceIds.filter((id: unknown) => typeof id === "string")
-    : null
+  const body = await readJsonBody(req)
+  const selectedIds = parseSourceIds(body.sourceIds)
 
   // Kontext: Quellentitel + ein paar Textausschnitte.
   const [sourceRows, chunkRows] = await Promise.all([
     db.select({ title: sources.title }).from(sources).where(eq(sources.notebookId, notebookId)).limit(20),
-    db
-      .select({ content: sourceChunks.content })
-      .from(sourceChunks)
-      .where(eq(sourceChunks.notebookId, notebookId))
-      .orderBy(asc(sourceChunks.createdAt))
-      .limit(6)
+    db.select({ content: sourceChunks.content }).from(sourceChunks).where(eq(sourceChunks.notebookId, notebookId)).orderBy(asc(sourceChunks.createdAt)).limit(6)
   ])
 
   const titles = sourceRows.map((s) => `- ${s.title}`).join("\n")
@@ -73,7 +62,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
   try {
     const message = await getAnthropic().messages.create({
-      model: REPORT_MODEL,
+      model: reportModel(),
       max_tokens: 800,
       system: SYSTEM_PROMPT,
       messages: [

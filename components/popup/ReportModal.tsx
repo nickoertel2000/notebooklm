@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import "material-symbols"
 import { REPORT_TYPES } from "@/lib/reports"
 import styles from "./ReportModal.module.scss"
+import { readJson } from "@/lib/api/client"
 
 export type ReportGeneratePayload = {
   type?: string
@@ -40,7 +41,7 @@ export default function ReportModal({ notebookId, sourceIds, onClose, onGenerate
           body: JSON.stringify({ sourceIds })
         })
         if (!res.ok) throw new Error()
-        const data = await res.json()
+        const data = await readJson<{ suggestions?: ReportSuggestion[] }>(res)
         if (!cancelled) setSuggestions(data.suggestions ?? [])
       } catch {
         if (!cancelled) setSuggestions([])

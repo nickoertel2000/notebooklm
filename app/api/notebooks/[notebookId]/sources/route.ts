@@ -1,29 +1,31 @@
-import { asc, eq } from "drizzle-orm"
+import { and, asc, eq, lt } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
-import { db } from "@/db"
+import { getDb } from "@/db"
 import { sources } from "@/db/schema"
-import { getSessionUser } from "@/lib/auth/session"
+import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { extractFromUrl } from "@/lib/extract"
-import { getNotebookForUser } from "@/lib/notebooks"
-import { presignUpload, putText, sourceKey } from "@/lib/s3"
+import { startIngestSource } from "@/lib/jobs/start"
+import { putObject, sourceKey } from "@/lib/storage"
 
-export const runtime = "nodejs"
+// Quellen, die so lange in 'processing' hängen, gelten als abgebrochen (z. B. PDF
+// angelegt, Upload nie angekommen) – sonst pollt das Frontend endlos.
+const STALE_PROCESSING_MS = 15 * 60 * 1000
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
 
-async function authorize(notebookId: string) {
-  const user = await getSessionUser()
-  if (!user) return { error: NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 }) }
-  const notebook = await getNotebookForUser(notebookId, user.id)
-  if (!notebook) return { error: NextResponse.json({ error: "Notebook nicht gefunden" }, { status: 404 }) }
-  return { user, notebook }
-}
+type CreateSourceBody = { type: "pdf"; filename?: string } | { type: "url"; url?: string } | { type: "text"; text?: string; title?: string }
 
 // Quellen eines Notebooks auflisten (für Status-Polling).
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
-  const auth = await authorize(notebookId)
+  const auth = await authorizeNotebook(notebookId)
   if (auth.error) return auth.error
+
+  const db = getDb()
+  await db
+    .update(sources)
+    .set({ status: "failed", error: "Zeitüberschreitung beim Import", updatedAt: new Date() })
+    .where(and(eq(sources.notebookId, notebookId), eq(sources.status, "processing"), lt(sources.updatedAt, new Date(Date.now() - STALE_PROCESSING_MS))))
 
   const rows = await db
     .select({
@@ -42,68 +44,56 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   return NextResponse.json({ sources: rows })
 }
 
-// Neue Quelle anlegen. PDF → presigned Upload-URL; URL/Text → serverseitig nach
-// S3 schreiben. In allen Fällen triggert der S3-Upload die ingest-Lambda.
+// Neue Quelle anlegen. PDF: nur die Zeile – die Datei folgt per PUT auf
+// sources/[sourceId]/file, das startet den Import. URL/Text: Inhalt wird direkt
+// gespeichert und der Import sofort gestartet.
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
-  const auth = await authorize(notebookId)
+  const auth = await authorizeNotebook(notebookId)
   if (auth.error) return auth.error
 
-  const body = await req.json()
+  const db = getDb()
+  const body = (await req.json()) as CreateSourceBody
 
   if (body.type === "pdf") {
-    const filename: string = body.filename || "dokument.pdf"
-    const [row] = await db
-      .insert(sources)
-      .values({ notebookId, type: "pdf", title: filename, status: "processing" })
-      .returning({ id: sources.id })
-
-    const key = sourceKey(notebookId, row.id, filename)
-    await db.update(sources).set({ s3Key: key }).where(eq(sources.id, row.id))
-    const uploadUrl = await presignUpload(key, body.contentType || "application/pdf")
-
-    return NextResponse.json({ sourceId: row.id, uploadUrl })
+    const filename = body.filename?.trim() || "dokument.pdf"
+    const [row] = await db.insert(sources).values({ notebookId, type: "pdf", title: filename, status: "processing" }).returning({ id: sources.id })
+    return NextResponse.json({ sourceId: row.id })
   }
+
+  let title: string
+  let text: string
+  let sourceUrl: string | null = null
 
   if (body.type === "url") {
-    const url: string = body.url
-    if (!url) return NextResponse.json({ error: "URL fehlt" }, { status: 400 })
-
-    let extracted: { title: string; text: string }
+    if (!body.url) return NextResponse.json({ error: "URL fehlt" }, { status: 400 })
     try {
-      extracted = await extractFromUrl(url)
+      const extracted = await extractFromUrl(body.url)
+      title = extracted.title
+      text = extracted.text
+      sourceUrl = body.url
     } catch (err) {
-      return NextResponse.json({ error: String(err) }, { status: 422 })
+      return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 422 })
     }
-
-    const [row] = await db
-      .insert(sources)
-      .values({ notebookId, type: "url", title: extracted.title, sourceUrl: url, status: "processing" })
-      .returning({ id: sources.id })
-
-    const key = sourceKey(notebookId, row.id, "content.txt")
-    await db.update(sources).set({ s3Key: key }).where(eq(sources.id, row.id))
-    await putText(key, extracted.text)
-
-    return NextResponse.json({ sourceId: row.id })
+  } else if (body.type === "text") {
+    text = body.text ?? ""
+    if (!text.trim()) return NextResponse.json({ error: "Text fehlt" }, { status: 400 })
+    title = body.title?.trim() || text.trim().split("\n")[0].slice(0, 80) || "Eingefügter Text"
+  } else {
+    return NextResponse.json({ error: "Unbekannter Quelltyp" }, { status: 400 })
   }
 
-  if (body.type === "text") {
-    const text: string = body.text
-    if (!text?.trim()) return NextResponse.json({ error: "Text fehlt" }, { status: 400 })
-    const title: string = body.title?.trim() || text.trim().split("\n")[0].slice(0, 80) || "Eingefügter Text"
+  const [row] = await db.insert(sources).values({ notebookId, type: body.type, title, sourceUrl, status: "processing" }).returning({ id: sources.id })
 
-    const [row] = await db
-      .insert(sources)
-      .values({ notebookId, type: "text", title, status: "processing" })
-      .returning({ id: sources.id })
-
-    const key = sourceKey(notebookId, row.id, "content.txt")
-    await db.update(sources).set({ s3Key: key }).where(eq(sources.id, row.id))
-    await putText(key, text)
-
-    return NextResponse.json({ sourceId: row.id })
+  const key = sourceKey(notebookId, row.id, "content.txt")
+  try {
+    await putObject(key, text, "text/plain; charset=utf-8")
+    await db.update(sources).set({ storageKey: key }).where(eq(sources.id, row.id))
+    await startIngestSource({ sourceId: row.id, notebookId, key, isPdf: false })
+  } catch (err) {
+    console.error("Import konnte nicht gestartet werden:", err)
+    await db.update(sources).set({ status: "failed", error: "Import konnte nicht gestartet werden", updatedAt: new Date() }).where(eq(sources.id, row.id))
   }
 
-  return NextResponse.json({ error: "Unbekannter Quelltyp" }, { status: 400 })
+  return NextResponse.json({ sourceId: row.id })
 }

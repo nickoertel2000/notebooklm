@@ -1,34 +1,26 @@
 import { and, desc, eq, inArray, lt } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
-import { db } from "@/db"
+import { getDb } from "@/db"
 import { audioOverviews, sources } from "@/db/schema"
 import { AudioLength, getAudioFormat } from "@/lib/audio"
-import { putText } from "@/lib/s3"
-import { getSessionUser } from "@/lib/auth/session"
-import { getNotebookForUser } from "@/lib/notebooks"
-
-export const runtime = "nodejs"
+import { startAudio } from "@/lib/jobs/start"
+import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
+import { readJsonBody, optionalString, parseSourceIds } from "@/lib/api/body"
 
 // Audio-Übersichten, die länger als das hier in 'processing' hängen, gelten als
 // abgebrochen und werden beim Auflisten auf 'failed' gesetzt — sonst pollt das
 // Studio-Panel endlos. Großzügig, da TTS einer 'standard'-Länge dauern kann.
-const STALE_PROCESSING_MS = 8 * 60 * 1000
+const STALE_PROCESSING_MS = 15 * 60 * 1000
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
 
-async function authorize(notebookId: string) {
-  const user = await getSessionUser()
-  if (!user) return { error: NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 }) }
-  const notebook = await getNotebookForUser(notebookId, user.id)
-  if (!notebook) return { error: NextResponse.json({ error: "Notebook nicht gefunden" }, { status: 404 }) }
-  return { user, notebook }
-}
-
-// Persistierte Audio-Übersichten des Notebooks auflisten (ohne s3Key) – fürs Studio-Panel.
+// Persistierte Audio-Übersichten des Notebooks auflisten (ohne storageKey) – fürs Studio-Panel.
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
-  const auth = await authorize(notebookId)
+  const auth = await authorizeNotebook(notebookId)
   if (auth.error) return auth.error
+
+  const db = getDb()
 
   // Hängengebliebene 'processing'-Audios aufräumen, bevor wir auflisten.
   await db
@@ -59,35 +51,30 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   return NextResponse.json({ audios: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })) })
 }
 
-// Audio-Übersicht erstellen: 'processing'-Zeile anlegen und einen Job nach S3
-// schreiben. Die lange Generierung (Claude-Skript + Gemini-TTS) übernimmt der
-// ingest-Worker; das Frontend pollt. So umgehen wir das 30s-Timeout des SSR.
+// Audio-Übersicht erstellen: 'processing'-Zeile anlegen und den AudioWorkflow
+// starten (Claude-Skript + Gemini-TTS im Jobs-Worker), das Frontend pollt.
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
-  const auth = await authorize(notebookId)
+  const auth = await authorizeNotebook(notebookId)
   if (auth.error) return auth.error
 
-  const body = await req.json()
-  const format = getAudioFormat(body.format)
+  const db = getDb()
+
+  const body = await readJsonBody(req)
+  const format = getAudioFormat(String(body.format))
   if (!format) return NextResponse.json({ error: "Unbekanntes Audio-Format" }, { status: 400 })
 
   const length: AudioLength = body.length === "kurz" ? "kurz" : "standard"
   const language = typeof body.language === "string" ? body.language : "de"
-  const focus = typeof body.focus === "string" && body.focus.trim() ? body.focus.trim() : null
-  const selectedIds: string[] | null = Array.isArray(body.sourceIds)
-    ? body.sourceIds.filter((id: unknown) => typeof id === "string")
-    : null
+  const focus = optionalString(body.focus)
+  const selectedIds = parseSourceIds(body.sourceIds)
 
   // Sicherstellen, dass es überhaupt fertige Quellen gibt (schnelle Prüfung).
   const ready = await db
     .select({ id: sources.id })
     .from(sources)
     .where(
-      and(
-        eq(sources.notebookId, notebookId),
-        eq(sources.status, "ready"),
-        selectedIds && selectedIds.length > 0 ? inArray(sources.id, selectedIds) : undefined
-      )
+      and(eq(sources.notebookId, notebookId), eq(sources.status, "ready"), selectedIds && selectedIds.length > 0 ? inArray(sources.id, selectedIds) : undefined)
     )
 
   if (ready.length === 0) {
@@ -101,21 +88,13 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     .values({ notebookId, format: format.id, title: format.label, length, language, focus, sourceCount, status: "processing" })
     .returning({ id: audioOverviews.id, createdAt: audioOverviews.createdAt })
 
-  // Job-Datei nach S3 schreiben → triggert den ingest-Worker.
-  const jobKey = `notebooks/${notebookId}/jobs/audio/${created.id}.json`
-  await putText(
-    jobKey,
-    JSON.stringify({
-      kind: "audio",
-      audioId: created.id,
-      notebookId,
-      formatId: format.id,
-      length,
-      language,
-      focus,
-      sourceIds: selectedIds
-    })
-  )
+  try {
+    await startAudio({ audioId: created.id, notebookId, formatId: format.id, length, language, focus, sourceIds: selectedIds })
+  } catch (err) {
+    console.error("Audio-Workflow konnte nicht gestartet werden:", err)
+    await db.update(audioOverviews).set({ status: "failed", error: "Erstellung konnte nicht gestartet werden" }).where(eq(audioOverviews.id, created.id))
+    return NextResponse.json({ error: "Erstellung konnte nicht gestartet werden" }, { status: 500 })
+  }
 
   return NextResponse.json(
     {

@@ -1,14 +1,12 @@
 import Image from "next/image"
 import Link from "next/link"
 import "material-symbols"
-import { headers } from "next/headers"
-import { auth } from "@/auth"
+import { getSessionUser } from "@/lib/auth/session"
 import AccountMenu from "./AccountMenu"
 import styles from "./header.module.scss"
 
 export default async function Header() {
-  const session = await auth.api.getSession({ headers: await headers() })
-  const user = session?.user
+  const user = await getSessionUser()
 
   return (
     <header className={styles.header}>

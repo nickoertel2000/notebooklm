@@ -5,36 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1780915212351,
-      "tag": "0000_chemical_screwball",
+      "when": 1790697310902,
+      "tag": "0000_enable_pgvector",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1780930607615,
-      "tag": "0001_unknown_scarlet_spider",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1781185806068,
-      "tag": "0002_whole_pandemic",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1781250332135,
-      "tag": "0003_daily_tyger_tiger",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1781305625159,
-      "tag": "0004_lying_old_lace",
+      "when": 1790697318261,
+      "tag": "0001_init",
       "breakpoints": true
     }
   ]

@@ -1,3 +1,5 @@
+import { env } from "cloudflare:workers"
+
 // Kleiner REST-Client für Voyage-AI-Embeddings (kein offizielles SDK nötig).
 // voyage-3.5 mit 1024 Dimensionen — passend zur pgvector-Spalte.
 
@@ -16,7 +18,7 @@ export async function embedTexts(texts: string[], inputType: "document" | "query
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.VOYAGE_API_KEY}`
+      "Authorization": `Bearer ${env.VOYAGE_API_KEY}`
     },
     body: JSON.stringify({
       model: MODEL,

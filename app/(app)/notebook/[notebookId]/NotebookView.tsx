@@ -16,6 +16,7 @@ import { useDictation } from "@/lib/useDictation"
 import "material-symbols"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import styles from "../notebook.module.scss"
+import { readError, readJson } from "@/lib/api/client"
 
 export type Citation = {
   sourceId: string
@@ -119,11 +120,11 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   const [menuReportId, setMenuReportId] = useState<string | null>(null)
   const [menuAudioId, setMenuAudioId] = useState<string | null>(null)
   const [menuVideoId, setMenuVideoId] = useState<string | null>(null)
-  // Aktuell abgespielte Audio-Übersicht inkl. presigned URL und Titel.
+  // Aktuell abgespielte Audio-Übersicht inkl. Datei-URL und Titel.
   const [playingAudio, setPlayingAudio] = useState<{ id: string; url: string; title: string } | null>(null)
   // Echter Play/Pause-Status des Players (für das Listen-Icon).
   const [audioPlaying, setAudioPlaying] = useState(false)
-  // Aktuell abgespielte Video-Übersicht (presigned URL) – Overlay-Player.
+  // Aktuell abgespielte Video-Übersicht – Overlay-Player.
   const [playingVideo, setPlayingVideo] = useState<{ id: string; url: string; title: string } | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(initialSources.map((s) => s.id)))
   const [input, setInput] = useState("")
@@ -163,7 +164,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   const refreshSources = useCallback(async () => {
     const res = await fetch(`/api/notebooks/${notebookId}/sources`)
     if (res.ok) {
-      const data = await res.json()
+      const data = await readJson<{ sources: SourceItem[] }>(res)
       setSources(data.sources)
     }
   }, [notebookId])
@@ -178,7 +179,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   const refreshReports = useCallback(async () => {
     const res = await fetch(`/api/notebooks/${notebookId}/reports`)
     if (!res.ok) return
-    const data = await res.json()
+    const data = await readJson<{ reports: ReportItem[] }>(res)
     // Lokale Platzhalter (temp-…) behalten, übrige durch Server-Stand ersetzen.
     setReports((prev) => [...prev.filter((r) => r.id.startsWith("temp-")), ...data.reports])
   }, [notebookId])
@@ -194,7 +195,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   const refreshAudios = useCallback(async () => {
     const res = await fetch(`/api/notebooks/${notebookId}/audio`)
     if (!res.ok) return
-    const data = await res.json()
+    const data = await readJson<{ audios: AudioItem[] }>(res)
     setAudios((prev) => [...prev.filter((a) => a.id.startsWith("temp-")), ...data.audios])
   }, [notebookId])
 
@@ -208,7 +209,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   const refreshVideos = useCallback(async () => {
     const res = await fetch(`/api/notebooks/${notebookId}/video`)
     if (!res.ok) return
-    const data = await res.json()
+    const data = await readJson<{ videos: VideoItem[] }>(res)
     setVideos((prev) => [...prev.filter((v) => v.id.startsWith("temp-")), ...data.videos])
   }, [notebookId])
 
@@ -260,7 +261,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     try {
       const res = await fetch(`/api/notebooks/${notebookId}/auto-title`, { method: "POST" })
       if (!res.ok) return
-      const data = await res.json()
+      const data = await readJson<{ title?: string; emoji?: string | null; generated: boolean }>(res)
       if (data.title) {
         setNotebookTitle(data.title)
         if (data.generated && data.title !== DEFAULT_NOTEBOOK_TITLE) {
@@ -282,25 +283,25 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       const res = await fetch(base, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "pdf", filename: payload.file.name, contentType: payload.file.type || "application/pdf" })
+        body: JSON.stringify({ type: "pdf", filename: payload.file.name })
       })
-      if (!res.ok) throw new Error("Anlegen fehlgeschlagen")
-      const { sourceId, uploadUrl } = await res.json()
+      if (!res.ok) throw new Error(await readError(res, "Anlegen fehlgeschlagen"))
+      const { sourceId } = await readJson<{ sourceId: string }>(res)
       newId = sourceId
-      const put = await fetch(uploadUrl, {
+      const put = await fetch(`${base}/${sourceId}/file`, {
         method: "PUT",
         body: payload.file,
-        headers: { "Content-Type": payload.file.type || "application/pdf" }
+        headers: { "Content-Type": "application/pdf" }
       })
-      if (!put.ok) throw new Error("Upload fehlgeschlagen")
+      if (!put.ok) throw new Error(await readError(put, "Upload fehlgeschlagen"))
     } else if (payload.type === "url") {
       const res = await fetch(base, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "url", url: payload.url })
       })
-      if (!res.ok) throw new Error((await res.json()).error || "URL fehlgeschlagen")
-      newId = (await res.json()).sourceId
+      if (!res.ok) throw new Error(await readError(res, "URL fehlgeschlagen"))
+      newId = (await readJson<{ sourceId: string }>(res)).sourceId
     } else {
       const res = await fetch(base, {
         method: "POST",
@@ -308,7 +309,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
         body: JSON.stringify({ type: "text", title: payload.title, text: payload.text })
       })
       if (!res.ok) throw new Error("Text fehlgeschlagen")
-      newId = (await res.json()).sourceId
+      newId = (await readJson<{ sourceId: string }>(res)).sourceId
     }
     // Neue Quelle automatisch auswählen.
     if (newId) setSelectedIds((prev) => new Set(prev).add(newId!))
@@ -328,7 +329,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
           body: JSON.stringify({ type: "url", url })
         })
         if (res.ok) {
-          const { sourceId } = await res.json()
+          const { sourceId } = await readJson<{ sourceId: string }>(res)
           if (sourceId) newIds.push(sourceId)
         }
       } catch {
@@ -359,9 +360,9 @@ export default function NotebookView({ notebookId, title, initialSources, initia
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: q, depth: searchDepth })
       })
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Suche fehlgeschlagen")
-      const data = await res.json()
-      const found: WebResult[] = data.results ?? []
+      if (!res.ok) throw new Error(await readError(res, "Suche fehlgeschlagen"))
+      const data = await readJson<{ results?: WebResult[] }>(res)
+      const found = data.results ?? []
       setSearchResults(found)
       setSelectedResults(new Set(found.map((r) => r.url))) // standardmäßig alle ausgewählt
     } catch (err) {
@@ -439,10 +440,10 @@ export default function NotebookView({ notebookId, title, initialSources, initia
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, sourceIds: selectedReadyIds })
       })
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Bericht fehlgeschlagen")
-      // 202: Bericht ist 'processing'; der ingest-Worker generiert, das Polling
+      if (!res.ok) throw new Error(await readError(res, "Bericht fehlgeschlagen"))
+      // 202: Bericht ist 'processing'; der Jobs-Worker generiert, das Polling
       // (siehe useEffect) holt den fertigen Stand.
-      const { report } = await res.json()
+      const { report } = await readJson<{ report: ReportItem }>(res)
       setReports((prev) => prev.map((r) => (r.id === tempId ? report : r)))
     } catch {
       setReports((prev) => prev.map((r) => (r.id === tempId ? { ...r, status: "failed" } : r)))
@@ -485,10 +486,10 @@ export default function NotebookView({ notebookId, title, initialSources, initia
           sourceIds: selectedReadyIds
         })
       })
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Audio fehlgeschlagen")
-      // 202: Audio ist 'processing'; der ingest-Worker generiert, das Polling
+      if (!res.ok) throw new Error(await readError(res, "Audio fehlgeschlagen"))
+      // 202: Audio ist 'processing'; der Jobs-Worker generiert, das Polling
       // (siehe useEffect) holt den fertigen Stand.
-      const { audio } = await res.json()
+      const { audio } = await readJson<{ audio: AudioItem }>(res)
       setAudios((prev) => prev.map((a) => (a.id === tempId ? audio : a)))
     } catch {
       setAudios((prev) => prev.map((a) => (a.id === tempId ? { ...a, status: "failed" } : a)))
@@ -507,7 +508,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     }
   }
 
-  // Beim Anklicken eines fertigen Audios die presigned URL laden und abspielen.
+  // Beim Anklicken eines fertigen Audios die Datei-URL laden und abspielen.
   async function handlePlayAudio(audioId: string) {
     if (playingAudio?.id === audioId) {
       setPlayingAudio(null)
@@ -516,7 +517,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     }
     const res = await fetch(`/api/notebooks/${notebookId}/audio/${audioId}`)
     if (!res.ok) return
-    const { audio } = await res.json()
+    const { audio } = await readJson<{ audio: { title: string; url: string | null } }>(res)
     if (audio.url) setPlayingAudio({ id: audioId, url: audio.url, title: audio.title })
   }
 
@@ -550,8 +551,8 @@ export default function NotebookView({ notebookId, title, initialSources, initia
           sourceIds: selectedReadyIds
         })
       })
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Video fehlgeschlagen")
-      const { video } = await res.json()
+      if (!res.ok) throw new Error(await readError(res, "Video fehlgeschlagen"))
+      const { video } = await readJson<{ video: VideoItem }>(res)
       setVideos((prev) => prev.map((v) => (v.id === tempId ? video : v)))
     } catch {
       setVideos((prev) => prev.map((v) => (v.id === tempId ? { ...v, status: "failed" } : v)))
@@ -567,11 +568,11 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     }
   }
 
-  // Beim Anklicken eines fertigen Videos die presigned URL laden und im Overlay abspielen.
+  // Beim Anklicken eines fertigen Videos die Datei-URL laden und im Overlay abspielen.
   async function handlePlayVideo(videoId: string) {
     const res = await fetch(`/api/notebooks/${notebookId}/video/${videoId}`)
     if (!res.ok) return
-    const { video } = await res.json()
+    const { video } = await readJson<{ video: { title: string; url: string | null } }>(res)
     if (video.url) setPlayingVideo({ id: videoId, url: video.url, title: video.title })
   }
 

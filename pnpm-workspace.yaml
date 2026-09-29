@@ -1,13 +1,12 @@
 allowBuilds:
-  '@aws-amplify/hosting': false
   '@google/genai': false
   "@parcel/watcher": true
   core-js: false
   esbuild: true
-  ffmpeg-static: true
   protobufjs: false
   sharp: true
   unrs-resolver: true
+  workerd: true
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver

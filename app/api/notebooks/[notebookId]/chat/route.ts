@@ -1,15 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { and, asc, cosineDistance, eq, inArray } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
-import { db } from "@/db"
+import { getDb } from "@/db"
 import { messages, MessageCitation, sourceChunks, sources } from "@/db/schema"
-import { CHAT_MODEL, getAnthropic } from "@/lib/anthropic"
-import { getSessionUser } from "@/lib/auth/session"
-import { getNotebookForUser } from "@/lib/notebooks"
+import { chatModel, getAnthropic } from "@/lib/anthropic"
+import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { embedQuery } from "@/lib/voyage"
-
-export const runtime = "nodejs"
-export const maxDuration = 60
+import { readJsonBody, parseSourceIds } from "@/lib/api/body"
 
 const TOP_K = 8
 
@@ -33,19 +30,19 @@ type RouteContext = { params: Promise<{ notebookId: string }> }
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
 
-  const user = await getSessionUser()
-  if (!user) return NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 })
-  const notebook = await getNotebookForUser(notebookId, user.id)
-  if (!notebook) return NextResponse.json({ error: "Notebook nicht gefunden" }, { status: 404 })
+  const auth = await authorizeNotebook(notebookId)
+  if (auth.error) return auth.error
+  const db = getDb()
 
-  const { message, sourceIds } = await req.json()
-  if (!message?.trim()) return NextResponse.json({ error: "Nachricht fehlt" }, { status: 400 })
+  const body = await readJsonBody(req)
+  const message = typeof body.message === "string" ? body.message : ""
+  if (!message.trim()) return NextResponse.json({ error: "Nachricht fehlt" }, { status: 400 })
 
   // User-Nachricht persistieren.
   await db.insert(messages).values({ notebookId, role: "user", content: message })
 
   // Optional auf die vom Nutzer ausgewählten Quellen einschränken.
-  const selectedIds: string[] | null = Array.isArray(sourceIds) ? sourceIds.filter((id) => typeof id === "string") : null
+  const selectedIds = parseSourceIds(body.sourceIds)
 
   // Frage einbetten + notebook-gefilterte Similarity-Suche (nur fertige Quellen).
   const queryVector = await embedQuery(message)
@@ -94,7 +91,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   ]
 
   const stream = getAnthropic().messages.stream({
-    model: CHAT_MODEL,
+    model: chatModel(),
     max_tokens: 8000,
     system: SYSTEM_PROMPT,
     messages: apiMessages
@@ -117,10 +114,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
         const finalMessage = await stream.finalMessage()
         const citations = extractCitations(finalMessage, retrieved)
 
-        const [row] = await db
-          .insert(messages)
-          .values({ notebookId, role: "assistant", content: fullText, citations })
-          .returning({ id: messages.id })
+        const [row] = await db.insert(messages).values({ notebookId, role: "assistant", content: fullText, citations }).returning({ id: messages.id })
 
         send({ type: "done", messageId: row.id, citations })
       } catch (err) {

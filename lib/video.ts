@@ -1,15 +1,11 @@
 // Video-Übersicht (NotebookLM-Stil): KEIN echtes KI-Video, sondern eine vertonte
-// Slideshow. Pipeline (siehe amplify/functions/ingest/handler.ts → processVideoJob):
+// Slideshow. Pipeline (VideoWorkflow in workers/jobs):
 //   1. Claude erzeugt aus den Quellen ein strukturiertes Skript (Folien + Narration).
 //   2. Gemini TTS vertont jede Narration einzeln (lib/gemini.ts → synthesizeSpeech).
 //   3. Gemini 2.5 Flash Image („Nano Banana") malt pro Folie einen Hintergrund
 //      (lib/gemini.ts → generateImage) im gewählten visuellen Stil.
-//   4. ffmpeg brennt Titel + Stichpunkte per drawtext darüber und fügt alle
-//      Segmente zur MP4 zusammen (lib/videoRender.ts).
-//
-// Diese Datei ist bewusst frei von Node-Abhängigkeiten, damit sie auch in den
-// API-Routen (Edge-/Node-Runtime) importiert werden kann. Die ffmpeg-/Dateiseite
-// liegt in lib/videoRender.ts.
+//   4. Der Container containers/video-renderer brennt Titel + Stichpunkte per
+//      ffmpeg-drawtext darüber und fügt alle Folien zur MP4 zusammen.
 
 // ───────────────────────── Formate ─────────────────────────
 // Entspricht den zwei Karten im Popup („Erklärvideo" / „Zusammenfassung").
@@ -227,4 +223,31 @@ export function wrapText(text: string, maxChars: number): string[] {
   }
   if (line) lines.push(line)
   return lines
+}
+
+export type SlideLayout = {
+  title: string
+  body: string
+  footer: string
+  titleLines: number
+}
+
+// Textlayout einer Folie für den Renderer: Titel max. 2 Zeilen, max. 4 Stichpunkte
+// mit je max. 2 Zeilen (Folgezeilen eingerückt), Seitenzähler als Fußzeile.
+export function layoutSlide(segment: VideoSegment, index: number, total: number): SlideLayout {
+  const titleLines = wrapText(segment.slideTitle, 26).slice(0, 2)
+
+  const bodyLines: string[] = []
+  for (const bullet of segment.bullets.slice(0, 4)) {
+    wrapText(bullet, 50)
+      .slice(0, 2)
+      .forEach((line, i) => bodyLines.push((i === 0 ? "•  " : "     ") + line))
+  }
+
+  return {
+    title: titleLines.join("\n"),
+    body: bodyLines.join("\n"),
+    footer: `${index + 1} / ${total}`,
+    titleLines: titleLines.length
+  }
 }

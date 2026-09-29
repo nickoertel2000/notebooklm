@@ -1,58 +1,63 @@
 import { and, eq } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
-import { db } from "@/db"
+import { getDb } from "@/db"
 import { videoOverviews } from "@/db/schema"
-import { deleteObject, presignDownload } from "@/lib/s3"
-import { getSessionUser } from "@/lib/auth/session"
-import { getNotebookForUser } from "@/lib/notebooks"
-
-export const runtime = "nodejs"
+import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
+import { cancelJob } from "@/lib/jobs/start"
+import { isUuid } from "@/lib/notebooks"
+import { deleteObject } from "@/lib/storage"
 
 type RouteContext = { params: Promise<{ notebookId: string; videoId: string }> }
 
-async function authorize(notebookId: string) {
-  const user = await getSessionUser()
-  if (!user) return { error: NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 }) }
-  const notebook = await getNotebookForUser(notebookId, user.id)
-  if (!notebook) return { error: NextResponse.json({ error: "Notebook nicht gefunden" }, { status: 404 }) }
-  return { user, notebook }
-}
-
-// Einzelne Video-Übersicht inkl. presigned Stream-URL für den Player.
+// Metadaten fürs Abspielen. Die Datei selbst liefert video/[videoId]/file aus, der
+// Storage-Key verlässt den Server nie.
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const { notebookId, videoId } = await params
-  const auth = await authorize(notebookId)
+  const auth = await authorizeNotebook(notebookId)
   if (auth.error) return auth.error
+  if (!isUuid(videoId)) return NextResponse.json({ error: "Video nicht gefunden" }, { status: 404 })
 
-  const [row] = await db
-    .select()
+  const [row] = await getDb()
+    .select({
+      id: videoOverviews.id,
+      title: videoOverviews.title,
+      durationSeconds: videoOverviews.durationSeconds,
+      status: videoOverviews.status,
+      storageKey: videoOverviews.storageKey,
+      createdAt: videoOverviews.createdAt
+    })
     .from(videoOverviews)
     .where(and(eq(videoOverviews.id, videoId), eq(videoOverviews.notebookId, notebookId)))
     .limit(1)
 
   if (!row) return NextResponse.json({ error: "Video nicht gefunden" }, { status: 404 })
 
-  const url = row.s3Key ? await presignDownload(row.s3Key) : null
-  return NextResponse.json({ video: { ...row, url, createdAt: row.createdAt.toISOString() } })
+  const { storageKey, ...video } = row
+  const url = storageKey ? `/api/notebooks/${notebookId}/video/${videoId}/file` : null
+  return NextResponse.json({ video: { ...video, url, createdAt: row.createdAt.toISOString() } })
 }
 
-// Video-Übersicht löschen (DB-Zeile + MP4 in S3).
+// Video löschen: laufende Erstellung abbrechen, Datei und DB-Zeile entfernen.
 export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const { notebookId, videoId } = await params
-  const auth = await authorize(notebookId)
+  const auth = await authorizeNotebook(notebookId)
   if (auth.error) return auth.error
+  if (!isUuid(videoId)) return NextResponse.json({ error: "Video nicht gefunden" }, { status: 404 })
 
+  const db = getDb()
   const [row] = await db
-    .select({ s3Key: videoOverviews.s3Key })
+    .select({ status: videoOverviews.status, storageKey: videoOverviews.storageKey })
     .from(videoOverviews)
     .where(and(eq(videoOverviews.id, videoId), eq(videoOverviews.notebookId, notebookId)))
     .limit(1)
+  if (!row) return NextResponse.json({ error: "Video nicht gefunden" }, { status: 404 })
 
-  if (row?.s3Key) {
+  if (row.status === "processing") await cancelJob("video", videoId)
+  if (row.storageKey) {
     try {
-      await deleteObject(row.s3Key)
+      await deleteObject(row.storageKey)
     } catch (err) {
-      console.error("S3-Video-Löschung fehlgeschlagen:", err)
+      console.error("Video-Datei konnte nicht gelöscht werden:", err)
     }
   }
 

@@ -1,0 +1,82 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "notebooklm-jobs",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  // PDF-Parsing und das Zusammenbauen großer Kontexte brauchen mehr als die 30 s CPU-Standard.
+  "limits": {
+    "cpu_ms": 300000
+  },
+  // Nahe der Datenbank (Neon, Frankfurt): jede Anfrage macht mehrere Queries.
+  "placement": {
+    "region": "aws:eu-central-1"
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "HYPERDRIVE_ID"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "notebooklm",
+      "jurisdiction": "eu"
+    }
+  ],
+  "exports": {
+    "IngestSourceWorkflow": {
+      "type": "workflow",
+      "name": "notebooklm-ingest-source"
+    },
+    "ReportWorkflow": {
+      "type": "workflow",
+      "name": "notebooklm-report"
+    },
+    "AudioWorkflow": {
+      "type": "workflow",
+      "name": "notebooklm-audio"
+    },
+    "VideoWorkflow": {
+      "type": "workflow",
+      "name": "notebooklm-video"
+    }
+  },
+  "containers": [
+    {
+      "class_name": "VideoRenderer",
+      "image": "../../containers/video-renderer/Dockerfile",
+      "image_build_context": "../../containers/video-renderer",
+      "instance_type": "standard-1",
+      "max_instances": 3
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "VIDEO_RENDERER",
+        "class_name": "VideoRenderer"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["VideoRenderer"]
+    }
+  ],
+  "vars": {
+    "CLAUDE_MODEL": "claude-sonnet-4-6",
+    "CLAUDE_REPORT_MODEL": "claude-sonnet-4-6",
+    "GEMINI_TTS_MODEL": "gemini-2.5-flash-preview-tts",
+    "GEMINI_IMAGE_MODEL": "gemini-2.5-flash-image",
+    "VIDEO_SLIDE_CONCURRENCY": "3"
+  },
+  "secrets": {
+    "required": ["ANTHROPIC_API_KEY", "VOYAGE_API_KEY", "GEMINI_API_KEY"]
+  }
+}

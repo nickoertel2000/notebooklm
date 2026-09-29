@@ -1,0 +1,66 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "notebooklm",
+  "main": "vinext/server/fetch-handler",
+  "compatibility_date": "2026-09-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "dist/client",
+    "not_found_handling": "none",
+    "binding": "ASSETS"
+  },
+  // Nahe der Datenbank (Neon, Frankfurt): jede Anfrage macht mehrere Queries.
+  "placement": {
+    "region": "aws:eu-central-1"
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "HYPERDRIVE_ID"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "notebooklm",
+      "jurisdiction": "eu"
+    }
+  ],
+  // Die Workflows leben im Jobs-Worker (workers/jobs), die App startet und beendet nur Instanzen.
+  "workflows": [
+    {
+      "binding": "INGEST_SOURCE_WORKFLOW",
+      "name": "notebooklm-ingest-source",
+      "class_name": "IngestSourceWorkflow",
+      "script_name": "notebooklm-jobs"
+    },
+    {
+      "binding": "REPORT_WORKFLOW",
+      "name": "notebooklm-report",
+      "class_name": "ReportWorkflow",
+      "script_name": "notebooklm-jobs"
+    },
+    {
+      "binding": "AUDIO_WORKFLOW",
+      "name": "notebooklm-audio",
+      "class_name": "AudioWorkflow",
+      "script_name": "notebooklm-jobs"
+    },
+    {
+      "binding": "VIDEO_WORKFLOW",
+      "name": "notebooklm-video",
+      "class_name": "VideoWorkflow",
+      "script_name": "notebooklm-jobs"
+    }
+  ],
+  "vars": {
+    "CLAUDE_MODEL": "claude-sonnet-4-6",
+    "CLAUDE_REPORT_MODEL": "claude-sonnet-4-6"
+  },
+  "secrets": {
+    "required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "ANTHROPIC_API_KEY", "VOYAGE_API_KEY"]
+  }
+}

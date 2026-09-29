@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import "material-symbols"
 import Markdown from "@/components/Markdown/Markdown"
 import styles from "./ReportModal.module.scss"
+import { readJson } from "@/lib/api/client"
 
 type ReportViewModalProps = {
   notebookId: string
@@ -23,7 +24,7 @@ export default function ReportViewModal({ notebookId, reportId, title, onClose }
       try {
         const res = await fetch(`/api/notebooks/${notebookId}/reports/${reportId}`)
         if (!res.ok) throw new Error("Bericht konnte nicht geladen werden")
-        const { report } = await res.json()
+        const { report } = await readJson<{ report: { content: string | null } }>(res)
         if (!cancelled) setContent(report.content ?? "")
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err))

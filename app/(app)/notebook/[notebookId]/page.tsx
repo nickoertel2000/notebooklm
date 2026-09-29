@@ -1,13 +1,14 @@
 import { asc, desc, eq } from "drizzle-orm"
 import { notFound, redirect } from "next/navigation"
 import NotebookHeader from "@/components/NotebookHeader/NotebookHeader"
-import { db } from "@/db"
+import { getDb } from "@/db"
 import { audioOverviews, messages, reports, sources, videoOverviews } from "@/db/schema"
 import { getSessionUser } from "@/lib/auth/session"
 import { getNotebookForUser } from "@/lib/notebooks"
 import NotebookView from "./NotebookView"
 
 export default async function NotebookPage({ params }: { params: Promise<{ notebookId: string }> }) {
+  const db = getDb()
   const { notebookId } = await params
 
   const user = await getSessionUser()

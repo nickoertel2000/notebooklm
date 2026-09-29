@@ -1,5 +1,5 @@
 import { and, desc, eq, sql } from "drizzle-orm"
-import { db } from "@/db"
+import { getDb } from "@/db"
 import { notebooks, sources } from "@/db/schema"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -12,7 +12,7 @@ export function isUuid(value: string) {
 // Jeder notebook-gebundene Zugriff MUSS hierüber laufen.
 export async function getNotebookForUser(notebookId: string, userId: string) {
   if (!isUuid(notebookId)) return null
-  const rows = await db
+  const rows = await getDb()
     .select()
     .from(notebooks)
     .where(and(eq(notebooks.id, notebookId), eq(notebooks.userId, userId)))
@@ -22,7 +22,7 @@ export async function getNotebookForUser(notebookId: string, userId: string) {
 
 // Liefert alle Notebooks des Users inkl. Quellen-Anzahl, neueste zuerst.
 export async function getNotebooksForUser(userId: string) {
-  return db
+  return getDb()
     .select({
       id: notebooks.id,
       title: notebooks.title,

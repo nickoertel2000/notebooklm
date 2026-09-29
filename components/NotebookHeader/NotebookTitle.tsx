@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import styles from "./notebookHeader.module.scss"
+import { readJson } from "@/lib/api/client"
 
 type NotebookTitleProps = {
   notebookId: string
@@ -88,7 +89,7 @@ export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, 
         body: JSON.stringify({ force: true })
       })
       if (!res.ok) return
-      const data = await res.json()
+      const data = await readJson<{ title?: string; emoji?: string | null; generated: boolean }>(res)
       if (data.generated && data.title) {
         setTitle(data.title)
         setDraft(data.title)

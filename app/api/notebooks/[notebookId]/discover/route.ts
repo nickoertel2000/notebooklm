@@ -1,22 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getAnthropic, REPORT_MODEL } from "@/lib/anthropic"
-import { getSessionUser } from "@/lib/auth/session"
-import { getNotebookForUser } from "@/lib/notebooks"
-
-export const runtime = "nodejs"
-export const maxDuration = 60
+import { getAnthropic, reportModel } from "@/lib/anthropic"
+import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
 
 export type DiscoverResult = { title: string; url: string; description: string }
-
-async function authorize(notebookId: string) {
-  const user = await getSessionUser()
-  if (!user) return { error: NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 }) }
-  const notebook = await getNotebookForUser(notebookId, user.id)
-  if (!notebook) return { error: NextResponse.json({ error: "Notebook nicht gefunden" }, { status: 404 }) }
-  return { user, notebook }
-}
 
 // Erstes JSON-Array aus einem Text herausziehen und parsen.
 function extractResults(text: string): DiscoverResult[] {
@@ -41,10 +29,10 @@ function extractResults(text: string): DiscoverResult[] {
 // Im Web nach neuen Quellen suchen – via Claude mit dem web_search-Server-Tool.
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
-  const auth = await authorize(notebookId)
+  const auth = await authorizeNotebook(notebookId)
   if (auth.error) return auth.error
 
-  const body = await req.json()
+  const body = (await req.json()) as { query?: unknown; depth?: unknown }
   const query = typeof body.query === "string" ? body.query.trim() : ""
   if (!query) return NextResponse.json({ error: "Suchbegriff fehlt" }, { status: 400 })
 
@@ -62,17 +50,14 @@ Gib am Ende AUSSCHLIESSLICH ein JSON-Array zurück – ohne weiteren Text, ohne 
 
   try {
     const message = await getAnthropic().messages.create({
-      model: REPORT_MODEL,
+      model: reportModel(),
       max_tokens: 2500,
       system,
       tools: [tool],
       messages: [{ role: "user", content: `Finde neue Web-Quellen zum Thema: ${query}.` }]
     } as unknown as Parameters<ReturnType<typeof getAnthropic>["messages"]["create"]>[0])
 
-    const text =
-      "content" in message
-        ? message.content.map((b) => (b.type === "text" ? b.text : "")).join("")
-        : ""
+    const text = "content" in message ? message.content.map((b) => (b.type === "text" ? b.text : "")).join("") : ""
 
     return NextResponse.json({ results: extractResults(text) })
   } catch (err) {

@@ -13,7 +13,7 @@ paths:
 
 - Pages are async Server Components: `getSessionUser()` → `redirect("/login")`, ownership via `getNotebookForUser` → `notFound()`, load data, serialize dates to ISO strings, pass as `initialX` props to one Client Component. Reference: `app/(app)/notebook/[notebookId]/page.tsx` + `NotebookView.tsx`.
 - Client Components never fetch initial data or check auth; they call `app/api/` (or the Notebook-CRUD Server Actions) and poll job status (see `jobs-worker.md`).
-- `app/(app)/layout.tsx` does no auth; protection is middleware + page guard.
+- `app/(app)/layout.tsx` does no auth (protection is `proxy.ts` + page guard) but sets `dynamic = "force-dynamic"`: vinext can't detect `headers()` at build time, and these pages must never be cached.
 - Item types shared between page and view are exported from the view (`NotebookView.tsx`); payload types of modals are exported next to the modal (`AudioOptions`, `ReportGeneratePayload`, …).
 - `NotebookView.tsx` is already very large — put new self-contained UI into `components/` instead of growing it further.
 

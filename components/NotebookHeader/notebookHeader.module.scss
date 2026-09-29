@@ -107,10 +107,10 @@
 }
 
 .titleAiSpin {
-  animation: title-ai-spin 0.9s linear infinite;
+  animation: title-ai-rotate 0.9s linear infinite;
 }
 
-@keyframes title-ai-spin {
+@keyframes title-ai-rotate {
   to {
     transform: rotate(360deg);
   }

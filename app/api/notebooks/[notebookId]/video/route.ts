@@ -1,34 +1,26 @@
 import { and, desc, eq, inArray, lt } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
-import { db } from "@/db"
+import { getDb } from "@/db"
 import { sources, videoOverviews } from "@/db/schema"
-import { putText } from "@/lib/s3"
-import { getSessionUser } from "@/lib/auth/session"
-import { getNotebookForUser } from "@/lib/notebooks"
+import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
+import { startVideo } from "@/lib/jobs/start"
 import { getVideoFormat, getVisualStyle } from "@/lib/video"
-
-export const runtime = "nodejs"
+import { readJsonBody, optionalString, parseSourceIds } from "@/lib/api/body"
 
 // Video-Übersichten, die länger als das hier in 'processing' hängen, gelten als
 // abgebrochen und werden beim Auflisten auf 'failed' gesetzt — sonst pollt das
 // Studio-Panel endlos. Großzügig: Skript + mehrere TTS-/Bild-Calls + ffmpeg.
-const STALE_PROCESSING_MS = 10 * 60 * 1000
+const STALE_PROCESSING_MS = 20 * 60 * 1000
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
 
-async function authorize(notebookId: string) {
-  const user = await getSessionUser()
-  if (!user) return { error: NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 }) }
-  const notebook = await getNotebookForUser(notebookId, user.id)
-  if (!notebook) return { error: NextResponse.json({ error: "Notebook nicht gefunden" }, { status: 404 }) }
-  return { user, notebook }
-}
-
-// Persistierte Video-Übersichten des Notebooks auflisten (ohne s3Key) – fürs Studio-Panel.
+// Persistierte Video-Übersichten des Notebooks auflisten (ohne storageKey) – fürs Studio-Panel.
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
-  const auth = await authorize(notebookId)
+  const auth = await authorizeNotebook(notebookId)
   if (auth.error) return auth.error
+
+  const db = getDb()
 
   await db
     .update(videoOverviews)
@@ -59,25 +51,26 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   return NextResponse.json({ videos: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })) })
 }
 
-// Video-Übersicht erstellen: 'processing'-Zeile anlegen und einen Job nach S3
-// schreiben. Die lange Generierung (Claude-Skript + Gemini-TTS + Gemini-Bild +
-// ffmpeg) übernimmt der ingest-Worker; das Frontend pollt.
+// Video-Übersicht erstellen: 'processing'-Zeile anlegen und den VideoWorkflow
+// starten (Skript, TTS + Bild pro Folie, Rendern im Container), das Frontend pollt.
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
-  const auth = await authorize(notebookId)
+  const auth = await authorizeNotebook(notebookId)
   if (auth.error) return auth.error
 
-  const body = await req.json()
-  const format = getVideoFormat(body.format)
+  const db = getDb()
+
+  const body = await readJsonBody(req)
+  const format = getVideoFormat(String(body.format))
   if (!format) return NextResponse.json({ error: "Unbekanntes Video-Format" }, { status: 400 })
 
-  const style = getVisualStyle(body.visualStyle)
+  const style = getVisualStyle(String(body.visualStyle))
   if (!style) return NextResponse.json({ error: "Unbekannter visueller Stil" }, { status: 400 })
 
   const language = typeof body.language === "string" ? body.language : "Deutsch"
-  const focus = typeof body.focus === "string" && body.focus.trim() ? body.focus.trim() : null
-  const customStyle = style.id === "custom" && typeof body.customStyle === "string" && body.customStyle.trim() ? body.customStyle.trim() : null
-  const selectedIds: string[] | null = Array.isArray(body.sourceIds) ? body.sourceIds.filter((id: unknown) => typeof id === "string") : null
+  const focus = optionalString(body.focus)
+  const customStyle = style.id === "custom" ? optionalString(body.customStyle) : null
+  const selectedIds = parseSourceIds(body.sourceIds)
 
   const ready = await db
     .select({ id: sources.id })
@@ -107,12 +100,8 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     })
     .returning({ id: videoOverviews.id, createdAt: videoOverviews.createdAt })
 
-  // Job-Datei nach S3 schreiben → triggert den ingest-Worker.
-  const jobKey = `notebooks/${notebookId}/jobs/video/${created.id}.json`
-  await putText(
-    jobKey,
-    JSON.stringify({
-      kind: "video",
+  try {
+    await startVideo({
       videoId: created.id,
       notebookId,
       formatId: format.id,
@@ -122,7 +111,11 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       focus,
       sourceIds: selectedIds
     })
-  )
+  } catch (err) {
+    console.error("Video-Workflow konnte nicht gestartet werden:", err)
+    await db.update(videoOverviews).set({ status: "failed", error: "Erstellung konnte nicht gestartet werden" }).where(eq(videoOverviews.id, created.id))
+    return NextResponse.json({ error: "Erstellung konnte nicht gestartet werden" }, { status: 500 })
+  }
 
   return NextResponse.json(
     {

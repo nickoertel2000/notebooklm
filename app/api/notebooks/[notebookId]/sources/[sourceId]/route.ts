@@ -1,44 +1,44 @@
 import { and, eq } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
-import { db } from "@/db"
+import { getDb } from "@/db"
 import { sourceChunks, sources } from "@/db/schema"
-import { getSessionUser } from "@/lib/auth/session"
-import { getNotebookForUser, isUuid } from "@/lib/notebooks"
-import { deleteObject, retriggerIngest } from "@/lib/s3"
-
-export const runtime = "nodejs"
+import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
+import { startIngestSource } from "@/lib/jobs/start"
+import { isUuid } from "@/lib/notebooks"
+import { deleteByPrefix, sourcePrefix } from "@/lib/storage"
 
 type RouteContext = { params: Promise<{ notebookId: string; sourceId: string }> }
 
-// Fehlgeschlagenen Import erneut versuchen: Der hochgeladene Inhalt liegt noch
-// in S3 — durch erneutes Anstossen der Lambda wird er neu verarbeitet.
-export async function POST(_req: NextRequest, { params }: RouteContext) {
-  const { notebookId, sourceId } = await params
-
-  const user = await getSessionUser()
-  if (!user) return NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 })
-  const notebook = await getNotebookForUser(notebookId, user.id)
-  if (!notebook) return NextResponse.json({ error: "Notebook nicht gefunden" }, { status: 404 })
-  if (!isUuid(sourceId)) return NextResponse.json({ error: "Quelle nicht gefunden" }, { status: 404 })
-
-  const [row] = await db
-    .select({ id: sources.id, s3Key: sources.s3Key })
+async function findSource(notebookId: string, sourceId: string) {
+  if (!isUuid(sourceId)) return null
+  const [row] = await getDb()
+    .select({ id: sources.id, type: sources.type, storageKey: sources.storageKey })
     .from(sources)
     .where(and(eq(sources.id, sourceId), eq(sources.notebookId, notebookId)))
     .limit(1)
+  return row ?? null
+}
 
+// Fehlgeschlagenen Import erneut versuchen: Die Datei liegt noch in R2, es wird
+// nur ein neuer Import-Workflow gestartet.
+export async function POST(_req: NextRequest, { params }: RouteContext) {
+  const { notebookId, sourceId } = await params
+  const auth = await authorizeNotebook(notebookId)
+  if (auth.error) return auth.error
+
+  const row = await findSource(notebookId, sourceId)
   if (!row) return NextResponse.json({ error: "Quelle nicht gefunden" }, { status: 404 })
-  if (!row.s3Key) return NextResponse.json({ error: "Kein Inhalt zum Wiederholen vorhanden" }, { status: 422 })
+  if (!row.storageKey) return NextResponse.json({ error: "Kein Inhalt zum Wiederholen vorhanden" }, { status: 422 })
 
-  // Etwaige Teil-Chunks eines vorherigen Versuchs entfernen, damit keine
-  // Duplikate entstehen, dann zurück auf „processing" setzen.
+  const db = getDb()
   await db.delete(sourceChunks).where(eq(sourceChunks.sourceId, sourceId))
   await db.update(sources).set({ status: "processing", error: null, updatedAt: new Date() }).where(eq(sources.id, sourceId))
 
   try {
-    await retriggerIngest(row.s3Key)
+    await startIngestSource({ sourceId, notebookId, key: row.storageKey, isPdf: row.type === "pdf" })
   } catch (err) {
-    await db.update(sources).set({ status: "failed", error: String(err).slice(0, 500), updatedAt: new Date() }).where(eq(sources.id, sourceId))
+    console.error("Import konnte nicht gestartet werden:", err)
+    await db.update(sources).set({ status: "failed", error: "Import konnte nicht gestartet werden", updatedAt: new Date() }).where(eq(sources.id, sourceId))
     return NextResponse.json({ error: "Erneuter Versuch konnte nicht gestartet werden" }, { status: 500 })
   }
 
@@ -47,31 +47,21 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
 
 export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const { notebookId, sourceId } = await params
+  const auth = await authorizeNotebook(notebookId)
+  if (auth.error) return auth.error
 
-  const user = await getSessionUser()
-  if (!user) return NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 })
-  const notebook = await getNotebookForUser(notebookId, user.id)
-  if (!notebook) return NextResponse.json({ error: "Notebook nicht gefunden" }, { status: 404 })
-  if (!isUuid(sourceId)) return NextResponse.json({ error: "Quelle nicht gefunden" }, { status: 404 })
-
-  const [row] = await db
-    .select({ id: sources.id, s3Key: sources.s3Key })
-    .from(sources)
-    .where(and(eq(sources.id, sourceId), eq(sources.notebookId, notebookId)))
-    .limit(1)
-
+  const row = await findSource(notebookId, sourceId)
   if (!row) return NextResponse.json({ error: "Quelle nicht gefunden" }, { status: 404 })
 
-  if (row.s3Key) {
-    try {
-      await deleteObject(row.s3Key)
-    } catch (err) {
-      console.error("S3-Objekt konnte nicht gelöscht werden:", err)
-    }
+  try {
+    await deleteByPrefix(sourcePrefix(notebookId, sourceId))
+  } catch (err) {
+    console.error("Dateien der Quelle konnten nicht gelöscht werden:", err)
   }
 
-  // Chunks werden per FK-Kaskade mitgelöscht.
-  await db.delete(sources).where(eq(sources.id, sourceId))
+  // Chunks werden per FK-Kaskade mitgelöscht. Ein laufender Import bricht beim
+  // nächsten Schritt selbst ab, weil die Quelle fehlt.
+  await getDb().delete(sources).where(eq(sources.id, sourceId))
 
   return NextResponse.json({ ok: true })
 }
