@@ -40,7 +40,7 @@ Die App bindet die Workflows des Jobs-Workers per `script_name`, und beide Worke
 - [ ] `pnpm cf:first-deploy`
 - [ ] Smoke-Test auf der workers.dev-URL: Login, Quelle, Chat, Bericht, Audio. Video funktioniert erst nach Schritt 6.
 - [ ] Neon-Dashboard: Geht die Compute bei Inaktivität auf „Idle“? Hyperdrive hält einen eigenen Connection-Pool, ob der Scale-to-Zero verhindert, ist nicht dokumentiert. Wichtig, weil die 100 CU-Stunden im Free-Tarif nur für rund 400 Stunden mit 0,25 CU reichen, nicht für Dauerbetrieb.
-- [ ] Neon: Autoscaling-Maximum auf 0,25 CU begrenzen.
+- [x] Neon: Autoscaling auf 0,25 bis 0,5 CU begrenzt (Standard war 0,25 bis 2 CU).
 - [x] README: erwähnen, dass die Demo bei aufgebrauchten CU-Stunden bis zum Monatsende offline ist (Neon suspendiert die Compute, Daten bleiben erhalten).
 
 Später geänderte Secrets überträgt `pnpm cf:secrets`. Die Secret-Listen stehen in `scripts/cf.mjs` und müssen nach der Gemini-Umstellung angepasst werden (siehe [`umstellung-gemini.md`](umstellung-gemini.md)).
