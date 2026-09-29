@@ -16,22 +16,30 @@ export function getGemini(): GoogleGenAI {
   return client
 }
 
-export const chatModel = () => env.GEMINI_CHAT_MODEL
-export const reportModel = () => env.GEMINI_REPORT_MODEL
+const modelChain = (list: string) =>
+  list
+    .split(",")
+    .map((model) => model.trim())
+    .filter(Boolean)
+
+export const chatModels = () => modelChain(env.GEMINI_CHAT_MODELS)
+export const reportModels = () => modelChain(env.GEMINI_REPORT_MODELS)
 
 const isOverloaded = (err: unknown) => err instanceof ApiError && err.status >= 500
 const isQuotaExceeded = (err: unknown) => err instanceof ApiError && err.status === 429
 
-// Überlastung und Kontingent gelten pro Modell, ein anderes Modell kann dann noch
-// antworten. run() muss vor der ersten Ausgabe scheitern, sonst käme Text doppelt.
-export async function withFallback<T>(model: string, run: (model: string) => Promise<T>, fallback: string = env.GEMINI_FALLBACK_MODEL): Promise<T> {
-  try {
-    return await run(model)
-  } catch (err) {
-    if (fallback === model || !(isOverloaded(err) || isQuotaExceeded(err))) throw err
-    console.warn(`Modell ${model} nicht verfügbar, weiche auf ${fallback} aus:`, err)
-    return run(fallback)
+// Überlastung und Kontingent gelten pro Modell, das nächste Modell der Kette kann dann
+// noch antworten. run() muss vor der ersten Ausgabe scheitern, sonst käme Text doppelt.
+export async function withFallback<T>(models: string[], run: (model: string) => Promise<T>): Promise<T> {
+  for (const [i, model] of models.entries()) {
+    try {
+      return await run(model)
+    } catch (err) {
+      if (i === models.length - 1 || !(isOverloaded(err) || isQuotaExceeded(err))) throw err
+      console.warn(`Modell ${model} nicht verfügbar, weiche auf ${models[i + 1]} aus:`, err)
+    }
   }
+  throw new Error("Keine Gemini-Modelle konfiguriert")
 }
 
 // Für den Client: nie den rohen ApiError weitergeben.
@@ -42,7 +50,7 @@ export function geminiErrorMessage(err: unknown): string {
 }
 
 type GenerateTextOptions = {
-  model: string
+  models: string[]
   system: string
   prompt: string
   maxOutputTokens: number
@@ -52,10 +60,10 @@ type GenerateTextOptions = {
   jsonSchema?: object
 }
 
-export async function generateText({ model, system, prompt, maxOutputTokens, minimalThinking, jsonSchema }: GenerateTextOptions): Promise<string> {
-  const response = await withFallback(model, (m) =>
+export async function generateText({ models, system, prompt, maxOutputTokens, minimalThinking, jsonSchema }: GenerateTextOptions): Promise<string> {
+  const response = await withFallback(models, (model) =>
     getGemini().models.generateContent({
-      model: m,
+      model,
       contents: prompt,
       config: {
         systemInstruction: system,
@@ -95,15 +103,12 @@ export async function synthesizeSpeech(script: string, speakers: 1 | 2): Promise
   // als Sprecher erkennt statt sie vorzulesen.
   const prompt = speakers === 2 ? `Lies das folgende Gespräch zwischen ${SPEAKER_LABELS[0]} und ${SPEAKER_LABELS[1]} vor:\n\n${script}` : script
 
-  const response = await withFallback(
-    env.GEMINI_TTS_MODEL,
-    (model) =>
-      getGemini().models.generateContent({
-        model,
-        contents: [{ parts: [{ text: prompt }] }],
-        config: { responseModalities: ["AUDIO"], speechConfig }
-      }),
-    env.GEMINI_TTS_FALLBACK_MODEL
+  const response = await withFallback(modelChain(env.GEMINI_TTS_MODELS), (model) =>
+    getGemini().models.generateContent({
+      model,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: { responseModalities: ["AUDIO"], speechConfig }
+    })
   )
 
   const data = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data

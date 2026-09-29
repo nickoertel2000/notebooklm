@@ -2,7 +2,7 @@ import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloud
 import { eq } from "drizzle-orm"
 import { getDb } from "@/db"
 import { reports } from "@/db/schema"
-import { generateText, reportModel } from "@/lib/gemini"
+import { generateText, reportModels } from "@/lib/gemini"
 import { buildContext } from "@/lib/jobs/context"
 import { toErrorMessage } from "@/lib/jobs/errors"
 import type { ReportParams } from "@/lib/jobs/types"
@@ -21,7 +21,7 @@ export class ReportWorkflow extends WorkflowEntrypoint<JobsEnv, ReportParams> {
 
         if (job.format) {
           const raw = await generateText({
-            model: reportModel(),
+            models: reportModels(),
             system: STUDIO_SYSTEM_PROMPT,
             prompt,
             maxOutputTokens: 16000,
@@ -34,7 +34,7 @@ export class ReportWorkflow extends WorkflowEntrypoint<JobsEnv, ReportParams> {
         }
 
         const content = await generateText({
-          model: reportModel(),
+          models: reportModels(),
           system: buildReportSystemPrompt(job.language),
           prompt,
           maxOutputTokens: 8000

@@ -11,7 +11,9 @@ import { getObject } from "@/lib/storage"
 import { embedTexts } from "@/lib/embeddings"
 import { API_STEP, DB_STEP } from "./shared"
 
-const EMBED_BATCH = 100
+// Gemini Embedding erlaubt 30.000 Tokens pro Minute, auch für die Chat-Suche. 25 Chunks
+// sind rund 20.000 Tokens, dazu eine Minute Pause zwischen den Batches.
+const EMBED_BATCH = 25
 const INSERT_BATCH = 500
 
 async function assertSourceExists(db: Db, sourceId: string) {
@@ -56,6 +58,7 @@ export class IngestSourceWorkflow extends WorkflowEntrypoint<JobsEnv, IngestSour
       })
 
       for (let batch = 0; batch < batches; batch++) {
+        if (batch > 0) await step.sleep(`embed-pause-${batch}`, "60 seconds")
         await step.do(`embed-${batch + 1}`, API_STEP, async () => {
           const db = getDb()
           const rows = await db
@@ -83,6 +86,8 @@ export class IngestSourceWorkflow extends WorkflowEntrypoint<JobsEnv, IngestSour
           await db.execute(
             sql`update ${sourceChunks} set embedding = data.embedding from (values ${values}) as data(id, embedding) where ${sourceChunks.id} = data.id`
           )
+          // Große Quellen brauchen länger als die Stale-Heilung (15 min ohne updatedAt-Änderung).
+          await db.update(sources).set({ updatedAt: new Date() }).where(eq(sources.id, sourceId))
         })
       }
 

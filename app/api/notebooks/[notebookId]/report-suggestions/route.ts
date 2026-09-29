@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/db"
 import { sourceChunks, sources } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
-import { chatModel, generateText } from "@/lib/gemini"
+import { chatModels, generateText } from "@/lib/gemini"
 import { readJsonBody, parseSourceIds } from "@/lib/api/body"
 
 export type ReportSuggestion = { title: string; description: string; prompt: string }
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
   try {
     const text = await generateText({
-      model: chatModel(),
+      models: chatModels(),
       system: SYSTEM_PROMPT,
       prompt: `Quellen:\n${titles}\n\nAuszüge:\n${excerpts}`.slice(0, 6000),
       maxOutputTokens: 800

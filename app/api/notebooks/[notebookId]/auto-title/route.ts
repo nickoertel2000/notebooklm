@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/db"
 import { messages, notebooks, sourceChunks, sources } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
-import { chatModel, generateText } from "@/lib/gemini"
+import { chatModels, generateText } from "@/lib/gemini"
 import { pickNotebookEmoji } from "@/lib/notebookIcons"
 import { DEFAULT_NOTEBOOK_TITLE } from "@/lib/notebookTitle"
 import { readJsonBody } from "@/lib/api/body"
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
   try {
     const raw = await generateText({
-      model: chatModel(),
+      models: chatModels(),
       system: SYSTEM_PROMPT,
       prompt: parts.join("\n\n").slice(0, 6000),
       maxOutputTokens: 200,

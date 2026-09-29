@@ -3,7 +3,7 @@ import { NonRetryableError } from "cloudflare:workflows"
 import { and, count, eq, gte, ne, sql } from "drizzle-orm"
 import { getDb } from "@/db"
 import { videoOverviews } from "@/db/schema"
-import { generateText, reportModel, synthesizeSpeech } from "@/lib/gemini"
+import { generateText, reportModels, synthesizeSpeech } from "@/lib/gemini"
 import { buildContext } from "@/lib/jobs/context"
 import { toErrorMessage } from "@/lib/jobs/errors"
 import type { VideoParams } from "@/lib/jobs/types"
@@ -40,7 +40,7 @@ export class VideoWorkflow extends WorkflowEntrypoint<JobsEnv, VideoParams> {
       const { title, segments } = await step.do("script", API_STEP, async () => {
         const context = await buildContext(getDb(), job.notebookId, job.sourceIds)
         const raw = await generateText({
-          model: reportModel(),
+          models: reportModels(),
           system: buildVideoScriptSystemPrompt(format, job.language, job.focus),
           prompt: `Hier sind die Quellen des Notebooks:\n${context}\n\n---\n\nErzeuge daraus eine Video-Übersicht.`,
           // Enthält auch die Denk-Tokens von Gemini.
@@ -59,10 +59,11 @@ export class VideoWorkflow extends WorkflowEntrypoint<JobsEnv, VideoParams> {
         return row.n * MAX_SLIDES + segments.length <= Number(this.env.IMAGE_DAILY_LIMIT)
       })
 
-      // Vertonung zuerst und nacheinander: Das TTS-Kontingent ist das knappste, so
-      // verbraucht ein Abbruch dort keine Bild-Neuronen und die Minutengrenze greift seltener.
+      // Vertonung zuerst: Das TTS-Kontingent ist das knappste, so verbraucht ein Abbruch
+      // dort keine Bild-Neuronen. Die Pause hält die Grenze von 3 TTS-Anfragen pro Minute ein.
       const seconds: number[] = []
       for (const [i, segment] of segments.entries()) {
+        if (i > 0) await step.sleep(`speech-pause-${i}`, "20 seconds")
         seconds.push(
           await step.do(`speech-${i + 1}`, API_STEP, async () => {
             const speech = await synthesizeSpeech(segment.narration, 1)

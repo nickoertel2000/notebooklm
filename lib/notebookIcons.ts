@@ -1,4 +1,4 @@
-import { chatModel, generateText } from "@/lib/gemini"
+import { chatModels, generateText } from "@/lib/gemini"
 
 // Muss zum Default in db/schema.ts passen.
 export const DEFAULT_NOTEBOOK_EMOJI = "📔"
@@ -99,7 +99,7 @@ export async function pickNotebookEmoji(title: string): Promise<string | null> {
 
   try {
     const raw = await generateText({
-      model: chatModel(),
+      models: chatModels(),
       system: SYSTEM_PROMPT,
       prompt: clean.slice(0, 200),
       maxOutputTokens: 50,

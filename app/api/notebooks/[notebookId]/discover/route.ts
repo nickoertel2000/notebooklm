@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
-import { chatModel, generateText } from "@/lib/gemini"
+import { chatModels, generateText } from "@/lib/gemini"
 import { SearchHit, SearchQuotaError, webSearch } from "@/lib/tavily"
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   let results: DiscoverResult[] = []
   try {
     const text = await generateText({
-      model: chatModel(),
+      models: chatModels(),
       system: SYSTEM_PROMPT,
       prompt: `Thema: ${query}\n\nSuchtreffer:\n\n${list}`,
       maxOutputTokens: 3000,

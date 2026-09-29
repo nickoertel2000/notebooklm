@@ -5,7 +5,7 @@ import { getDb } from "@/db"
 import { messages, MessageCitation, sourceChunks, sources } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { embedQuery } from "@/lib/embeddings"
-import { chatModel, geminiErrorMessage, getGemini, withFallback } from "@/lib/gemini"
+import { chatModels, geminiErrorMessage, getGemini, withFallback } from "@/lib/gemini"
 import { readJsonBody, parseSourceIds } from "@/lib/api/body"
 
 const TOP_K = 8
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
       try {
         // Das SDK wirft 429/5xx schon beim Öffnen des Streams, also vor dem ersten Text.
-        const stream = await withFallback(chatModel(), openStream)
+        const stream = await withFallback(chatModels(), openStream)
 
         for await (const chunk of stream) {
           const text = chunk.text

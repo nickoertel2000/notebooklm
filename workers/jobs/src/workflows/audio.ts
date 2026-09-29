@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm"
 import { getDb } from "@/db"
 import { audioOverviews } from "@/db/schema"
 import { type AudioLength, buildScriptSystemPrompt, getAudioFormat, parseScript } from "@/lib/audio"
-import { generateText, reportModel, synthesizeSpeech } from "@/lib/gemini"
+import { generateText, reportModels, synthesizeSpeech } from "@/lib/gemini"
 import { buildContext } from "@/lib/jobs/context"
 import { toErrorMessage } from "@/lib/jobs/errors"
 import type { AudioParams } from "@/lib/jobs/types"
@@ -26,7 +26,7 @@ export class AudioWorkflow extends WorkflowEntrypoint<JobsEnv, AudioParams> {
         const context = await buildContext(getDb(), job.notebookId, job.sourceIds)
         const focusLine = job.focus ? `\n\nLege den Fokus auf Folgendes: ${job.focus}` : ""
         const raw = await generateText({
-          model: reportModel(),
+          models: reportModels(),
           system: buildScriptSystemPrompt(format, job.length, job.language),
           prompt: `Hier sind die Quellen des Notebooks:\n${context}\n\n---\n\nAufgabe: ${format.instruction}${focusLine}`,
           maxOutputTokens: SCRIPT_MAX_TOKENS[job.length]
