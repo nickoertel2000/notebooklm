@@ -59,30 +59,40 @@ export class VideoWorkflow extends WorkflowEntrypoint<JobsEnv, VideoParams> {
         return row.n * MAX_SLIDES + segments.length <= Number(this.env.IMAGE_DAILY_LIMIT)
       })
 
-      // Ein Step pro Folie, damit ein Fehler nur diese Folie wiederholt; gruppenweise, um die APIs nicht zu fluten.
+      // Vertonung zuerst und nacheinander: Das TTS-Kontingent ist das knappste, so
+      // verbraucht ein Abbruch dort keine Bild-Neuronen und die Minutengrenze greift seltener.
+      const seconds: number[] = []
+      for (const [i, segment] of segments.entries()) {
+        seconds.push(
+          await step.do(`speech-${i + 1}`, API_STEP, async () => {
+            const speech = await synthesizeSpeech(segment.narration, 1)
+            await putObject(`${parts}${i}.wav`, speech.wav, "audio/wav")
+            return wavSeconds(speech.wav)
+          })
+        )
+      }
+
+      // Ein Step pro Folie, damit ein Fehler nur diese Folie wiederholt; gruppenweise, um die API nicht zu fluten.
       const concurrency = Math.max(1, Number(this.env.VIDEO_SLIDE_CONCURRENCY) || 3)
-      const slides: { background: SlideBackground; seconds: number }[] = []
+      const backgrounds: SlideBackground[] = []
       for (let start = 0; start < segments.length; start += concurrency) {
         const group = segments.slice(start, start + concurrency).map((segment, offset) => {
           const i = start + offset
-          return step.do(`slide-${i + 1}`, API_STEP, async () => {
-            const [speech, image] = await Promise.all([
-              synthesizeSpeech(segment.narration, 1),
-              // Ohne Bild fällt die Folie auf einen einfarbigen Hintergrund zurück.
-              withImages
-                ? generateSlideImage(this.env.AI, this.env.IMAGE_MODEL, buildSlideImagePrompt(style, job.customStyle, segment)).catch((err) => {
-                    console.error(`Folien-Bild ${i + 1} fehlgeschlagen:`, toErrorMessage(err))
-                    return null
-                  })
-                : null
-            ])
-            await putObject(`${parts}${i}.wav`, speech.wav, "audio/wav")
-            if (image) await putObject(`${parts}${i}.${image.format}`, image.bytes, `image/${image.format === "jpg" ? "jpeg" : image.format}`)
-            return { background: image?.format ?? null, seconds: wavSeconds(speech.wav) }
+          return step.do(`image-${i + 1}`, API_STEP, async () => {
+            if (!withImages) return null
+            // Ohne Bild fällt die Folie auf einen einfarbigen Hintergrund zurück.
+            const image = await generateSlideImage(this.env.AI, this.env.IMAGE_MODEL, buildSlideImagePrompt(style, job.customStyle, segment)).catch((err) => {
+              console.error(`Folien-Bild ${i + 1} fehlgeschlagen:`, toErrorMessage(err))
+              return null
+            })
+            if (!image) return null
+            await putObject(`${parts}${i}.${image.format}`, image.bytes, `image/${image.format === "jpg" ? "jpeg" : image.format}`)
+            return image.format
           })
         })
-        slides.push(...(await Promise.all(group)))
+        backgrounds.push(...(await Promise.all(group)))
       }
+      const slides = segments.map((_, i) => ({ background: backgrounds[i], seconds: seconds[i] }))
 
       const key = videoKey(job.notebookId, job.videoId)
       await step.do("render", { ...API_STEP, retries: { limit: 2, delay: "30 seconds", backoff: "exponential" }, timeout: "15 minutes" }, async () => {

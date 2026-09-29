@@ -34,7 +34,8 @@ Im Dashboard unter Workers & Pages → jeweiliger Worker → Settings → Builds
 Die Free-Tier-Limits gelten pro Projekt und Modell (AI Studio → Rate Limits). Chat & Co. laufen deshalb auf Flash-Lite (500/Tag), Flash (20/Tag) nur für Studio-Inhalte, mit Ausweichmodell bei 429/5xx.
 
 - [ ] Embeddings: Gemini Embedding 2 erlaubt 30.000 Tokens pro Minute, der Import schickt 100 Chunks (rund 80.000 Tokens) pro Anfrage. Größere Quellen scheitern daran. Batches verkleinern (etwa 30 Chunks) und zwischen den Batches `step.sleep`.
-- [ ] TTS: Tageslimit von `gemini-3.8-flash-tts` in AI Studio prüfen. Ein Video braucht bis zu 8 TTS-Anfragen. Gegebenenfalls `gemini-3.8-flash-lite-tts` als Ausweichmodell.
+- [x] TTS: `gemini-3.8-flash-tts` erlaubt nur 10 Anfragen. Nur noch Kurzvideos (3–4 Folien), Vertonung vor den Bildern, `gemini-3.8-flash-lite-tts` als Ausweichmodell.
+- [ ] In AI Studio prüfen, ob die 10 TTS-Anfragen pro Tag oder pro Minute gelten, und das Limit von `gemini-3.8-flash-lite-tts` nachsehen.
 - [ ] Optional: `gemini-3.5-flash` (eigene 20/Tag) als Stufe zwischen Flash und Flash-Lite für Studio-Inhalte.
 
 ## 5. Aufräumen

@@ -24,11 +24,10 @@ const isQuotaExceeded = (err: unknown) => err instanceof ApiError && err.status 
 
 // Überlastung und Kontingent gelten pro Modell, ein anderes Modell kann dann noch
 // antworten. run() muss vor der ersten Ausgabe scheitern, sonst käme Text doppelt.
-export async function withFallback<T>(model: string, run: (model: string) => Promise<T>): Promise<T> {
+export async function withFallback<T>(model: string, run: (model: string) => Promise<T>, fallback: string = env.GEMINI_FALLBACK_MODEL): Promise<T> {
   try {
     return await run(model)
   } catch (err) {
-    const fallback = env.GEMINI_FALLBACK_MODEL
     if (fallback === model || !(isOverloaded(err) || isQuotaExceeded(err))) throw err
     console.warn(`Modell ${model} nicht verfügbar, weiche auf ${fallback} aus:`, err)
     return run(fallback)
@@ -96,19 +95,37 @@ export async function synthesizeSpeech(script: string, speakers: 1 | 2): Promise
   // als Sprecher erkennt statt sie vorzulesen.
   const prompt = speakers === 2 ? `Lies das folgende Gespräch zwischen ${SPEAKER_LABELS[0]} und ${SPEAKER_LABELS[1]} vor:\n\n${script}` : script
 
-  const response = await getGemini().models.generateContent({
-    model: env.GEMINI_TTS_MODEL,
-    contents: [{ parts: [{ text: prompt }] }],
-    config: { responseModalities: ["AUDIO"], speechConfig }
-  })
+  const response = await withFallback(
+    env.GEMINI_TTS_MODEL,
+    (model) =>
+      getGemini().models.generateContent({
+        model,
+        contents: [{ parts: [{ text: prompt }] }],
+        config: { responseModalities: ["AUDIO"], speechConfig }
+      }),
+    env.GEMINI_TTS_FALLBACK_MODEL
+  )
 
   const data = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data
   if (!data) throw new Error("Gemini TTS lieferte keine Audiodaten")
 
-  const pcm = Buffer.from(data, "base64")
+  const pcm = stripWavHeader(Buffer.from(data, "base64"))
   const wav = pcmToWav(pcm)
   const durationSeconds = Math.round(pcm.length / (SAMPLE_RATE * CHANNELS * (BITS / 8)))
   return { wav, durationSeconds }
+}
+
+// Gemini-3.8-TTS liefert WAV, ältere Modelle Roh-PCM. Ohne Abschneiden stünde
+// der Header doppelt in der Datei und die Längenberechnung wäre falsch.
+function stripWavHeader(audio: Buffer): Buffer {
+  if (audio.toString("ascii", 0, 4) !== "RIFF") return audio
+  let offset = 12
+  while (offset + 8 <= audio.length) {
+    const size = audio.readUInt32LE(offset + 4)
+    if (audio.toString("ascii", offset, offset + 4) === "data") return audio.subarray(offset + 8, offset + 8 + size)
+    offset += 8 + size + (size % 2)
+  }
+  throw new Error("Gemini TTS lieferte WAV ohne Audiodaten")
 }
 
 // WAV statt MP3, weil MP3 einen Encoder (ffmpeg) bräuchte.

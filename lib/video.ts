@@ -4,24 +4,16 @@ export type VideoFormat = {
   id: string
   label: string
   description: string
-  depth: "kurz" | "standard"
   instruction: string
 }
 
+// Nur kurze Videos: Jede Folie kostet eine TTS-Anfrage, und deren Tageskontingent
+// ist knapp (siehe jobs-worker.md).
 export const VIDEO_FORMATS: VideoFormat[] = [
-  {
-    id: "explainer",
-    label: "Erklärvideo",
-    description: "Eine strukturierte, umfassende Übersicht, in der Zusammenhänge innerhalb Ihrer Quellen aufgezeigt werden.",
-    depth: "standard",
-    instruction:
-      "Erzeuge eine strukturierte, umfassende Erklär-Übersicht. Baue die Folien logisch aufeinander auf, zeige Zusammenhänge zwischen den Quellen und erkläre Fachbegriffe verständlich."
-  },
   {
     id: "summary",
     label: "Zusammenfassung",
     description: "Eine kurze Übersicht, mit der Sie die wichtigsten Informationen aus Ihren Quellen schnell erfassen können.",
-    depth: "kurz",
     instruction:
       "Erzeuge eine kompakte Zusammenfassung der wichtigsten Informationen. Bring die Kernpunkte klar und in sinnvoller Reihenfolge auf den Punkt, ohne Nebenschauplätze."
   }
@@ -81,7 +73,7 @@ export function getVisualStyle(id: string): VisualStyle | undefined {
 // ───────────────────────── Skript ─────────────────────────
 
 // Die Tagesgrenze für Folienbilder rechnet mit diesem Wert.
-export const MAX_SLIDES = 8
+export const MAX_SLIDES = 4
 
 // Dateiendung des Folienbilds im Render-Manifest, null = einfarbiger Hintergrund.
 export type SlideBackground = "png" | "jpg" | "webp" | null
@@ -98,10 +90,7 @@ export type VideoScript = {
   segments: VideoSegment[]
 }
 
-const SEGMENT_HINT: Record<VideoFormat["depth"], string> = {
-  kurz: "Erzeuge 3–4 Folien. Jede Narration ca. 40–70 Wörter (etwa 20–30 Sekunden).",
-  standard: "Erzeuge 5–7 Folien. Jede Narration ca. 70–110 Wörter (etwa 30–45 Sekunden)."
-}
+const SEGMENT_HINT = `Erzeuge 3–${MAX_SLIDES} Folien. Jede Narration ca. 40–70 Wörter (etwa 20–30 Sekunden).`
 
 export function buildVideoScriptSystemPrompt(format: VideoFormat, language: string, focus: string | null): string {
   const focusLine = focus ? `\n- Lege den Fokus besonders auf: ${focus}` : ""
@@ -111,7 +100,7 @@ export function buildVideoScriptSystemPrompt(format: VideoFormat, language: stri
 - Wenn die Quellen zu wenig hergeben, sage das offen in der Narration.
 - Schreibe ALLE Texte (Titel, Folien, Narration) in folgender Sprache: ${language}.
 - ${format.instruction}
-- ${SEGMENT_HINT[format.depth]}${focusLine}
+- ${SEGMENT_HINT}${focusLine}
 
 Pro Folie:
 - "slideTitle": kurze, plakative Folien-Überschrift (max. ~6 Wörter), KEIN Markdown.
