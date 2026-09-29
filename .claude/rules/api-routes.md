@@ -35,8 +35,11 @@ Reference: `app/api/notebooks/[notebookId]/audio/route.ts` (list + create job), 
 
 - NDJSON stream (`application/x-ndjson; charset=utf-8`, `Cache-Control: no-store`) with events `{type:"text"}`, `{type:"done", messageId, citations}`, `{type:"error"}`; the stream is closed in `finally`. The client parser in `NotebookView.tsx` depends on exactly this format.
 - Retrieval: embed question (`embedQuery`) → `cosineDistance` top-8 on `source_chunks`, joined to `sources` with `status = "ready"`.
-- Each chunk is passed as a `document` block with `citations: { enabled: true }`; `extractCitations` maps `document_index` back to the array index of the retrieved chunks — don't reorder the chunk array between building the request and mapping citations.
+- The user message is persisted only together with the finished answer (two separate inserts, so `created_at` keeps the order). A failed attempt must leave nothing in the history, otherwise every retry adds another unanswered question.
+- Model fallback only when opening the stream (`withFallback(chatModel(), openStream)`), never mid-stream: the client would get duplicated text. The `error` event carries `geminiErrorMessage(err)`, never the raw `ApiError`.
+- Gemini has no native citations for own documents: chunks go into the last user turn numbered `[n] Titel\nText` (n = array index + 1), the system prompt demands `[n]` after every statement. `extractCitations` reads the markers from the finished text and maps them back to `retrieved[n - 1]` — don't reorder the chunk array between building the prompt and mapping citations.
+- `MessageCitation.marker` is that `n`. The markers stay in the stored text; `components/CitedMarkdown` renders them as inline chips numbered by first appearance and links them via `marker`. History roles map `assistant` → `model`.
 
 ## Web tools
 
-`discover` and `report-suggestions` use the Anthropic `web_search` server tool and parse a JSON array out of the text answer via regex. Prompts must keep demanding "nur ein JSON-Array".
+`discover` searches with Tavily (`lib/tavily.ts`: `basic` = 1 credit for quick, `advanced` = 2 credits for deep; free tier 1,000 credits/month, no card). Gemini's Google Search grounding is not usable: its free-tier quota is 0 (429 on the first call). A second `generateText` call picks up to 8 hits and writes German descriptions; only URLs present in the Tavily hits are accepted, without usable JSON the Tavily order and excerpts are returned. Tavily 432/433 (credits used up) → 503 with a German message, never the raw error. The prompt must keep demanding "nur ein JSON-Array". `report-suggestions` is a plain `generateText` call without web access.

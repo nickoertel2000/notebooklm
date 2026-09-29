@@ -1,4 +1,5 @@
 import type { AudioLength } from "@/lib/audio"
+import type { StudioFormatId } from "@/lib/studio"
 
 // Parameter der Workflow-Instanzen. Die App erzeugt sie (lib/jobs/start.ts), der
 // Jobs-Worker (workers/jobs) verarbeitet sie. Sie werden von Workflows persistiert,
@@ -17,6 +18,8 @@ export type ReportParams = {
   instruction: string
   reportLabel: string
   language?: string
+  // Gesetzt bei Lernformaten (lib/studio.ts): Antwort als JSON statt Markdown.
+  format?: StudioFormatId
   sourceIds: string[] | null
 }
 

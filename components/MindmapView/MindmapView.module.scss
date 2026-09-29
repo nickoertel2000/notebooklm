@@ -1,0 +1,163 @@
+$line: rgba(255, 255, 255, 0.22);
+$gap: 28px;
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+}
+
+.toolBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  background: transparent;
+  color: #9aa0a6;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+
+  span {
+    font-size: 18px;
+  }
+
+  &:hover {
+    background: #2a2b2d;
+    color: #e3e3e3;
+  }
+}
+
+.canvas {
+  padding: 8px 4px 16px;
+  overflow: auto;
+}
+
+// Die Kinder-Liste ist am Elternknoten vertikal zentriert, deshalb trifft die
+// Linie auf halber Höhe (.children::before) genau die senkrechte Linie der Kinder.
+.branch {
+  display: flex;
+  align-items: center;
+}
+
+.children {
+  position: relative;
+  margin: 0 0 0 $gap;
+  padding: 0;
+  list-style: none;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -$gap;
+    width: $gap;
+    border-top: 1.5px solid $line;
+  }
+}
+
+.child {
+  position: relative;
+  padding: 5px 0 5px $gap;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: $gap;
+    border-top: 1.5px solid $line;
+  }
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    border-left: 1.5px solid $line;
+  }
+
+  &:first-child::after {
+    top: 50%;
+  }
+
+  &:last-child::after {
+    bottom: 50%;
+  }
+
+  &:only-child::after {
+    display: none;
+  }
+}
+
+.node {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 8px 10px 8px 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: #e3e3e3;
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.15);
+  }
+
+  &:disabled {
+    padding-right: 14px;
+    cursor: default;
+  }
+}
+
+.level0 {
+  background: #3b2f57;
+  border-color: rgba(197, 138, 249, 0.5);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.level1 {
+  background: #22334d;
+  border-color: rgba(138, 180, 248, 0.4);
+  font-weight: 500;
+}
+
+.level2 {
+  background: #1f3a2c;
+  border-color: rgba(129, 201, 149, 0.35);
+}
+
+.level3 {
+  background: #2a2b2d;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.label {
+  flex: 1;
+}
+
+.chevron {
+  display: grid !important;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 16px !important;
+}

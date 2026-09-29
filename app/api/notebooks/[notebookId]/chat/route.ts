@@ -1,19 +1,24 @@
-import Anthropic from "@anthropic-ai/sdk"
+import type { Content } from "@google/genai"
 import { and, asc, cosineDistance, eq, inArray } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/db"
 import { messages, MessageCitation, sourceChunks, sources } from "@/db/schema"
-import { chatModel, getAnthropic } from "@/lib/anthropic"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
-import { embedQuery } from "@/lib/voyage"
+import { embedQuery } from "@/lib/embeddings"
+import { chatModel, geminiErrorMessage, getGemini, withFallback } from "@/lib/gemini"
 import { readJsonBody, parseSourceIds } from "@/lib/api/body"
 
 const TOP_K = 8
+const SNIPPET_LENGTH = 240
 
-const SYSTEM_PROMPT = `Du bist der KI-Assistent eines Notebooks. Beantworte die Frage des Nutzers ausschließlich anhand der bereitgestellten Quellen-Dokumente.
-- Stütze jede Aussage auf die Quellen und zitiere die genutzten Stellen.
-- Wenn die Antwort nicht aus den Quellen hervorgeht, sage das offen und erfinde nichts.
+const SYSTEM_PROMPT = `Du bist der KI-Assistent eines Notebooks. Beantworte die Frage des Nutzers ausschließlich anhand der bereitgestellten, nummerierten Quellen-Auszüge.
+- Belege jede Aussage direkt dahinter mit der Nummer des Auszugs in eckigen Klammern, z. B. [2]. Mehrere Belege schreibst du als [1][3].
+- Verwende nur Nummern, die in den Auszügen vorkommen, und erfinde keine.
+- Wenn die Antwort nicht aus den Auszügen hervorgeht, sage das offen und erfinde nichts.
 - Antworte auf Deutsch, klar und prägnant.`
+
+// [n] oder [n, m] im Antworttext.
+const MARKER_PATTERN = /\[(\d+(?:\s*,\s*\d+)*)\]/g
 
 type RetrievedChunk = {
   chunkId: string
@@ -37,9 +42,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const body = await readJsonBody(req)
   const message = typeof body.message === "string" ? body.message : ""
   if (!message.trim()) return NextResponse.json({ error: "Nachricht fehlt" }, { status: 400 })
-
-  // User-Nachricht persistieren.
-  await db.insert(messages).values({ notebookId, role: "user", content: message })
 
   // Optional auf die vom Nutzer ausgewählten Quellen einschränken.
   const selectedIds = parseSourceIds(body.sourceIds)
@@ -69,33 +71,26 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     .orderBy(distance)
     .limit(TOP_K)
 
-  // Bisherigen Verlauf laden (ohne die gerade eingefügte Frage).
   const history = await db
     .select({ role: messages.role, content: messages.content })
     .from(messages)
     .where(eq(messages.notebookId, notebookId))
     .orderBy(asc(messages.createdAt))
-  const prior = history.slice(0, -1)
+  const prior = history.filter((m) => m.content.trim())
 
-  // Letzter User-Turn: je Chunk ein document-Block mit aktivierten Citations.
-  const documents: Anthropic.DocumentBlockParam[] = retrieved.map((c) => ({
-    type: "document",
-    source: { type: "content", content: [{ type: "text", text: c.content }] },
-    title: c.sourceTitle,
-    citations: { enabled: true }
-  }))
-
-  const apiMessages: Anthropic.MessageParam[] = [
-    ...prior.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-    { role: "user", content: [...documents, { type: "text", text: message }] }
+  // Die Nummer n im Prompt ist retrieved[n - 1]; extractCitations verlässt sich darauf.
+  const excerpts = retrieved.map((c, i) => `[${i + 1}] ${c.sourceTitle}\n${c.content}`).join("\n\n")
+  const contents: Content[] = [
+    ...prior.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
+    { role: "user", parts: [{ text: `Quellen-Auszüge:\n\n${excerpts || "(keine)"}\n\n---\n\nFrage: ${message}` }] }
   ]
 
-  const stream = getAnthropic().messages.stream({
-    model: chatModel(),
-    max_tokens: 8000,
-    system: SYSTEM_PROMPT,
-    messages: apiMessages
-  })
+  const openStream = (model: string) =>
+    getGemini().models.generateContentStream({
+      model,
+      contents,
+      config: { systemInstruction: SYSTEM_PROMPT, maxOutputTokens: 8000 }
+    })
 
   const encoder = new TextEncoder()
   const readable = new ReadableStream<Uint8Array>({
@@ -104,22 +99,28 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       let fullText = ""
 
       try {
-        for await (const event of stream) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            fullText += event.delta.text
-            send({ type: "text", text: event.delta.text })
-          }
+        // Das SDK wirft 429/5xx schon beim Öffnen des Streams, also vor dem ersten Text.
+        const stream = await withFallback(chatModel(), openStream)
+
+        for await (const chunk of stream) {
+          const text = chunk.text
+          if (!text) continue
+          fullText += text
+          send({ type: "text", text })
         }
 
-        const finalMessage = await stream.finalMessage()
-        const citations = extractCitations(finalMessage, retrieved)
+        const citations = extractCitations(fullText, retrieved)
 
+        // Frage erst mit der fertigen Antwort speichern: Nach einem Fehler bliebe
+        // sonst eine unbeantwortete Frage im Verlauf, bei jedem neuen Versuch eine weitere.
+        // Getrennte Inserts, damit created_at die Reihenfolge eindeutig hält.
+        await db.insert(messages).values({ notebookId, role: "user", content: message })
         const [row] = await db.insert(messages).values({ notebookId, role: "assistant", content: fullText, citations }).returning({ id: messages.id })
 
         send({ type: "done", messageId: row.id, citations })
       } catch (err) {
         console.error("Chat-Stream-Fehler:", err)
-        send({ type: "error", error: String(err) })
+        send({ type: "error", error: geminiErrorMessage(err) })
       } finally {
         controller.close()
       }
@@ -131,20 +132,21 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   })
 }
 
-// Native Claude-Zitate (content_block_location) auf unsere Chunks mappen.
-function extractCitations(message: Anthropic.Message, retrieved: RetrievedChunk[]): MessageCitation[] {
-  const byChunkId = new Map<string, MessageCitation>()
+// Marker [n] aus der Antwort auf die abgerufenen Chunks abbilden, in Reihenfolge
+// des ersten Auftretens, ein Zitat pro Marker.
+function extractCitations(text: string, retrieved: RetrievedChunk[]): MessageCitation[] {
+  const byMarker = new Map<number, MessageCitation>()
 
-  for (const block of message.content) {
-    if (block.type !== "text" || !block.citations) continue
-    for (const citation of block.citations) {
-      if (citation.type !== "content_block_location") continue
-      const chunk = retrieved[citation.document_index]
-      if (!chunk || byChunkId.has(chunk.chunkId)) continue
-      byChunkId.set(chunk.chunkId, {
+  for (const match of text.matchAll(MARKER_PATTERN)) {
+    for (const part of match[1].split(",")) {
+      const marker = Number(part.trim())
+      const chunk = retrieved[marker - 1]
+      if (!chunk || byMarker.has(marker)) continue
+      byMarker.set(marker, {
+        marker,
         sourceId: chunk.sourceId,
         chunkId: chunk.chunkId,
-        snippet: citation.cited_text,
+        snippet: snippetOf(chunk.content),
         page: chunk.page,
         charStart: chunk.charStart,
         charEnd: chunk.charEnd
@@ -152,5 +154,13 @@ function extractCitations(message: Anthropic.Message, retrieved: RetrievedChunk[
     }
   }
 
-  return [...byChunkId.values()]
+  return [...byMarker.values()]
+}
+
+function snippetOf(content: string): string {
+  const text = content.replace(/\s+/g, " ").trim()
+  if (text.length <= SNIPPET_LENGTH) return text
+  const cut = text.slice(0, SNIPPET_LENGTH)
+  const lastSpace = cut.lastIndexOf(" ")
+  return `${lastSpace > SNIPPET_LENGTH / 2 ? cut.slice(0, lastSpace) : cut}…`
 }

@@ -1,9 +1,9 @@
 // Video-Übersicht (NotebookLM-Stil): KEIN echtes KI-Video, sondern eine vertonte
 // Slideshow. Pipeline (VideoWorkflow in workers/jobs):
-//   1. Claude erzeugt aus den Quellen ein strukturiertes Skript (Folien + Narration).
+//   1. Gemini erzeugt aus den Quellen ein strukturiertes Skript (Folien + Narration).
 //   2. Gemini TTS vertont jede Narration einzeln (lib/gemini.ts → synthesizeSpeech).
-//   3. Gemini 2.5 Flash Image („Nano Banana") malt pro Folie einen Hintergrund
-//      (lib/gemini.ts → generateImage) im gewählten visuellen Stil.
+//   3. FLUX über Workers AI malt pro Folie einen Hintergrund im gewählten
+//      visuellen Stil (workers/jobs/src/images.ts), begrenzt durch IMAGE_DAILY_LIMIT.
 //   4. Der Container containers/video-renderer brennt Titel + Stichpunkte per
 //      ffmpeg-drawtext darüber und fügt alle Folien zur MP4 zusammen.
 
@@ -93,7 +93,13 @@ export function getVisualStyle(id: string): VisualStyle | undefined {
   return VISUAL_STYLES.find((s) => s.id === id)
 }
 
-// ───────────────────────── Skript (Claude) ─────────────────────────
+// ───────────────────────── Skript ─────────────────────────
+
+// Obergrenze pro Video. Die Tagesgrenze für Folienbilder rechnet mit diesem Wert.
+export const MAX_SLIDES = 8
+
+// Dateiendung des Folienbilds im Render-Manifest, null = einfarbiger Hintergrund.
+export type SlideBackground = "png" | "jpg" | "webp" | null
 
 export type VideoSegment = {
   // Folien-Überschrift (kurz, plakativ).
@@ -173,6 +179,7 @@ export function parseVideoScript(raw: string): VideoScript {
       imageHint: String(s?.imageHint ?? "").trim()
     }))
     .filter((s) => s.narration.length > 0)
+    .slice(0, MAX_SLIDES)
 
   if (segments.length === 0) throw new Error("Video-Skript enthielt keine vertonbaren Segmente")
 
@@ -185,7 +192,7 @@ export function parseVideoScript(raw: string): VideoScript {
   }
 }
 
-// ───────────────────────── Bild-Prompt (Nano Banana) ─────────────────────────
+// ───────────────────────── Bild-Prompt ─────────────────────────
 
 // Baut den Prompt für die Hintergrund-Illustration einer Folie. `customStyle`
 // greift nur bei visualStyle === "custom". Wir verbieten explizit Text im Bild,

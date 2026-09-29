@@ -1,0 +1,166 @@
+$modal-bg: #1d1e20;
+$border-subtle: rgba(255, 255, 255, 0.1);
+$surface: #2a2b2d;
+$surface-hover: #323335;
+$text-primary: #e3e3e3;
+$text-secondary: #9aa0a6;
+$accent: #a8c7fa;
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 600px;
+  max-height: 88vh;
+  background: $modal-bg;
+  border: 1px solid $border-subtle;
+  border-radius: 16px;
+  color: $text-primary;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  border-bottom: 1px solid $border-subtle;
+}
+
+.headerIcon {
+  font-size: 22px;
+  color: $accent;
+}
+
+.title {
+  flex: 1;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: $text-secondary;
+  cursor: pointer;
+
+  span {
+    font-size: 20px;
+  }
+
+  &:hover {
+    background: $surface-hover;
+    color: $text-primary;
+  }
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  padding: 18px;
+  overflow-y: auto;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+.sectionLabel {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: $text-secondary;
+}
+
+.toggle {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid $border-subtle;
+  border-radius: 10px;
+  background: $surface;
+}
+
+.toggleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: $text-secondary;
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+
+  span {
+    font-size: 16px;
+  }
+}
+
+.toggleBtnActive {
+  background: $surface-hover;
+  color: $text-primary;
+}
+
+.focus {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid $border-subtle;
+  border-radius: 10px;
+  background: $surface;
+  color: $text-primary;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+
+  &::placeholder {
+    color: $text-secondary;
+  }
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 18px;
+  border-top: 1px solid $border-subtle;
+}
+
+.createBtn {
+  height: 40px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 20px;
+  background: $accent;
+  color: #0b1320;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    filter: brightness(1.05);
+  }
+}

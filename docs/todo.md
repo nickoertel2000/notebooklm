@@ -24,13 +24,24 @@ Begründung für Neon: README, Tech-Entscheidungen. Hyperdrive ist als „public
 - [x] Die zurückgegebene ID ersetzt `HYPERDRIVE_ID` in `wrangler.jsonc` **und** `workers/jobs/wrangler.jsonc`. Das Placement (`aws:eu-central-1`, passend zu Neon Frankfurt) ist dort bereits eingetragen. Falls Neon in einer anderen Region landet, dort anpassen.
 - [x] `pnpm cf-typegen`, `pnpm typecheck`.
 
+## 2a. Gemini- und Tavily-Key
+
+Die KI läuft komplett über Gemini (Gratis-Tarif), siehe [`umstellung-gemini.md`](umstellung-gemini.md). Anleitung: [`anleitung-google-account.md`](anleitung-google-account.md).
+
+- [x] Gemini-API-Key im neuen Google-Account anlegen, in 1Password eintragen, `pnpm env:pull`.
+- [x] Modell-IDs prüfen: `node --env-file=.env.local scripts/gemini-models.mjs`.
+- [x] Tavily-Konto anlegen, Key als `TAVILY_API_KEY` in 1Password, `pnpm env:pull` (Anleitung, Schritt 1b). Die Google-Suche von Gemini hat im Gratis-Tarif kein Kontingent.
+
 ## 3. Lokal testen
 
-- [ ] `pnpm dev` → Login, Notebook anlegen, PDF/URL/Text-Quelle (Status `ready`), Chat mit Zitaten, Bericht, Audio. Die Video-Übersicht wird erst in Produktion getestet (siehe unten).
+- [ ] `pnpm dev` → Registrieren, Notebook anlegen, PDF/URL/Text-Quelle (Status `ready`), Chat mit Zitaten, Bericht, Audio. Die Video-Übersicht wird erst in Produktion getestet (siehe unten).
 
-## 4. Google OAuth
+## 4. Demo-Vorlage
 
-- [ ] Google Cloud Console → OAuth-Client → autorisierte Redirect-URI ergänzen: `https://notebooklm.fancy-cherry-09d8.workers.dev/api/auth/callback/google`
+Login mit Google gibt es nicht mehr, Besucher nutzen den Demo-Zugang (eigenes Konto mit Kopie der Vorlage, Löschung nach 7 Tagen ohne Login).
+
+- [ ] Vorlage-Konto `demo@notebooklm.invalid` anlegen und Beispiel-Notebooks aufbauen: [`anleitung-google-account.md`](anleitung-google-account.md), Schritt 4.
+- [ ] „Demo-Zugang erstellen“ testen: Kopie vollständig, Chat-Zitate klickbar, Audio und Video abspielbar.
 
 ## 5. Erster Deploy
 
@@ -44,7 +55,7 @@ Die App bindet die Workflows des Jobs-Workers per `script_name`, und beide Worke
 - [ ] Neon, 1 bis 2 Tage nach dem Deploy: Branch-Übersicht → Usage → Compute. Bei normaler Nutzung deutlich unter 3 CU-Stunden pro Tag. Etwa 6 oder mehr pro Tag heißt, die Compute läuft rund um die Uhr (vermutlich hält Hyperdrive sie wach).
 - [x] README: erwähnen, dass die Demo bei aufgebrauchten CU-Stunden bis zum Monatsende offline ist (Neon suspendiert die Compute, Daten bleiben erhalten).
 
-Später geänderte Secrets überträgt `pnpm cf:secrets`. Die Secret-Listen stehen in `scripts/cf.mjs` und müssen nach der Gemini-Umstellung angepasst werden (siehe [`umstellung-gemini.md`](umstellung-gemini.md)).
+Später geänderte Secrets überträgt `pnpm cf:secrets`. Die Secret-Listen stehen in `scripts/cf.mjs` (seit der Gemini-Umstellung nur noch `GEMINI_API_KEY` plus die Auth-Secrets).
 
 ## 6. Workers Builds (baut auch das Video-Container-Image)
 
@@ -64,6 +75,25 @@ Im Dashboard unter Workers & Pages → jeweiliger Worker → Settings → Builds
 
 - [ ] AWS: Amplify-App, S3-Bucket, Lambda, Lambda-Layer und IAM-Policies löschen (falls noch vorhanden).
 - [ ] 1Password: AWS-Felder (`AWS_REGION`, `S3_BUCKET_NAME`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) entfernen.
+
+## 8. Später besprechen: Organisation der Env-Dateien
+
+Aktueller Aufbau:
+
+- `.env`: alle `NEXT_PUBLIC_`-Werte, wird ins Repo committet und in Produktion genutzt.
+- `.env.development`: überschreibt Werte aus `.env` lokal (z. B. `NEXT_PUBLIC_APP_URL`).
+- `.env.template`: nur `op://`-Referenzen auf die Secrets in 1Password, daraus erzeugt `pnpm env:pull` die `.env.local`.
+- `.env.local`: die echten Secrets, nicht im Repo.
+
+Es wird immer wieder angemerkt, dass die `.env` auf GitHub zu sehen ist. Klären, wie das üblicherweise organisiert wird und ob der Aufbau geändert werden sollte.
+
+- [ ] Env-Organisation mit Claude durchsprechen.
+
+## 9. Später: Kommentare aufräumen
+
+Viele Kommentare im Projekt stammen aus der Zeit vor der Kommentar-Richtlinie in `.claude/CLAUDE.md` (Abschnitt „Kommentare“) und verstoßen dagegen: Sie wiederholen den Code, enthalten Anleitungen, Links oder Betriebshinweise oder beschreiben die Entstehung. Solange sie drinstehen, dienen sie beim Schreiben neuen Codes als Vorbild.
+
+- [ ] Alle Dateien mit Kommentaren durchgehen (Code, Konfiguration, Templates, SCSS, Skripte) und jeden Kommentar gegen die Richtlinie prüfen: behalten, kürzen oder löschen. Informationen, die woanders fehlen, vorher nach `README.md`, `docs/` oder `.claude/rules/` verschieben.
 
 ## Warum kein Docker nötig ist
 

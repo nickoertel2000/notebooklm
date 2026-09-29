@@ -1,33 +1,35 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import WebSourceSearch from "@/components/WebSourceSearch/WebSourceSearch"
 import styles from "./AddSourceModal.module.scss"
 
-const ROTATING_WORDS = ["Ihre Dokumente", "Websites", "Ihre Notizen"] as const
+const ROTATING_WORDS = ["Deine Dokumente", "Websites", "Deine Notizen"] as const
 
 const HOLD_DURATION = 3000 // ms sichtbar
 const EXIT_DURATION = 280 // ms (muss zur SCSS-Keyframe-Dauer passen)
 
-export type AddSourcePayload =
-  | { type: "pdf"; file: File }
-  | { type: "url"; url: string }
-  | { type: "text"; title?: string; text: string }
+export type AddSourcePayload = { type: "pdf"; file: File } | { type: "url"; url: string } | { type: "text"; title?: string; text: string }
 
 interface AddSourceModalProps {
+  notebookId: string
   /** Wird beim Klick auf das X bzw. den Overlay-Hintergrund aufgerufen. */
   onClose?: () => void
   /** Legt eine neue Quelle an. Wirft bei Fehler. */
   onAdd: (payload: AddSourcePayload) => Promise<void>
+  /** Importiert die in der Websuche ausgewählten URLs. */
+  onImportUrls: (urls: string[]) => Promise<void>
 }
 
 type Mode = "menu" | "url" | "text"
 
-export default function AddSourceModal({ onClose, onAdd }: AddSourceModalProps) {
+export default function AddSourceModal({ notebookId, onClose, onAdd, onImportUrls }: AddSourceModalProps) {
   const [index, setIndex] = useState(0)
   const [phase, setPhase] = useState<"enter" | "exit">("enter")
   const [mode, setMode] = useState<Mode>("menu")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [dragging, setDragging] = useState(false)
   const [url, setUrl] = useState("")
   const [title, setTitle] = useState("")
   const [text, setText] = useState("")
@@ -56,9 +58,19 @@ export default function AddSourceModal({ onClose, onAdd }: AddSourceModalProps) 
     }
   }
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (file) await run({ type: "pdf", file })
+  async function addPdf(file: File | undefined) {
+    if (!file) return
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setError("Es werden nur PDF-Dateien unterstützt.")
+      return
+    }
+    await run({ type: "pdf", file })
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    setDragging(false)
+    if (!busy) addPdf(e.dataTransfer.files[0])
   }
 
   return (
@@ -71,26 +83,21 @@ export default function AddSourceModal({ onClose, onAdd }: AddSourceModalProps) 
         </button>
 
         <h2 className={styles.title}>
-          <span key={index} className={`${styles.rotating} ${phase === "exit" ? styles.exit : styles.enter}`}>
-            {ROTATING_WORDS[index]}
-          </span>{" "}
-          als Wissensquelle für deinen Chat hinzufügen
+          <span className={styles.rotatingLine}>
+            <span key={index} className={`${styles.rotating} ${phase === "exit" ? styles.exit : styles.enter}`}>
+              {ROTATING_WORDS[index]}
+            </span>
+          </span>
+          in Audio- und Video-Zusammenfassungen umwandeln lassen
         </h2>
 
         {error && <p className={styles.modeError}>{error}</p>}
 
-        {mode === "menu" && (
-          <div className={styles.uploadZone}>
-            <p className={styles.uploadHeadline}>Wähle eine Quelle</p>
-            <p className={styles.uploadHint}>PDF, Website-Link oder eingefügter Text</p>
+        <input ref={fileInputRef} type="file" accept="application/pdf" hidden onChange={(e) => addPdf(e.target.files?.[0])} />
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/pdf"
-              hidden
-              onChange={handleFile}
-            />
+        {mode === "menu" && (
+          <>
+            <WebSourceSearch notebookId={notebookId} onImport={onImportUrls} variant="modal" />
 
             <div className={styles.buttonRow}>
               <button type="button" className={styles.sourceButton} disabled={busy} onClick={() => fileInputRef.current?.click()}>
@@ -113,8 +120,34 @@ export default function AddSourceModal({ onClose, onAdd }: AddSourceModalProps) 
               </button>
             </div>
 
-            {busy && <p className={styles.uploadHint}>Wird hinzugefügt…</p>}
-          </div>
+            <div
+              className={`${styles.dropZone} ${dragging ? styles.dropZoneActive : ""}`}
+              role="button"
+              tabIndex={0}
+              aria-disabled={busy}
+              onClick={() => !busy && fileInputRef.current?.click()}
+              onKeyDown={(e) => {
+                if ((e.key === "Enter" || e.key === " ") && !busy) {
+                  e.preventDefault()
+                  fileInputRef.current?.click()
+                }
+              }}
+              onDragOver={(e) => {
+                e.preventDefault()
+                setDragging(true)
+              }}
+              onDragLeave={(e) => {
+                // Auch beim Wechsel auf Icon oder Text gefeuert, nur beim echten Verlassen zurücksetzen.
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false)
+              }}
+              onDrop={handleDrop}
+            >
+              <span className={`material-symbols-outlined ${styles.icon} ${styles.dropIcon}`} aria-hidden="true">
+                upload
+              </span>
+              <p className={styles.dropText}>{busy ? "Wird hinzugefügt…" : "PDF-Dateien zum Hochladen per Drag-and-drop hierher ziehen oder klicken."}</p>
+            </div>
+          </>
         )}
 
         {mode === "url" && (
@@ -153,13 +186,7 @@ export default function AddSourceModal({ onClose, onAdd }: AddSourceModalProps) 
               if (text.trim()) run({ type: "text", title: title.trim() || undefined, text })
             }}
           >
-            <input
-              className={styles.modeInput}
-              type="text"
-              placeholder="Titel (optional)"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
+            <input className={styles.modeInput} type="text" placeholder="Titel (optional)" value={title} onChange={(e) => setTitle(e.target.value)} />
             <textarea
               className={styles.modeTextarea}
               placeholder="Text hier einfügen…"

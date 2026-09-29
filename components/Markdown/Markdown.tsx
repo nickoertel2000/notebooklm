@@ -1,15 +1,13 @@
 import { Fragment, ReactNode } from "react"
 import styles from "./markdown.module.scss"
 
-// Minimaler Markdown-Renderer für die von Claude erzeugten Berichte.
+// Minimaler Markdown-Renderer für die KI-erzeugten Berichte und Chat-Antworten.
 // Unterstützt: Überschriften (#/##/###), Aufzählungen (- / *), Nummerierungen
 // (1.), Absätze und **fett**. Bewusst klein gehalten — kein HTML, keine Tabellen.
 
-type Block =
-  | { kind: "heading"; level: number; text: string }
-  | { kind: "ul"; items: string[] }
-  | { kind: "ol"; items: string[] }
-  | { kind: "p"; text: string }
+type TextRenderer = (text: string) => ReactNode
+
+type Block = { kind: "heading"; level: number; text: string } | { kind: "ul"; items: string[] } | { kind: "ol"; items: string[] } | { kind: "p"; text: string }
 
 function parse(markdown: string): Block[] {
   const lines = markdown.replace(/\r\n/g, "\n").split("\n")
@@ -70,30 +68,30 @@ function parse(markdown: string): Block[] {
   return blocks
 }
 
-// **fett** in React-Nodes auflösen.
-function renderInline(text: string): ReactNode {
+// **fett** in React-Nodes auflösen. renderText verarbeitet die reinen Textstücke weiter.
+function renderInline(text: string, renderText: TextRenderer): ReactNode {
   const parts = text.split(/(\*\*[^*]+\*\*)/g)
   return parts.map((part, i) => {
     const bold = /^\*\*([^*]+)\*\*$/.exec(part)
-    if (bold) return <strong key={i}>{bold[1]}</strong>
-    return <Fragment key={i}>{part}</Fragment>
+    if (bold) return <strong key={i}>{renderText(bold[1])}</strong>
+    return <Fragment key={i}>{renderText(part)}</Fragment>
   })
 }
 
-export default function Markdown({ children }: { children: string }) {
+export default function Markdown({ children, renderText = (text) => text }: { children: string; renderText?: TextRenderer }) {
   const blocks = parse(children)
   return (
     <div className={styles.markdown}>
       {blocks.map((block, i) => {
         if (block.kind === "heading") {
-          const Tag = (`h${block.level}` as "h1" | "h2" | "h3")
-          return <Tag key={i}>{renderInline(block.text)}</Tag>
+          const Tag = `h${block.level}` as "h1" | "h2" | "h3"
+          return <Tag key={i}>{renderInline(block.text, renderText)}</Tag>
         }
         if (block.kind === "ul") {
           return (
             <ul key={i}>
               {block.items.map((item, j) => (
-                <li key={j}>{renderInline(item)}</li>
+                <li key={j}>{renderInline(item, renderText)}</li>
               ))}
             </ul>
           )
@@ -102,12 +100,12 @@ export default function Markdown({ children }: { children: string }) {
           return (
             <ol key={i}>
               {block.items.map((item, j) => (
-                <li key={j}>{renderInline(item)}</li>
+                <li key={j}>{renderInline(item, renderText)}</li>
               ))}
             </ol>
           )
         }
-        return <p key={i}>{renderInline(block.text)}</p>
+        return <p key={i}>{renderInline(block.text, renderText)}</p>
       })}
     </div>
   )

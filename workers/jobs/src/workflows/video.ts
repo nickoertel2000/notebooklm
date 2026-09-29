@@ -1,10 +1,9 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers"
 import { NonRetryableError } from "cloudflare:workflows"
-import { eq } from "drizzle-orm"
+import { and, count, eq, gte, ne, sql } from "drizzle-orm"
 import { getDb } from "@/db"
 import { videoOverviews } from "@/db/schema"
-import { getAnthropic, reportModel } from "@/lib/anthropic"
-import { generateImage, synthesizeSpeech } from "@/lib/gemini"
+import { generateText, reportModel, synthesizeSpeech } from "@/lib/gemini"
 import { buildContext } from "@/lib/jobs/context"
 import { toErrorMessage } from "@/lib/jobs/errors"
 import type { VideoParams } from "@/lib/jobs/types"
@@ -15,11 +14,14 @@ import {
   getVideoFormat,
   getVisualStyle,
   layoutSlide,
+  MAX_SLIDES,
   parseVideoScript,
   SLIDE_HEIGHT,
-  SLIDE_WIDTH
+  SLIDE_WIDTH,
+  type SlideBackground
 } from "@/lib/video"
-import { API_STEP, DB_STEP, joinText } from "./shared"
+import { generateSlideImage } from "../images"
+import { API_STEP, DB_STEP } from "./shared"
 
 // Gemini TTS liefert 24 kHz, 16 bit, mono hinter einem 44-Byte-WAV-Header.
 const wavSeconds = (wav: Uint8Array) => Math.max(0, wav.length - 44) / (24000 * 2)
@@ -37,36 +39,49 @@ export class VideoWorkflow extends WorkflowEntrypoint<JobsEnv, VideoParams> {
 
       const { title, segments } = await step.do("script", API_STEP, async () => {
         const context = await buildContext(getDb(), job.notebookId, job.sourceIds)
-        const message = await getAnthropic().messages.create({
+        const raw = await generateText({
           model: reportModel(),
-          max_tokens: 4000,
           system: buildVideoScriptSystemPrompt(format, job.language, job.focus),
-          messages: [{ role: "user", content: `Hier sind die Quellen des Notebooks:\n${context}\n\n---\n\nErzeuge daraus eine Video-Übersicht.` }]
+          prompt: `Hier sind die Quellen des Notebooks:\n${context}\n\n---\n\nErzeuge daraus eine Video-Übersicht.`,
+          // Inklusive der Denk-Tokens von Gemini.
+          maxOutputTokens: 10000
         })
-        const script = parseVideoScript(joinText(message.content))
+        const script = parseVideoScript(raw)
         if (script.segments.length === 0) throw new Error("Skript ohne Folien erzeugt")
         return script
       })
 
+      // Folienbilder nur im Gratis-Kontingent von Workers AI: Jede heute (UTC)
+      // angelegte Video-Übersicht zählt mit der Höchstzahl an Folien.
+      const withImages = await step.do("image-budget", DB_STEP, async () => {
+        const [row] = await getDb()
+          .select({ n: count() })
+          .from(videoOverviews)
+          .where(and(ne(videoOverviews.id, job.videoId), gte(videoOverviews.createdAt, sql`date_trunc('day', now() at time zone 'UTC')`)))
+        return row.n * MAX_SLIDES + segments.length <= Number(this.env.IMAGE_DAILY_LIMIT)
+      })
+
       // Pro Folie ein eigener Step (Vertonung + Hintergrund parallel), damit ein
-      // Rate-Limit nur diese Folie wiederholt. Gruppenweise, um Gemini nicht zu fluten.
+      // Rate-Limit nur diese Folie wiederholt. Gruppenweise, um die APIs nicht zu fluten.
       const concurrency = Math.max(1, Number(this.env.VIDEO_SLIDE_CONCURRENCY) || 3)
-      const slides: { hasBackground: boolean; seconds: number }[] = []
+      const slides: { background: SlideBackground; seconds: number }[] = []
       for (let start = 0; start < segments.length; start += concurrency) {
         const group = segments.slice(start, start + concurrency).map((segment, offset) => {
           const i = start + offset
           return step.do(`slide-${i + 1}`, API_STEP, async () => {
-            const [speech, background] = await Promise.all([
+            const [speech, image] = await Promise.all([
               synthesizeSpeech(segment.narration, 1),
               // Ohne Bild fällt die Folie auf einen einfarbigen Hintergrund zurück.
-              generateImage(buildSlideImagePrompt(style, job.customStyle, segment)).catch((err) => {
-                console.error(`Folien-Bild ${i + 1} fehlgeschlagen:`, toErrorMessage(err))
-                return null
-              })
+              withImages
+                ? generateSlideImage(this.env.AI, this.env.IMAGE_MODEL, buildSlideImagePrompt(style, job.customStyle, segment)).catch((err) => {
+                    console.error(`Folien-Bild ${i + 1} fehlgeschlagen:`, toErrorMessage(err))
+                    return null
+                  })
+                : null
             ])
             await putObject(`${parts}${i}.wav`, speech.wav, "audio/wav")
-            if (background) await putObject(`${parts}${i}.png`, background, "image/png")
-            return { hasBackground: background !== null, seconds: wavSeconds(speech.wav) }
+            if (image) await putObject(`${parts}${i}.${image.format}`, image.bytes, `image/${image.format === "jpg" ? "jpeg" : image.format}`)
+            return { background: image?.format ?? null, seconds: wavSeconds(speech.wav) }
           })
         })
         slides.push(...(await Promise.all(group)))
@@ -77,7 +92,7 @@ export class VideoWorkflow extends WorkflowEntrypoint<JobsEnv, VideoParams> {
         const manifest = {
           width: SLIDE_WIDTH,
           height: SLIDE_HEIGHT,
-          slides: segments.map((segment, i) => ({ ...layoutSlide(segment, i, segments.length), hasBackground: slides[i].hasBackground }))
+          slides: segments.map((segment, i) => ({ ...layoutSlide(segment, i, segments.length), background: slides[i].background }))
         }
         const form = new FormData()
         form.append("manifest", JSON.stringify(manifest))
@@ -85,10 +100,10 @@ export class VideoWorkflow extends WorkflowEntrypoint<JobsEnv, VideoParams> {
           const audio = await getObject(`${parts}${i}.wav`)
           if (!audio) throw new Error(`Vertonung für Folie ${i + 1} fehlt`)
           form.append(`audio-${i}`, new File([await audio.arrayBuffer()], `slide${i}.wav`, { type: "audio/wav" }))
-          if (slide.hasBackground) {
-            const image = await getObject(`${parts}${i}.png`)
+          if (slide.background) {
+            const image = await getObject(`${parts}${i}.${slide.background}`)
             if (!image) throw new Error(`Hintergrund für Folie ${i + 1} fehlt`)
-            form.append(`background-${i}`, new File([await image.arrayBuffer()], `slide${i}.png`, { type: "image/png" }))
+            form.append(`background-${i}`, new File([await image.arrayBuffer()], `slide${i}.${slide.background}`))
           }
         }
 

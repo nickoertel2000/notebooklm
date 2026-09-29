@@ -3,17 +3,16 @@ import { NonRetryableError } from "cloudflare:workflows"
 import { eq } from "drizzle-orm"
 import { getDb } from "@/db"
 import { audioOverviews } from "@/db/schema"
-import { getAnthropic, reportModel } from "@/lib/anthropic"
 import { type AudioLength, buildScriptSystemPrompt, getAudioFormat, parseScript } from "@/lib/audio"
-import { synthesizeSpeech } from "@/lib/gemini"
+import { generateText, reportModel, synthesizeSpeech } from "@/lib/gemini"
 import { buildContext } from "@/lib/jobs/context"
 import { toErrorMessage } from "@/lib/jobs/errors"
 import type { AudioParams } from "@/lib/jobs/types"
 import { audioKey, putObject } from "@/lib/storage"
-import { API_STEP, DB_STEP, joinText } from "./shared"
+import { API_STEP, DB_STEP } from "./shared"
 
-// Token-Budget für das Skript je nach Länge.
-const SCRIPT_MAX_TOKENS: Record<AudioLength, number> = { kurz: 1500, standard: 4000 }
+// Token-Budget für das Skript je nach Länge, inklusive der Denk-Tokens von Gemini.
+const SCRIPT_MAX_TOKENS: Record<AudioLength, number> = { kurz: 6000, standard: 10000 }
 
 export class AudioWorkflow extends WorkflowEntrypoint<JobsEnv, AudioParams> {
   async run(event: WorkflowEvent<AudioParams>, step: WorkflowStep) {
@@ -26,13 +25,13 @@ export class AudioWorkflow extends WorkflowEntrypoint<JobsEnv, AudioParams> {
       const { title, script } = await step.do("script", API_STEP, async () => {
         const context = await buildContext(getDb(), job.notebookId, job.sourceIds)
         const focusLine = job.focus ? `\n\nLege den Fokus auf Folgendes: ${job.focus}` : ""
-        const message = await getAnthropic().messages.create({
+        const raw = await generateText({
           model: reportModel(),
-          max_tokens: SCRIPT_MAX_TOKENS[job.length],
           system: buildScriptSystemPrompt(format, job.length, job.language),
-          messages: [{ role: "user", content: `Hier sind die Quellen des Notebooks:\n${context}\n\n---\n\nAufgabe: ${format.instruction}${focusLine}` }]
+          prompt: `Hier sind die Quellen des Notebooks:\n${context}\n\n---\n\nAufgabe: ${format.instruction}${focusLine}`,
+          maxOutputTokens: SCRIPT_MAX_TOKENS[job.length]
         })
-        const parsed = parseScript(joinText(message.content), format.label)
+        const parsed = parseScript(raw, format.label)
         if (!parsed.script) throw new Error("Leeres Skript erzeugt")
         return parsed
       })

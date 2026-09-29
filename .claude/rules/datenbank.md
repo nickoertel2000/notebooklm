@@ -29,8 +29,9 @@ Flow and stop points: CLAUDE.md, "Workflow for New Features" step 2. Additionall
 - Columns snake_case in the DB, camelCase in TS.
 - Status/enum values are plain `text` with a comment listing allowed values, not pg enums. Job tables use `processing | ready | failed` + `error`. Keep the comment in sync when adding values.
 - All FKs `onDelete: "cascade"` from `user` → `notebooks` → content. No soft delete: deleting a notebook deletes everything, the Server Action removes the storage prefix `notebooks/{id}/` first.
-- `source_chunks.notebookId` is denormalized on purpose (fast filter before vector search). `embedding` is `vector(1024)` with an HNSW index (`vector_cosine_ops`) — dimension must match `voyage-3.5` `output_dimension`.
-- `messages.citations` is JSONB typed as `MessageCitation[]`.
+- `source_chunks.notebookId` is denormalized on purpose (fast filter before vector search). `embedding` is `vector(1024)` with an HNSW index (`vector_cosine_ops`) — dimension must match `outputDimensionality` in `lib/embeddings.ts`. Vectors of different embedding models are not comparable: changing `GEMINI_EMBEDDING_MODEL` means re-embedding all chunks (a data change, needs approval).
+- `reports` also stores the study formats of the Studio (`type` = `flashcards | quiz | table | mindmap` from `lib/studio.ts`); for those `content` is JSON, not Markdown. Check `getStudioFormat(type)` before treating `content` as Markdown. This way list, polling, delete, stale healing and the demo clone cover them without extra tables.
+- `messages.citations` is JSONB typed as `MessageCitation[]`. Adding a field there needs no migration, but old rows lack it.
 - `DEFAULT_NOTEBOOK_TITLE` (`lib/notebookTitle.ts`) must match the column default of `notebooks.title`.
 
 ## Queries

@@ -5,7 +5,7 @@ import { audioOverviews } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { cancelJob } from "@/lib/jobs/start"
 import { isUuid } from "@/lib/notebooks"
-import { deleteObject } from "@/lib/storage"
+import { deleteNotebookObject } from "@/lib/storage"
 
 type RouteContext = { params: Promise<{ notebookId: string; audioId: string }> }
 
@@ -55,7 +55,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   if (row.status === "processing") await cancelJob("audio", audioId)
   if (row.storageKey) {
     try {
-      await deleteObject(row.storageKey)
+      await deleteNotebookObject(notebookId, row.storageKey)
     } catch (err) {
       console.error("Audio-Datei konnte nicht gelöscht werden:", err)
     }

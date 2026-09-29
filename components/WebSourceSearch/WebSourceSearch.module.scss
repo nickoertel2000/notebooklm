@@ -1,0 +1,391 @@
+// Nutzt die Design-Tokens der Notebook-Seite (.shell in notebook.module.scss).
+
+.card {
+  padding: 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.input {
+  display: block;
+  width: 100%;
+  margin-bottom: 12px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+
+  &::placeholder {
+    color: var(--text-muted);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+  }
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.selectWrap {
+  position: relative;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  // --panel-border ist auf --chip-bg kaum sichtbar.
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-pill);
+  background: var(--chip-bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover {
+    border-color: rgba(255, 255, 255, 0.32);
+    background: var(--surface-hover);
+  }
+
+  :global(.material-symbols-outlined) {
+    font-size: 18px;
+    color: var(--text-muted);
+  }
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: 290px;
+  max-width: calc(100vw - 48px);
+  padding: 6px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.menuItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  :global(.material-symbols-outlined) {
+    margin-top: 1px;
+    font-size: 20px;
+    color: var(--text);
+  }
+
+  &:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.menuItemText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.menuItemLabel {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.menuItemDesc {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.menuItemActive {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.submit {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  flex-shrink: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 50%;
+  background: var(--chip-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(66, 89, 255, 0.25);
+  border-radius: var(--radius-md);
+  background: rgba(66, 89, 255, 0.1);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.spinner {
+  font-size: 20px !important;
+  color: var(--accent);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(242, 139, 130, 0.12);
+  color: #f28b82;
+  font-size: 13px;
+}
+
+.results {
+  margin-top: 10px;
+  padding: 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.resultsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.resultsClose {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+
+  span {
+    font-size: 18px;
+  }
+
+  &:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.resultsEmpty {
+  margin: 0;
+  padding: 8px 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.resultList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.resultItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: var(--surface);
+  }
+}
+
+.checkbox {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  background: transparent;
+  color: transparent; // Häkchen nur im ausgewählten Zustand sichtbar
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+
+  span {
+    font-size: 14px;
+    font-variation-settings: "wght" 500;
+  }
+
+  &[aria-checked="true"] {
+    border-color: var(--surface-hover);
+    background: var(--surface-hover);
+    color: var(--text-muted);
+  }
+
+  &:hover {
+    border-color: var(--text-muted);
+  }
+}
+
+.resultText {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.resultTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.resultDesc {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.resultUrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: fit-content;
+  margin: 3px 0 0;
+  font-size: 11.5px;
+  color: var(--accent);
+  text-decoration: none;
+
+  span {
+    font-size: 13px;
+  }
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.importBtn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  &:not(:disabled):hover {
+    filter: brightness(1.08);
+  }
+}
+
+// Popup-Variante: größeres, gefülltes Suchfeld ohne Rahmen.
+.cardModal {
+  padding: 16px 16px 12px;
+  border-color: transparent;
+  border-radius: 18px;
+  background: var(--surface);
+
+  .input {
+    margin-bottom: 14px;
+    font-size: 15px;
+  }
+
+  // Das Suchfeld hat hier dieselbe Farbe wie --chip-bg, die Chips brauchen eine eigene Füllung.
+  .chip {
+    background: rgba(255, 255, 255, 0.07);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+  }
+
+  .chipStatic:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.07);
+  }
+
+  .submit {
+    border-color: transparent;
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+// Reiner Hinweis auf die Suchquelle, es gibt nur das Web.
+.chipStatic {
+  cursor: default;
+
+  &:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: var(--chip-bg);
+  }
+}

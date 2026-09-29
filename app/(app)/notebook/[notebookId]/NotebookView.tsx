@@ -1,17 +1,20 @@
 "use client"
 
 import AudioPlayer from "@/components/AudioPlayer/AudioPlayer"
-import Markdown from "@/components/Markdown/Markdown"
+import CitedMarkdown from "@/components/CitedMarkdown/CitedMarkdown"
+import StudioPanel, { StudioEntryKind, StudioTool } from "@/components/StudioPanel/StudioPanel"
 import VideoPlayer from "@/components/VideoPlayer/VideoPlayer"
+import WebSourceSearch from "@/components/WebSourceSearch/WebSourceSearch"
 import AddSourceModal, { AddSourcePayload } from "@/components/popup/AddSourceModal"
 import AudioModal, { AudioOptions } from "@/components/popup/AudioModal"
 import ReportModal, { ReportGeneratePayload } from "@/components/popup/ReportModal"
 import ReportViewModal from "@/components/popup/ReportViewModal"
+import StudioOptionsModal from "@/components/popup/StudioOptionsModal"
 import VideoModal, { VideoOptions } from "@/components/popup/VideoModal"
-import { getAudioFormat } from "@/lib/audio"
 import { DEFAULT_NOTEBOOK_TITLE } from "@/lib/notebookTitle"
 import { getReportType } from "@/lib/reports"
-import { getVideoFormat } from "@/lib/video"
+import { getStudioFormat, StudioFormat, StudioOptions } from "@/lib/studio"
+import { hostOf } from "@/lib/url"
 import { useDictation } from "@/lib/useDictation"
 import "material-symbols"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -19,6 +22,7 @@ import styles from "../notebook.module.scss"
 import { readError, readJson } from "@/lib/api/client"
 
 export type Citation = {
+  marker: number
   sourceId: string
   chunkId: string
   snippet: string
@@ -74,15 +78,7 @@ export type VideoItem = {
   createdAt: string
 }
 
-type WebResult = { title: string; url: string; description: string }
-
 const SOURCE_ICON: Record<string, string> = { pdf: "picture_as_pdf", url: "link", text: "description" }
-
-const studioTools = [
-  { label: "Audio-Übersicht", icon: "graphic_eq", tint: "#8ab4f8" },
-  { label: "Videoübersicht", icon: "movie", tint: "#81c995" },
-  { label: "Berichte", icon: "summarize", tint: "#fdd663" }
-]
 
 type Props = {
   notebookId: string
@@ -107,19 +103,8 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   const [reportOpen, setReportOpen] = useState(false)
   const [audioOpen, setAudioOpen] = useState(false)
   const [videoOpen, setVideoOpen] = useState(false)
-  // Web-Quellensuche (Discover): Inline-Karte in „Quellen".
-  const [searchDepth, setSearchDepth] = useState<"quick" | "deep">("quick")
-  const [searchMenu, setSearchMenu] = useState<"depth" | null>(null)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [searching, setSearching] = useState(false)
-  const [searchResults, setSearchResults] = useState<WebResult[] | null>(null)
-  const [selectedResults, setSelectedResults] = useState<Set<string>>(new Set())
-  const [importingResults, setImportingResults] = useState(false)
-  const [searchError, setSearchError] = useState<string | null>(null)
   const [viewReport, setViewReport] = useState<ReportItem | null>(null)
-  const [menuReportId, setMenuReportId] = useState<string | null>(null)
-  const [menuAudioId, setMenuAudioId] = useState<string | null>(null)
-  const [menuVideoId, setMenuVideoId] = useState<string | null>(null)
+  const [studioOptions, setStudioOptions] = useState<StudioFormat | null>(null)
   // Aktuell abgespielte Audio-Übersicht inkl. Datei-URL und Titel.
   const [playingAudio, setPlayingAudio] = useState<{ id: string; url: string; title: string } | null>(null)
   // Echter Play/Pause-Status des Players (für das Listen-Icon).
@@ -130,7 +115,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   const [input, setInput] = useState("")
   const [streaming, setStreaming] = useState(false)
   const [activeSourceId, setActiveSourceId] = useState<string | null>(null)
-  const [openCitation, setOpenCitation] = useState<string | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   // Spracheingabe (Diktat) für das Chat-Eingabefeld.
@@ -219,35 +203,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     const id = setInterval(refreshVideos, 5000)
     return () => clearInterval(id)
   }, [videos, refreshVideos])
-
-  // ⋮-Menü bei Klick außerhalb schließen.
-  useEffect(() => {
-    if (!menuReportId) return
-    const close = () => setMenuReportId(null)
-    document.addEventListener("click", close)
-    return () => document.removeEventListener("click", close)
-  }, [menuReportId])
-
-  useEffect(() => {
-    if (!menuAudioId) return
-    const close = () => setMenuAudioId(null)
-    document.addEventListener("click", close)
-    return () => document.removeEventListener("click", close)
-  }, [menuAudioId])
-
-  useEffect(() => {
-    if (!menuVideoId) return
-    const close = () => setMenuVideoId(null)
-    document.addEventListener("click", close)
-    return () => document.removeEventListener("click", close)
-  }, [menuVideoId])
-
-  useEffect(() => {
-    if (!searchMenu) return
-    const close = () => setSearchMenu(null)
-    document.addEventListener("click", close)
-    return () => document.removeEventListener("click", close)
-  }, [searchMenu])
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -347,53 +302,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     maybeAutoTitle()
   }
 
-  // Inline-Websuche: Claude durchsucht das Web nach neuen Quellen.
-  async function runWebSearch() {
-    const q = searchQuery.trim()
-    if (!q || searching) return
-    setSearching(true)
-    setSearchError(null)
-    setSearchResults(null)
-    try {
-      const res = await fetch(`/api/notebooks/${notebookId}/discover`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q, depth: searchDepth })
-      })
-      if (!res.ok) throw new Error(await readError(res, "Suche fehlgeschlagen"))
-      const data = await readJson<{ results?: WebResult[] }>(res)
-      const found = data.results ?? []
-      setSearchResults(found)
-      setSelectedResults(new Set(found.map((r) => r.url))) // standardmäßig alle ausgewählt
-    } catch (err) {
-      setSearchError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setSearching(false)
-    }
-  }
-
-  function toggleResult(url: string) {
-    setSelectedResults((prev) => {
-      const next = new Set(prev)
-      if (next.has(url)) next.delete(url)
-      else next.add(url)
-      return next
-    })
-  }
-
-  async function importSelectedResults() {
-    if (selectedResults.size === 0 || importingResults) return
-    setImportingResults(true)
-    try {
-      await handleImportSources([...selectedResults])
-      // Nach dem Import die Suche zurücksetzen.
-      setSearchResults(null)
-      setSearchQuery("")
-    } finally {
-      setImportingResults(false)
-    }
-  }
-
   // Fehlgeschlagenen Import erneut versuchen. Optimistisch auf „processing"
   // setzen; das laufende Status-Polling übernimmt danach.
   async function handleRetrySource(sourceId: string) {
@@ -418,16 +326,26 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     await refreshSources()
   }
 
-  // Bericht im Hintergrund erstellen: Popup schließen, Ladekarte zeigen, dann
-  // den fertigen Bericht eintragen (oder als fehlgeschlagen markieren).
-  async function handleCreateReport(payload: ReportGeneratePayload) {
+  function handleCreateReport(payload: ReportGeneratePayload) {
     setReportOpen(false)
+    const title = payload.type ? (getReportType(payload.type)?.label ?? "Bericht") : (payload.title ?? "Eigener Bericht")
+    startReport(payload, payload.type ?? "custom", title)
+  }
+
+  // Lernformate laufen über dieselbe Route wie Berichte (lib/studio.ts).
+  function handleCreateStudio(format: StudioFormat, options?: StudioOptions) {
+    setStudioOptions(null)
+    startReport({ format: format.id, ...options }, format.id, format.label)
+  }
+
+  // Im Hintergrund erstellen: Ladekarte zeigen, dann den fertigen Eintrag
+  // übernehmen (oder als fehlgeschlagen markieren).
+  async function startReport(body: object, type: string, title: string) {
     const tempId = `temp-${crypto.randomUUID()}`
-    const placeholderTitle = payload.type ? (getReportType(payload.type)?.label ?? "Bericht") : (payload.title ?? "Eigener Bericht")
     const placeholder: ReportItem = {
       id: tempId,
-      type: payload.type ?? "custom",
-      title: placeholderTitle,
+      type,
+      title,
       sourceCount: selectedReadyIds.length,
       status: "processing",
       createdAt: new Date().toISOString()
@@ -438,7 +356,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       const res = await fetch(`/api/notebooks/${notebookId}/reports`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, sourceIds: selectedReadyIds })
+        body: JSON.stringify({ ...body, sourceIds: selectedReadyIds })
       })
       if (!res.ok) throw new Error(await readError(res, "Bericht fehlgeschlagen"))
       // 202: Bericht ist 'processing'; der Jobs-Worker generiert, das Polling
@@ -451,7 +369,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   }
 
   async function handleDeleteReport(reportId: string) {
-    setMenuReportId(null)
     setReports((prev) => prev.filter((r) => r.id !== reportId))
     if (!reportId.startsWith("temp-")) {
       await fetch(`/api/notebooks/${notebookId}/reports/${reportId}`, { method: "DELETE" })
@@ -497,7 +414,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   }
 
   async function handleDeleteAudio(audioId: string) {
-    setMenuAudioId(null)
     setAudios((prev) => prev.filter((a) => a.id !== audioId))
     if (playingAudio?.id === audioId) {
       setPlayingAudio(null)
@@ -560,7 +476,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   }
 
   async function handleDeleteVideo(videoId: string) {
-    setMenuVideoId(null)
     setVideos((prev) => prev.filter((v) => v.id !== videoId))
     if (playingVideo?.id === videoId) setPlayingVideo(null)
     if (!videoId.startsWith("temp-")) {
@@ -574,6 +489,33 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     if (!res.ok) return
     const { video } = await readJson<{ video: { title: string; url: string | null } }>(res)
     if (video.url) setPlayingVideo({ id: videoId, url: video.url, title: video.title })
+  }
+
+  function handleOpenTool(tool: StudioTool) {
+    if (tool === "audio") setAudioOpen(true)
+    else if (tool === "video") setVideoOpen(true)
+    else if (tool === "reports") setReportOpen(true)
+    else {
+      const format = getStudioFormat(tool)
+      if (!format) return
+      if (format.hasOptions) setStudioOptions(format)
+      else handleCreateStudio(format)
+    }
+  }
+
+  function handleOpenEntry(kind: StudioEntryKind, id: string) {
+    if (kind === "audio") handlePlayAudio(id)
+    else if (kind === "video") handlePlayVideo(id)
+    else {
+      const report = reports.find((r) => r.id === id)
+      if (report) setViewReport(report)
+    }
+  }
+
+  function handleDeleteEntry(kind: StudioEntryKind, id: string) {
+    if (kind === "audio") handleDeleteAudio(id)
+    else if (kind === "video") handleDeleteVideo(id)
+    else handleDeleteReport(id)
   }
 
   async function sendMessage(text: string) {
@@ -630,7 +572,6 @@ export default function NotebookView({ notebookId, title, initialSources, initia
 
   function focusCitation(citation: Citation) {
     setActiveSourceId(citation.sourceId)
-    setOpenCitation((cur) => (cur === citation.chunkId ? null : citation.chunkId))
   }
 
   return (
@@ -648,120 +589,9 @@ export default function NotebookView({ notebookId, title, initialSources, initia
               Quellen hinzufügen
             </button>
 
-            {/* Im Web nach neuen Quellen suchen (Claude-Websuche) */}
-            <div className={styles.searchCard}>
-              <input
-                className={styles.searchInput}
-                type="text"
-                placeholder="Im Web nach neuen Quellen suchen"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault()
-                    runWebSearch()
-                  }
-                }}
-                disabled={searching}
-              />
-              <div className={styles.searchRow}>
-                <div className={styles.searchSelectWrap} onClick={(e) => e.stopPropagation()}>
-                  <button className={styles.chip} onClick={() => setSearchMenu((m) => (m === "depth" ? null : "depth"))}>
-                    <span className="material-symbols-outlined">travel_explore</span>
-                    {searchDepth === "deep" ? "Deep Research" : "Schnelle Recherche"}
-                    <span className="material-symbols-outlined">expand_more</span>
-                  </button>
-                  {searchMenu === "depth" && (
-                    <div className={styles.searchMenu} role="menu">
-                      <button
-                        className={`${styles.searchMenuItem} ${searchDepth === "quick" ? styles.searchMenuItemActive : ""}`}
-                        onClick={() => {
-                          setSearchDepth("quick")
-                          setSearchMenu(null)
-                        }}
-                      >
-                        <span className="material-symbols-outlined">bolt</span>
-                        Schnelle Recherche
-                      </button>
-                      <button
-                        className={`${styles.searchMenuItem} ${searchDepth === "deep" ? styles.searchMenuItemActive : ""}`}
-                        onClick={() => {
-                          setSearchDepth("deep")
-                          setSearchMenu(null)
-                        }}
-                      >
-                        <span className="material-symbols-outlined">manage_search</span>
-                        Deep Research
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <button className={styles.searchSubmit} aria-label="Im Web suchen" onClick={runWebSearch} disabled={searching || !searchQuery.trim()}>
-                  <span className="material-symbols-outlined">search</span>
-                </button>
-              </div>
+            <div className={styles.webSearch}>
+              <WebSourceSearch notebookId={notebookId} onImport={handleImportSources} />
             </div>
-
-            {/* Lauf-Hinweis während der Recherche */}
-            {searching && (
-              <div className={styles.searchLoading}>
-                <span className={`material-symbols-outlined ${styles.searchSpinner}`}>progress_activity</span>
-                Recherche auf Websites läuft…
-              </div>
-            )}
-
-            {searchError && <p className={styles.searchError}>{searchError}</p>}
-
-            {/* Gefundene Quellen zur Auswahl */}
-            {searchResults && !searching && (
-              <div className={styles.searchResults}>
-                {searchResults.length === 0 ? (
-                  <p className={styles.searchResultsEmpty}>Keine passenden Quellen gefunden.</p>
-                ) : (
-                  <>
-                    <div className={styles.searchResultsHead}>
-                      <span>Gefundene Quellen</span>
-                      <button className={styles.searchResultsClose} aria-label="Ergebnisse schließen" onClick={() => setSearchResults(null)}>
-                        <span className="material-symbols-outlined">close</span>
-                      </button>
-                    </div>
-                    <ul className={styles.searchResultList}>
-                      {searchResults.map((r) => {
-                        const checked = selectedResults.has(r.url)
-                        return (
-                          <li key={r.url} className={styles.searchResultItem} onClick={() => toggleResult(r.url)}>
-                            <button
-                              className={styles.checkbox}
-                              role="checkbox"
-                              aria-checked={checked}
-                              aria-label={`„${r.title}" auswählen`}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                toggleResult(r.url)
-                              }}
-                            >
-                              <span className="material-symbols-outlined">check</span>
-                            </button>
-                            <div className={styles.searchResultText}>
-                              <p className={styles.searchResultTitle}>{r.title}</p>
-                              {r.description && <p className={styles.searchResultDesc}>{r.description}</p>}
-                              <a className={styles.searchResultUrl} href={r.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                                {hostOf(r.url)}
-                                <span className="material-symbols-outlined">open_in_new</span>
-                              </a>
-                            </div>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                    <button className={styles.searchImportBtn} onClick={importSelectedResults} disabled={importingResults || selectedResults.size === 0}>
-                      {importingResults ? "Wird importiert…" : `${selectedResults.size} ${selectedResults.size === 1 ? "Quelle" : "Quellen"} importieren`}
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
 
             {sources.length === 0 ? (
               <div className={styles.emptyState}>
@@ -864,25 +694,18 @@ export default function NotebookView({ notebookId, title, initialSources, initia
               {messages.map((m) => (
                 <div key={m.id} className={`${styles.message} ${m.role === "user" ? styles.messageUser : styles.messageAssistant}`}>
                   <div className={styles.messageContent}>
-                    {m.role === "assistant" ? m.content ? <Markdown>{m.content}</Markdown> : streaming ? "…" : "" : m.content}
+                    {m.role === "assistant" ? (
+                      m.content ? (
+                        <CitedMarkdown content={m.content} citations={m.citations} sourceTitle={(id) => sourceTitleFor(sources, id)} onSelect={focusCitation} />
+                      ) : streaming ? (
+                        "…"
+                      ) : (
+                        ""
+                      )
+                    ) : (
+                      m.content
+                    )}
                   </div>
-                  {m.role === "assistant" && m.citations && m.citations.length > 0 && (
-                    <div className={styles.citations}>
-                      {m.citations.map((c, i) => (
-                        <button key={c.chunkId} className={styles.citationChip} onClick={() => focusCitation(c)}>
-                          <span className="material-symbols-outlined">format_quote</span>
-                          {i + 1}. {sourceTitleFor(sources, c.sourceId)}
-                        </button>
-                      ))}
-                      {m.citations
-                        .filter((c) => c.chunkId === openCitation)
-                        .map((c) => (
-                          <p key={`snippet-${c.chunkId}`} className={styles.citationSnippet}>
-                            „{c.snippet}“
-                          </p>
-                        ))}
-                    </div>
-                  )}
                 </div>
               ))}
               <div ref={chatEndRef} />
@@ -932,169 +755,17 @@ export default function NotebookView({ notebookId, title, initialSources, initia
             <h2>Studio</h2>
           </header>
 
-          <div className={styles.studioBody}>
-            <div className={styles.studioGrid}>
-              {studioTools.map((tool) => {
-                const isReports = tool.label === "Berichte"
-                const isAudio = tool.label === "Audio-Übersicht"
-                const isVideo = tool.label === "Videoübersicht"
-                const interactive = isReports || isAudio || isVideo
-                const onClick = isReports ? () => setReportOpen(true) : isAudio ? () => setAudioOpen(true) : isVideo ? () => setVideoOpen(true) : undefined
-                return (
-                  <button
-                    key={tool.label}
-                    className={styles.studioCard}
-                    style={{ "--tint": tool.tint } as React.CSSProperties}
-                    disabled={interactive ? readyCount === 0 : false}
-                    title={interactive && readyCount === 0 ? "Zuerst Quellen auswählen" : undefined}
-                    onClick={onClick}
-                  >
-                    <span className={`material-symbols-outlined ${styles.studioCardIcon}`}>{tool.icon}</span>
-                    <span className={styles.studioCardLabel}>{tool.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-
-            {videos.length > 0 && (
-              <ul className={styles.reportList}>
-                {videos.map((v) => {
-                  const meta = getVideoFormat(v.format)
-                  const processing = v.status === "processing"
-                  const failed = v.status === "failed"
-                  return (
-                    <li key={v.id} className={styles.audioEntry}>
-                      <div
-                        className={`${styles.reportItem} ${processing ? styles.reportItemBusy : ""}`}
-                        onClick={() => !processing && !failed && handlePlayVideo(v.id)}
-                      >
-                        <span className={`material-symbols-outlined ${styles.reportIcon} ${processing ? styles.reportIconBusy : ""}`}>
-                          {processing ? "autorenew" : failed ? "error" : "play_circle"}
-                        </span>
-                        <div className={styles.reportText}>
-                          <p className={styles.reportTitle}>{processing ? "Video wird erstellt…" : failed ? "Erstellung fehlgeschlagen" : v.title}</p>
-                          <p className={styles.reportMeta}>
-                            {processing
-                              ? `basierend auf ${v.sourceCount} ${v.sourceCount === 1 ? "Quelle" : "Quellen"}`
-                              : `${meta?.label ?? "Video"} · ${v.sourceCount} ${v.sourceCount === 1 ? "Quelle" : "Quellen"}${v.durationSeconds ? ` · ${formatDuration(v.durationSeconds)}` : ""} · ${relativeTime(v.createdAt)}`}
-                          </p>
-                        </div>
-
-                        {!processing && (
-                          <div className={styles.reportMenuWrap} onClick={(e) => e.stopPropagation()}>
-                            <button className={styles.reportMenuBtn} aria-label="Optionen" onClick={() => setMenuVideoId((cur) => (cur === v.id ? null : v.id))}>
-                              <span className="material-symbols-outlined">more_vert</span>
-                            </button>
-                            {menuVideoId === v.id && (
-                              <div className={styles.reportMenu} role="menu">
-                                <button className={styles.reportMenuItem} onClick={() => handleDeleteVideo(v.id)}>
-                                  <span className="material-symbols-outlined">delete</span>
-                                  Löschen
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-
-            {audios.length > 0 && (
-              <ul className={styles.reportList}>
-                {audios.map((a) => {
-                  const meta = getAudioFormat(a.format)
-                  const processing = a.status === "processing"
-                  const failed = a.status === "failed"
-                  // Aktiv = im Player geladen; Icon spiegelt den echten Play/Pause-Status.
-                  const active = playingAudio?.id === a.id
-                  return (
-                    <li key={a.id} className={styles.audioEntry}>
-                      <div
-                        className={`${styles.reportItem} ${processing ? styles.reportItemBusy : ""}`}
-                        onClick={() => !processing && !failed && handlePlayAudio(a.id)}
-                      >
-                        <span className={`material-symbols-outlined ${styles.reportIcon} ${processing ? styles.reportIconBusy : ""}`}>
-                          {processing ? "autorenew" : failed ? "error" : active && audioPlaying ? "pause_circle" : "play_circle"}
-                        </span>
-                        <div className={styles.reportText}>
-                          <p className={styles.reportTitle}>{processing ? "Audio wird erstellt…" : failed ? "Erstellung fehlgeschlagen" : a.title}</p>
-                          <p className={styles.reportMeta}>
-                            {processing
-                              ? `basierend auf ${a.sourceCount} ${a.sourceCount === 1 ? "Quelle" : "Quellen"}`
-                              : `${meta?.label ?? "Audio"} · ${a.sourceCount} ${a.sourceCount === 1 ? "Quelle" : "Quellen"}${a.durationSeconds ? ` · ${formatDuration(a.durationSeconds)}` : ""} · ${relativeTime(a.createdAt)}`}
-                          </p>
-                        </div>
-
-                        {!processing && (
-                          <div className={styles.reportMenuWrap} onClick={(e) => e.stopPropagation()}>
-                            <button className={styles.reportMenuBtn} aria-label="Optionen" onClick={() => setMenuAudioId((cur) => (cur === a.id ? null : a.id))}>
-                              <span className="material-symbols-outlined">more_vert</span>
-                            </button>
-                            {menuAudioId === a.id && (
-                              <div className={styles.reportMenu} role="menu">
-                                <button className={styles.reportMenuItem} onClick={() => handleDeleteAudio(a.id)}>
-                                  <span className="material-symbols-outlined">delete</span>
-                                  Löschen
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-
-            {reports.length > 0 && (
-              <ul className={styles.reportList}>
-                {reports.map((r) => {
-                  const meta = getReportType(r.type)
-                  const processing = r.status === "processing"
-                  const failed = r.status === "failed"
-                  return (
-                    <li
-                      key={r.id}
-                      className={`${styles.reportItem} ${processing ? styles.reportItemBusy : ""}`}
-                      onClick={() => !processing && !failed && setViewReport(r)}
-                    >
-                      <span className={`material-symbols-outlined ${styles.reportIcon} ${processing ? styles.reportIconBusy : ""}`}>
-                        {processing ? "autorenew" : failed ? "error" : (meta?.icon ?? "description")}
-                      </span>
-                      <div className={styles.reportText}>
-                        <p className={styles.reportTitle}>{processing ? "Bericht wird erstellt…" : failed ? "Erstellung fehlgeschlagen" : r.title}</p>
-                        <p className={styles.reportMeta}>
-                          {processing
-                            ? `basierend auf ${r.sourceCount} ${r.sourceCount === 1 ? "Quelle" : "Quellen"}`
-                            : `${meta?.metaLabel ?? "Bericht"} · ${r.sourceCount} ${r.sourceCount === 1 ? "Quelle" : "Quellen"} · ${relativeTime(r.createdAt)}`}
-                        </p>
-                      </div>
-
-                      {!processing && (
-                        <div className={styles.reportMenuWrap} onClick={(e) => e.stopPropagation()}>
-                          <button className={styles.reportMenuBtn} aria-label="Optionen" onClick={() => setMenuReportId((cur) => (cur === r.id ? null : r.id))}>
-                            <span className="material-symbols-outlined">more_vert</span>
-                          </button>
-                          {menuReportId === r.id && (
-                            <div className={styles.reportMenu} role="menu">
-                              <button className={styles.reportMenuItem} onClick={() => handleDeleteReport(r.id)}>
-                                <span className="material-symbols-outlined">delete</span>
-                                Löschen
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </div>
+          <StudioPanel
+            readyCount={readyCount}
+            reports={reports}
+            audios={audios}
+            videos={videos}
+            activeAudioId={playingAudio?.id ?? null}
+            audioPlaying={audioPlaying}
+            onOpenTool={handleOpenTool}
+            onOpen={handleOpenEntry}
+            onDelete={handleDeleteEntry}
+          />
 
           {playingAudio && (
             <AudioPlayer
@@ -1112,9 +783,22 @@ export default function NotebookView({ notebookId, title, initialSources, initia
 
       <p className={styles.disclaimer}>NotebookLM kann Fehler machen, überprüfe daher die Antworten.</p>
 
-      {modalOpen && <AddSourceModal onClose={() => setModalOpen(false)} onAdd={handleAddSource} />}
+      {modalOpen && (
+        <AddSourceModal
+          notebookId={notebookId}
+          onClose={() => setModalOpen(false)}
+          onAdd={handleAddSource}
+          onImportUrls={async (urls) => {
+            await handleImportSources(urls)
+            setModalOpen(false)
+          }}
+        />
+      )}
       {reportOpen && <ReportModal notebookId={notebookId} sourceIds={selectedReadyIds} onClose={() => setReportOpen(false)} onGenerate={handleCreateReport} />}
       {audioOpen && <AudioModal onClose={() => setAudioOpen(false)} onCreate={handleCreateAudio} />}
+      {studioOptions && (
+        <StudioOptionsModal format={studioOptions} onClose={() => setStudioOptions(null)} onCreate={(options) => handleCreateStudio(studioOptions, options)} />
+      )}
       {videoOpen && <VideoModal onClose={() => setVideoOpen(false)} onCreate={handleCreateVideo} />}
       {viewReport && <ReportViewModal notebookId={notebookId} reportId={viewReport.id} title={viewReport.title} onClose={() => setViewReport(null)} />}
       {playingVideo && <VideoPlayer title={playingVideo.title} src={playingVideo.url} onClose={() => setPlayingVideo(null)} />}
@@ -1122,36 +806,8 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   )
 }
 
-// "Vor 1 Min.", "Vor 2 Std.", "Vor 3 Tagen" – kurze relative Zeitangabe (de).
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const min = Math.floor(diff / 60000)
-  if (min < 1) return "Gerade eben"
-  if (min < 60) return `Vor ${min} Min.`
-  const hours = Math.floor(min / 60)
-  if (hours < 24) return `Vor ${hours} Std.`
-  const days = Math.floor(hours / 24)
-  return `Vor ${days} ${days === 1 ? "Tag" : "Tagen"}`
-}
-
-// Anzeige-Host einer URL (ohne „www.").
-function hostOf(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "")
-  } catch {
-    return url
-  }
-}
-
 function sourceTitleFor(sources: SourceItem[], sourceId: string) {
   return sources.find((s) => s.id === sourceId)?.title ?? "Quelle"
-}
-
-// "1:05 Min." – Dauer in mm:ss.
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${m}:${s.toString().padStart(2, "0")} Min.`
 }
 
 // Quellen-Icon: Bei URL-Quellen das Favicon der Website, sonst (oder bei

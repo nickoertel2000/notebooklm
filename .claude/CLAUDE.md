@@ -2,9 +2,9 @@
 
 Guidance for Claude Code when working in this repository.
 
-NotebookLM clone: users create **Notebooks**, add **Quellen** (PDF, URL, text), chat with them via RAG with native citations and generate **Studio** content (Berichte, Audio-Übersicht, Video-Übersicht). Next.js App Router API on **vinext** (Vite 8, no `next` package) + React 19, Drizzle on Neon Postgres/pgvector via Hyperdrive, Better Auth. German-only UI.
+NotebookLM clone: users create **Notebooks**, add **Quellen** (PDF, URL, text), chat with them via RAG with inline citations and generate **Studio** content (Berichte, Audio-Übersicht, Video-Übersicht). Next.js App Router API on **vinext** (Vite 8, no `next` package) + React 19, Drizzle on Neon Postgres/pgvector via Hyperdrive, Better Auth. German-only UI.
 
-- AI: Anthropic Claude (chat, reports, scripts, discover), Voyage AI `voyage-3.5` (embeddings, 1024 dim), Google Gemini (TTS + slide images).
+- AI: Google Gemini on the free tier for everything text (chat, reports, scripts), embeddings (Gemini Embedding 2, 1024 dim) and TTS. Web search for new sources (discover): Tavily free tier. Slide images of the Video-Übersicht: Workers AI (FLUX.2), capped to the daily free allocation. The demo must run without AI costs.
 - Hosting: Cloudflare. Worker `notebooklm` (the app) + Worker `notebooklm-jobs` (`workers/jobs`: Cloudflare Workflows for everything long-running, plus the ffmpeg container `containers/video-renderer`). Storage R2, DB via Hyperdrive. Setup, env and deployment: `.claude/rules/env-und-cloudflare.md`.
 
 Area-specific details live in `.claude/rules/` and load automatically when matching files are touched (API routes, async jobs/Workflows, DB, storage, auth, UI/styling, env/Cloudflare).
@@ -21,9 +21,9 @@ These rules apply unconditionally, even if I explicitly ask you to break them:
 - Never add or remove dependencies without asking first.
 - There is a single database (`DATABASE_URL`, Neon) — treat it as production data. `pnpm db:migrate` / `pnpm db:push` only after I confirmed the generated SQL. Every data change outside the app (insert, update, delete via SQL, `db:studio`, scripts) needs my explicit approval in the current conversation: show the exact statement and why, then wait.
 - Never `git push --force`. Commit and push only when I tell you to.
-- Never import server secrets or server-only modules (`@/db`, `@/auth`, `lib/storage.ts`, `lib/jobs/*`, `lib/anthropic.ts`, `lib/gemini.ts`, `lib/voyage.ts`, anything importing `cloudflare:workers`) into Client Components (`"use client"`).
+- Never import server secrets or server-only modules (`@/db`, `@/auth`, `lib/storage.ts`, `lib/jobs/*`, `lib/gemini.ts`, `lib/embeddings.ts`, `lib/tavily.ts`, anything importing `cloudflare:workers`) into Client Components (`"use client"`).
 - Never log env variables, include them in API responses, or expose them in error messages.
-- Every notebook-bound access goes through `getNotebookForUser(notebookId, user.id)` (`lib/notebooks.ts`). Child records (sources, reports, audio, video) are additionally filtered by `notebookId`. No query on user content without this ownership chain.
+- Every notebook-bound access goes through `getNotebookForUser(notebookId, user.id)` (`lib/notebooks.ts`). Child records (sources, reports, audio, video) are additionally filtered by `notebookId`. No query on user content without this ownership chain (single exception: copying the demo template in `lib/demo.ts`, see `.claude/rules/auth.md`).
 - Never hardcode values that belong in env (keys, bucket names, URLs, model IDs).
 
 ## Workflow for New Features
@@ -56,7 +56,12 @@ These rules apply unconditionally, even if I explicitly ask you to break them:
 
 ## Kommentare
 
+Gilt für jede Datei mit Kommentaren, auch Konfiguration und Templates (`.env.template`, `wrangler.jsonc`, `vite.config.ts`, SCSS, Skripte).
+
 - Kommentare erklären nur ein Warum, das der Code nicht selbst zeigt: eine nicht offensichtliche Code- oder Design-Entscheidung, eine Falle, eine externe Einschränkung (z. B. NUL-Bytes in PDFs, Workflow-Schritte, die beim Replay erneut laufen). Und auch dann nur, wenn es wirklich nötig ist.
+- Prüffrage vor jedem Kommentar: Würde jemand, der genau diese Stelle ändert, ohne ihn einen Fehler machen? Wenn nein, weglassen.
+- Keine Anleitungen oder Betriebshinweise: Links auf Konsolen und Dashboards, Setup-Schritte, Tarif- und Billing-Hinweise, Aufzählungen, wofür ein Wert verwendet wird. Das steht in `README.md`, `docs/` oder `.claude/rules/`.
+- Bestehende Kommentare sind kein Vorbild. Ist ein Kommentar an einer geänderten Stelle veraltet, löschen statt umschreiben, sofern er die Prüffrage nicht besteht.
 - Kein Kommentar für selbsterklärenden Code, keine Wiederholung dessen, was der Code sagt.
 - Kommentare halten nie den Chat oder die Entstehung fest: kein „wie besprochen“, „jetzt statt X“, „verschoben aus Y“. Das gehört in die Commit-Message.
 - Dateiübergreifende Konventionen gehören in `.claude/rules/`, nicht als Kommentar an jede Stelle.

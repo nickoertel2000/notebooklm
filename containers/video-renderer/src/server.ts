@@ -6,8 +6,11 @@ import path from "node:path"
 import { Readable } from "node:stream"
 import { composeVideo, type RenderManifest } from "./compose.ts"
 
+// Die Endung landet im Dateinamen, deshalb nur bekannte Werte zulassen.
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "webp"])
+
 // Nimmt multipart/form-data entgegen: "manifest" (JSON) plus "audio-{i}" (WAV) und
-// optional "background-{i}" (PNG) je Folie. Antwortet mit der fertigen MP4.
+// optional "background-{i}" (Bild, Endung in slide.background) je Folie. Antwortet mit der fertigen MP4.
 async function handleRender(req: IncomingMessage, res: ServerResponse) {
   const dir = await mkdtemp(path.join(os.tmpdir(), "render-"))
   const cleanup = () => rm(dir, { recursive: true, force: true }).catch(() => {})
@@ -27,9 +30,10 @@ async function handleRender(req: IncomingMessage, res: ServerResponse) {
       await writeFile(path.join(dir, `slide${i}.wav`), Buffer.from(await audio.arrayBuffer()))
 
       const background = form.get(`background-${i}`)
-      if (slide.hasBackground) {
+      if (slide.background) {
+        if (!IMAGE_EXTENSIONS.has(slide.background)) throw new Error(`Unbekanntes Bildformat für Folie ${i + 1}`)
         if (!(background instanceof File)) throw new Error(`Hintergrund für Folie ${i + 1} fehlt`)
-        await writeFile(path.join(dir, `slide${i}.png`), Buffer.from(await background.arrayBuffer()))
+        await writeFile(path.join(dir, `slide${i}.${slide.background}`), Buffer.from(await background.arrayBuffer()))
       }
     }
 

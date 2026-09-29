@@ -1,4 +1,4 @@
-import { chatModel, getAnthropic } from "@/lib/anthropic"
+import { chatModel, generateText } from "@/lib/gemini"
 
 // Standard-Emoji neuer Notebooks (muss zum Default in db/schema.ts passen).
 export const DEFAULT_NOTEBOOK_EMOJI = "📔"
@@ -95,7 +95,7 @@ const SYSTEM_PROMPT = `Du wählst für einen Notebook-Titel das thematisch am be
 ${NOTEBOOK_ICON_LIBRARY.join(" ")}
 - Wähle das Emoji, das das Thema des Titels am treffendsten darstellt.`
 
-// Lässt Claude aus der Bibliothek das passendste Emoji zum Titel wählen.
+// Lässt Gemini aus der Bibliothek das passendste Emoji zum Titel wählen.
 // Gibt null zurück, wenn nichts Sinnvolles bestimmt werden konnte (leerer Titel,
 // API-Fehler, keine Übereinstimmung) — Aufrufer behalten dann das bisherige Emoji.
 export async function pickNotebookEmoji(title: string): Promise<string | null> {
@@ -103,17 +103,13 @@ export async function pickNotebookEmoji(title: string): Promise<string | null> {
   if (!clean) return null
 
   try {
-    const message = await getAnthropic().messages.create({
+    const raw = await generateText({
       model: chatModel(),
-      max_tokens: 8,
       system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: clean.slice(0, 200) }]
+      prompt: clean.slice(0, 200),
+      maxOutputTokens: 50,
+      minimalThinking: true
     })
-
-    const raw = message.content
-      .map((b) => (b.type === "text" ? b.text : ""))
-      .join("")
-      .trim()
 
     // Nur ein Emoji aus der Bibliothek akzeptieren.
     return NOTEBOOK_ICON_LIBRARY.find((e) => raw.includes(e)) ?? null

@@ -16,8 +16,10 @@ export function getObject(key: string) {
   return env.BUCKET.get(key)
 }
 
-export async function deleteObject(key: string) {
-  await env.BUCKET.delete(key)
+// Kopien der Demo-Vorlage verweisen auf Dateien der Vorlage. Gelöscht wird deshalb
+// nur, was unter dem eigenen Notebook liegt.
+export async function deleteNotebookObject(notebookId: string, key: string) {
+  if (key.startsWith(notebookPrefix(notebookId))) await env.BUCKET.delete(key)
 }
 
 export async function deleteByPrefix(prefix: string) {

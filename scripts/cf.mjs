@@ -17,14 +17,14 @@ const WORKERS = [
   {
     config: "workers/jobs/wrangler.jsonc",
     built: "dist/notebooklm_jobs/wrangler.json",
-    secrets: ["ANTHROPIC_API_KEY", "VOYAGE_API_KEY", "GEMINI_API_KEY"],
+    secrets: ["GEMINI_API_KEY"],
     // Worker-Code und Workflows deployen, Container-Image überspringen.
     deployArgs: ["--containers-rollout=none"]
   },
   {
     config: "wrangler.jsonc",
     built: "dist/server/wrangler.json",
-    secrets: ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "ANTHROPIC_API_KEY", "VOYAGE_API_KEY"],
+    secrets: ["BETTER_AUTH_SECRET", "GEMINI_API_KEY", "TAVILY_API_KEY"],
     deployArgs: []
   }
 ]

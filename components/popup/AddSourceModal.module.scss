@@ -1,18 +1,13 @@
 // AddSourceModal.module.scss
 
-@use "sass:color";
-
 // ---- Theme-Variablen (NotebookLM Dark) ----
 $modal-bg: #1d1e20;
-$modal-radius: 16px;
-$border-subtle: rgba(255, 255, 255, 0.1);
+$modal-radius: 24px;
 
 $text-primary: #e3e3e3;
 $text-secondary: #9aa0a6;
-$text-muted: #c4c7c5;
 
-$accent-blue: #5b8dff;
-$accent-green: #62c98a;
+$accent-blue: #7ea7ff;
 $search-border: #6b8cff;
 
 $pill-bg: #2a2b2d;
@@ -42,26 +37,6 @@ $enter-duration: 0.35s;
   font-size: 22px;
 }
 
-.iconChevron {
-  font-size: 18px;
-  margin-left: -2px;
-}
-
-// Websites-Button: link-Symbol + YouTube-SVG nebeneinander, gleiche Höhe
-.websitesIcon {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  flex-shrink: 0;
-}
-
-.youtubeImg {
-  // gleiche Höhe wie das link-Symbol (.icon = 20px)
-  height: 20px;
-  width: auto;
-  display: block;
-}
-
 .overlay {
   position: fixed;
   inset: 0;
@@ -76,28 +51,14 @@ $enter-duration: 0.35s;
 .modal {
   position: relative;
   width: 100%;
-  max-width: 740px;
+  max-width: 700px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
   background: $modal-bg;
   border-radius: $modal-radius;
-  padding: 56px 40px 40px;
+  padding: 32px 28px 28px;
   color: $text-primary;
-  overflow: hidden;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
-
-  // Blau/Grüner Lichtschein oben (links blau, rechts grün)
-  &::before {
-    content: "";
-    position: absolute;
-    top: -120px;
-    left: 0;
-    right: 0;
-    height: 240px;
-    pointer-events: none;
-    background:
-      radial-gradient(60% 80% at 22% 60%, rgba(70, 110, 255, 0.45) 0%, rgba(70, 110, 255, 0) 70%),
-      radial-gradient(55% 80% at 82% 55%, rgba(60, 200, 130, 0.4) 0%, rgba(60, 200, 130, 0) 70%);
-    filter: blur(8px);
-  }
 }
 
 .close {
@@ -126,28 +87,28 @@ $enter-duration: 0.35s;
 }
 
 .title {
-  position: relative;
-  z-index: 1;
-  margin: 0 0 28px;
+  margin: 0 40px 24px;
   text-align: center;
-  font-size: 28px;
+  font-size: 20px;
   font-weight: 500;
-  line-height: 1.35;
+  line-height: 1.4;
   color: $text-primary;
 }
 
-// Wechselnder Verlaufstext (blau -> grün)
+// Erste Zeile der Überschrift mit dem wechselnden Wort.
+.rotatingLine {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 18px;
+  font-weight: 400;
+}
+
 .rotating {
   // inline-block ist nötig, damit transform (translateY) greift
   display: inline-block;
-  background: linear-gradient(90deg, $accent-blue 0%, $accent-green 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+  color: $accent-blue;
   white-space: nowrap;
   will-change: transform, opacity;
-  vertical-align: baseline;
 }
 
 // Phase 1: alter Text fliegt nach oben weg und blendet aus
@@ -199,174 +160,102 @@ $enter-duration: 0.35s;
   }
 }
 
-// ---- Suchfeld ----
-.searchBox {
-  position: relative;
-  z-index: 1;
-  border: 1.5px solid $search-border;
-  border-radius: 14px;
-  padding: 14px 18px 12px;
-  background: rgba(255, 255, 255, 0.02);
-  box-shadow: 0 0 0 3px rgba(107, 140, 255, 0.12);
-}
-
-.searchInput {
-  width: 100%;
-  border: none;
-  background: transparent;
-  color: $text-primary;
-  font-size: 15px;
-  outline: none;
-  margin-bottom: 12px;
-
-  &::placeholder {
-    color: $text-secondary;
-  }
-}
-
-.searchControls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.pillGroup {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 34px;
-  padding: 0 12px;
-  border: 1px solid $pill-border;
-  border-radius: 999px;
-  background: $pill-bg;
-  color: $text-primary;
-  font-size: 13.5px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s ease;
-
-  &:hover {
-    background: color.adjust($pill-bg, $lightness: 5%);
-  }
-
-  svg {
-    flex-shrink: 0;
-  }
-}
-
-.searchSubmit {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
-  color: $text-secondary;
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
-  flex-shrink: 0;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.12);
-    color: $text-primary;
-  }
-}
-
-// ---- Upload-Bereich ----
-.uploadZone {
-  position: relative;
-  z-index: 1;
-  margin-top: 24px;
-  border: 1.5px dashed rgba(255, 255, 255, 0.14);
-  border-radius: 14px;
-  padding: 48px 24px 36px;
-  text-align: center;
-}
-
-.uploadHeadline {
-  margin: 0 0 8px;
-  font-size: 20px;
-  font-weight: 500;
-  color: $text-primary;
-}
-
-.uploadHint {
-  margin: 0 0 32px;
-  font-size: 14px;
-  color: $text-secondary;
-}
-
-.moreLink {
-  color: $text-secondary;
-  text-decoration: underline;
-
-  &:hover {
-    color: $text-primary;
-  }
-}
-
+// ---- Quellen-Buttons ----
 .buttonRow {
   display: flex;
-  align-items: center;
-  justify-content: center;
   flex-wrap: wrap;
-  gap: 14px;
+  justify-content: center;
+  gap: 10px;
+  margin: 20px 0;
 }
 
 .sourceButton {
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  height: 42px;
+  height: 40px;
   padding: 0 18px;
   border: 1px solid $pill-border;
   border-radius: 999px;
   background: transparent;
   color: $text-primary;
-  font-size: 14px;
+  font-family: inherit;
+  font-size: 14.5px;
   cursor: pointer;
   white-space: nowrap;
   transition:
     background 0.15s ease,
     border-color 0.15s ease;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: rgba(255, 255, 255, 0.06);
     border-color: rgba(255, 255, 255, 0.22);
   }
 
-  svg {
-    flex-shrink: 0;
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
+}
+
+// ---- Drag-and-drop-Zone ----
+.dropZone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 36px 24px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover,
+  &:focus-visible {
+    background: rgba(255, 255, 255, 0.02);
+    border-color: rgba(255, 255, 255, 0.28);
+    outline: none;
+  }
+
+  &[aria-disabled="true"] {
+    cursor: default;
+  }
+}
+
+.dropZoneActive {
+  background: rgba(107, 140, 255, 0.08);
+  border-color: $search-border;
+}
+
+.dropIcon {
+  font-size: 24px;
+  color: $text-secondary;
+}
+
+.dropText {
+  margin: 0;
+  max-width: 420px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: $text-secondary;
 }
 
 // ---- Responsive ----
 @media (max-width: 640px) {
   .modal {
-    padding: 48px 20px 28px;
+    padding: 28px 16px 20px;
   }
 
   .title {
-    font-size: 22px;
+    margin: 0 32px 20px;
+    font-size: 18px;
   }
 
-  .pillGroup {
-    flex-wrap: wrap;
-  }
-
-  .uploadZone {
-    padding: 32px 16px 24px;
+  .rotatingLine {
+    font-size: 16px;
   }
 }
 

@@ -8,7 +8,7 @@ import { chunkText } from "@/lib/chunk"
 import { stripNul, toErrorMessage } from "@/lib/jobs/errors"
 import type { IngestSourceParams } from "@/lib/jobs/types"
 import { getObject } from "@/lib/storage"
-import { embedTexts } from "@/lib/voyage"
+import { embedTexts } from "@/lib/embeddings"
 import { API_STEP, DB_STEP } from "./shared"
 
 const EMBED_BATCH = 100

@@ -1,6 +1,12 @@
 # Umstellung: Claude + Voyage → Gemini
 
-Stand: 29.09.2026. Umsetzung **erst nach Abschluss der Cloudflare-Migration** – dieses Dokument beschreibt die Änderungen, es ist noch nichts davon umgesetzt.
+Stand: 29.09.2026. **Umgesetzt** auf Branch `feat/cloudflare-migration`. Die finale Fassung mit allen Abweichungen steht in [`superpowers/specs/2026-09-29-gemini-umstellung-design.md`](superpowers/specs/2026-09-29-gemini-umstellung-design.md), die wichtigsten:
+
+- Folienbilder kommen aus Workers AI (FLUX.2 klein) statt Gemini: Kein Gemini-Bildmodell hat einen Gratis-Tarif, und Billing an einem Google-Projekt macht jeden Aufruf des Projekts kostenpflichtig. Eine Tagesgrenze (`IMAGE_DAILY_LIMIT`) hält die Bilder im Gratis-Kontingent.
+- Zitate erscheinen wie in NotebookLM als Chips im Antworttext, die Liste unter der Antwort entfällt.
+- Der Datenschutz-Hinweis unten ist überholt: Für Nutzer im EWR, in der Schweiz und im UK nutzt Google die Eingaben auch im Gratis-Tarif nicht zur Produktverbesserung.
+
+Der Rest dieses Dokuments ist der ursprüngliche Plan.
 
 ## Ziel
 

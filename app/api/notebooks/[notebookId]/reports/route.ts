@@ -4,6 +4,7 @@ import { getDb } from "@/db"
 import { reports, sources } from "@/db/schema"
 import { startReport } from "@/lib/jobs/start"
 import { getReportType } from "@/lib/reports"
+import { buildStudioInstruction, getAmount, getDifficulty, getStudioFormat } from "@/lib/studio"
 import { optionalString, parseSourceIds, readJsonBody } from "@/lib/api/body"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 
@@ -55,16 +56,23 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
   const body = await readJsonBody(req)
 
-  // Entweder ein bekannter Typ ODER eine freie Anweisung (Eigener Bericht /
-  // KI-Formatvorschlag).
+  // Ein Lernformat, ein bekannter Bericht-Typ ODER eine freie Anweisung (Eigener
+  // Bericht / KI-Formatvorschlag).
+  const studioFormat = getStudioFormat(body.format)
   const reportType = getReportType(String(body.type))
-  const instruction = reportType?.instruction ?? optionalString(body.instruction)
+  const instruction = studioFormat
+    ? buildStudioInstruction(studioFormat, {
+        amount: getAmount(body.amount),
+        difficulty: getDifficulty(body.difficulty),
+        focus: optionalString(body.focus) ?? ""
+      })
+    : (reportType?.instruction ?? optionalString(body.instruction))
   if (!instruction) {
     return NextResponse.json({ error: "Unbekannter Bericht-Typ" }, { status: 400 })
   }
 
-  const reportTypeId = reportType ? reportType.id : "custom"
-  const reportLabel = reportType ? reportType.label : (optionalString(body.title) ?? "Eigener Bericht")
+  const reportTypeId = studioFormat?.id ?? reportType?.id ?? "custom"
+  const reportLabel = studioFormat?.label ?? reportType?.label ?? optionalString(body.title) ?? "Eigener Bericht"
 
   const selectedIds = parseSourceIds(body.sourceIds)
 
@@ -94,6 +102,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       instruction,
       reportLabel,
       language: optionalString(body.language) ?? undefined,
+      format: studioFormat?.id,
       sourceIds: selectedIds
     })
   } catch (err) {

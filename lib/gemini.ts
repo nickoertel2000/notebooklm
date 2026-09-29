@@ -1,12 +1,74 @@
-import { GoogleGenAI } from "@google/genai"
+import { ApiError, GoogleGenAI, ThinkingLevel } from "@google/genai"
 import { env } from "cloudflare:workers"
 import { SPEAKER_LABELS } from "./audio"
 
 let client: GoogleGenAI | null = null
 
 export function getGemini(): GoogleGenAI {
-  if (!client) client = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY })
+  if (!client) {
+    client = new GoogleGenAI({
+      apiKey: env.GEMINI_API_KEY,
+      // Ohne retryOptions wiederholt das SDK gar nicht. 429 bewusst nicht: im
+      // Free Tier ist dann meist das Kontingent aufgebraucht.
+      httpOptions: { retryOptions: { attempts: 3, initialDelay: 1, maxDelay: 8, httpStatusCodes: [500, 502, 503, 504] } }
+    })
+  }
   return client
+}
+
+// Modell-IDs kommen aus den vars der Worker-Konfiguration (wrangler.jsonc).
+export const chatModel = () => env.GEMINI_CHAT_MODEL
+export const reportModel = () => env.GEMINI_REPORT_MODEL
+
+const isOverloaded = (err: unknown) => err instanceof ApiError && err.status >= 500
+const isQuotaExceeded = (err: unknown) => err instanceof ApiError && err.status === 429
+
+// Überlastung und Kontingent gelten pro Modell, ein anderes Modell kann dann noch
+// antworten. run() muss vor der ersten Ausgabe scheitern, sonst käme Text doppelt.
+export async function withFallback<T>(model: string, run: (model: string) => Promise<T>): Promise<T> {
+  try {
+    return await run(model)
+  } catch (err) {
+    const fallback = env.GEMINI_FALLBACK_MODEL
+    if (fallback === model || !(isOverloaded(err) || isQuotaExceeded(err))) throw err
+    console.warn(`Modell ${model} nicht verfügbar, weiche auf ${fallback} aus:`, err)
+    return run(fallback)
+  }
+}
+
+// Für den Client: nie den rohen ApiError weitergeben.
+export function geminiErrorMessage(err: unknown): string {
+  if (isOverloaded(err)) return "Das KI-Modell ist gerade überlastet. Bitte versuche es in ein paar Sekunden erneut."
+  if (isQuotaExceeded(err)) return "Das Anfragekontingent ist gerade ausgeschöpft. Bitte versuche es später erneut."
+  return "Die Antwort konnte nicht erzeugt werden. Bitte versuche es erneut."
+}
+
+type GenerateTextOptions = {
+  model: string
+  system: string
+  prompt: string
+  maxOutputTokens: number
+  // Gemini-3-Modelle denken, und Denk-Tokens zählen gegen maxOutputTokens. Bei
+  // kleinen Budgets käme sonst eine leere Antwort zurück.
+  minimalThinking?: boolean
+  // JSON-Schema: Gemini antwortet dann nur mit JSON in dieser Form.
+  jsonSchema?: object
+}
+
+export async function generateText({ model, system, prompt, maxOutputTokens, minimalThinking, jsonSchema }: GenerateTextOptions): Promise<string> {
+  const response = await withFallback(model, (m) =>
+    getGemini().models.generateContent({
+      model: m,
+      contents: prompt,
+      config: {
+        systemInstruction: system,
+        maxOutputTokens,
+        ...(minimalThinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL } } : {}),
+        ...(jsonSchema ? { responseMimeType: "application/json", responseJsonSchema: jsonSchema } : {})
+      }
+    })
+  )
+  return (response.text ?? "").trim()
 }
 
 // Deutschtaugliche Prebuilt-Stimmen. Index 0/1 entsprechen SPEAKER_LABELS.
@@ -51,23 +113,6 @@ export async function synthesizeSpeech(script: string, speakers: 1 | 2): Promise
   const wav = pcmToWav(pcm)
   const durationSeconds = Math.round(pcm.length / (SAMPLE_RATE * CHANNELS * (BITS / 8)))
   return { wav, durationSeconds }
-}
-
-// Erzeugt eine Hintergrund-Illustration via Gemini 2.5 Flash Image und liefert
-// die rohen PNG-Bytes. Genutzt für die Folien der Video-Übersicht (lib/video.ts).
-export async function generateImage(prompt: string): Promise<Buffer> {
-  const response = await getGemini().models.generateContent({
-    model: env.GEMINI_IMAGE_MODEL,
-    contents: [{ parts: [{ text: prompt }] }],
-    config: { responseModalities: ["IMAGE"] }
-  })
-
-  // Das Modell kann mehrere Parts liefern (Text + Bild) – das erste inlineData nehmen.
-  const parts = response.candidates?.[0]?.content?.parts ?? []
-  const imagePart = parts.find((p) => p.inlineData?.data)
-  const data = imagePart?.inlineData?.data
-  if (!data) throw new Error("Gemini Image lieferte keine Bilddaten")
-  return Buffer.from(data, "base64")
 }
 
 // Verpackt rohes PCM in einen WAV-Container (44-Byte-Header). Kein externer

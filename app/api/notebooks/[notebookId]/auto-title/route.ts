@@ -3,8 +3,8 @@ import { revalidatePath } from "next/cache"
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/db"
 import { messages, notebooks, sourceChunks, sources } from "@/db/schema"
-import { chatModel, getAnthropic } from "@/lib/anthropic"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
+import { chatModel, generateText } from "@/lib/gemini"
 import { pickNotebookEmoji } from "@/lib/notebookIcons"
 import { DEFAULT_NOTEBOOK_TITLE } from "@/lib/notebookTitle"
 import { readJsonBody } from "@/lib/api/body"
@@ -64,17 +64,13 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   }
 
   try {
-    const message = await getAnthropic().messages.create({
+    const raw = await generateText({
       model: chatModel(),
-      max_tokens: 40,
       system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: parts.join("\n\n").slice(0, 6000) }]
+      prompt: parts.join("\n\n").slice(0, 6000),
+      maxOutputTokens: 200,
+      minimalThinking: true
     })
-
-    const raw = message.content
-      .map((b) => (b.type === "text" ? b.text : ""))
-      .join("")
-      .trim()
 
     // Erste nichtleere Zeile, ohne Anführungszeichen/Umrandung.
     const title = (raw.split("\n").find((l) => l.trim()) ?? "")

@@ -118,6 +118,8 @@ export const sourceChunks = pgTable(
 // ── Chat-Nachrichten ──────────────────────────────────────────────────────────
 
 export type MessageCitation = {
+  // Nummer n des Markers [n] im Antworttext (Position des Chunks im Prompt, ab 1).
+  marker: number
   sourceId: string
   chunkId: string
   snippet: string
@@ -147,7 +149,8 @@ export const reports = pgTable("reports", {
   notebookId: uuid("notebook_id")
     .notNull()
     .references(() => notebooks.id, { onDelete: "cascade" }),
-  // Bericht-Typ aus lib/reports.ts: 'briefing' | 'study-guide' | 'faq' | 'timeline'
+  // Bericht-Typ aus lib/reports.ts ('briefing' | 'study-guide' | 'blogpost' | 'custom', content ist Markdown)
+  // oder Lernformat aus lib/studio.ts ('flashcards' | 'quiz' | 'table' | 'mindmap', content ist JSON)
   type: text("type").notNull(),
   title: text("title").notNull().default("Bericht"),
   content: text("content"),

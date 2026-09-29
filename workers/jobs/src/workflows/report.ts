@@ -2,12 +2,13 @@ import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloud
 import { eq } from "drizzle-orm"
 import { getDb } from "@/db"
 import { reports } from "@/db/schema"
-import { getAnthropic, reportModel } from "@/lib/anthropic"
+import { generateText, reportModel } from "@/lib/gemini"
 import { buildContext } from "@/lib/jobs/context"
 import { toErrorMessage } from "@/lib/jobs/errors"
 import type { ReportParams } from "@/lib/jobs/types"
 import { buildReportSystemPrompt, deriveReportTitle } from "@/lib/reports"
-import { API_STEP, DB_STEP, joinText } from "./shared"
+import { parseStudioContent, STUDIO_SCHEMAS, STUDIO_SYSTEM_PROMPT } from "@/lib/studio"
+import { API_STEP, DB_STEP } from "./shared"
 
 export class ReportWorkflow extends WorkflowEntrypoint<JobsEnv, ReportParams> {
   async run(event: WorkflowEvent<ReportParams>, step: WorkflowStep) {
@@ -16,13 +17,28 @@ export class ReportWorkflow extends WorkflowEntrypoint<JobsEnv, ReportParams> {
     try {
       const report = await step.do("generate", API_STEP, async () => {
         const context = await buildContext(getDb(), job.notebookId, job.sourceIds)
-        const message = await getAnthropic().messages.create({
+        const prompt = `Hier sind die Quellen des Notebooks:\n${context}\n\n---\n\nAufgabe: ${job.instruction}`
+
+        if (job.format) {
+          const raw = await generateText({
+            model: reportModel(),
+            system: STUDIO_SYSTEM_PROMPT,
+            prompt,
+            maxOutputTokens: 16000,
+            jsonSchema: STUDIO_SCHEMAS[job.format]
+          })
+          const parsed = parseStudioContent(job.format, raw)
+          // Wirft, damit der Step mit einer neuen Antwort wiederholt wird.
+          if (!parsed) throw new Error("Die KI hat kein gültiges Ergebnis geliefert")
+          return { title: parsed.data.title || job.reportLabel, content: JSON.stringify(parsed.data) }
+        }
+
+        const content = await generateText({
           model: reportModel(),
-          max_tokens: 8000,
           system: buildReportSystemPrompt(job.language),
-          messages: [{ role: "user", content: `Hier sind die Quellen des Notebooks:\n${context}\n\n---\n\nAufgabe: ${job.instruction}` }]
+          prompt,
+          maxOutputTokens: 8000
         })
-        const content = joinText(message.content)
         return { title: deriveReportTitle(content, job.reportLabel), content }
       })
 

@@ -30,6 +30,6 @@ paths:
 - `styles/globals.scss` holds only resets, the base font and the icon defaults. No colors there.
 - The app is dark-only. Design tokens are CSS custom properties defined locally on the page root (`.shell` in `notebook.module.scss`, `.nlm` in `notebook-home.scss`): `var(--bg)`, `var(--surface)`, `var(--text)`, `var(--text-muted)`, `var(--accent)`, `var(--radius-*)`. Reuse them instead of new hex values.
 - Font: Google Sans via `next/font/local` in `app/layout.tsx` as `--font-google-sans`; inputs/buttons use `font-family: inherit`.
-- Icons only from `material-symbols` (`import "material-symbols"` in the page/component) as `<span className="material-symbols-outlined">icon_name</span>`. Weight/fill/size defaults are in `globals.scss`.
+- Icons only from `material-symbols` (`import "material-symbols"` in the page/component) as `<span className="material-symbols-outlined">icon_name</span>`. Weight/fill/size defaults are in `globals.scss`. To style icons inside a module, nest `:global(.material-symbols-outlined)` (or `span`): CSS Modules hash every class name (`generateScopedName` in `vite.config.ts`), so a plain nested `.material-symbols-outlined` never matches. Older rules in `notebook.module.scss` still have this bug.
 - Breakpoints are desktop-first `max-width`. No shared breakpoint variables exist yet; stick to the values already used in the file you edit.
 - Dates in the UI: `Intl.DateTimeFormat("de-DE")`.

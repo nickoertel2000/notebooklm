@@ -2,8 +2,8 @@ import { asc, eq } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/db"
 import { sourceChunks, sources } from "@/db/schema"
-import { getAnthropic, reportModel } from "@/lib/anthropic"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
+import { chatModel, generateText } from "@/lib/gemini"
 import { readJsonBody, parseSourceIds } from "@/lib/api/body"
 
 export type ReportSuggestion = { title: string; description: string; prompt: string }
@@ -61,19 +61,12 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   void selectedIds
 
   try {
-    const message = await getAnthropic().messages.create({
-      model: reportModel(),
-      max_tokens: 800,
+    const text = await generateText({
+      model: chatModel(),
       system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: "user",
-          content: `Quellen:\n${titles}\n\nAuszüge:\n${excerpts}`.slice(0, 6000)
-        }
-      ]
+      prompt: `Quellen:\n${titles}\n\nAuszüge:\n${excerpts}`.slice(0, 6000),
+      maxOutputTokens: 800
     })
-
-    const text = message.content.map((b) => (b.type === "text" ? b.text : "")).join("")
     return NextResponse.json({ suggestions: parseSuggestions(text) })
   } catch (err) {
     console.error("Formatvorschläge fehlgeschlagen:", err)
