@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { register } from "./helpers"
+import { register, waitForHydration } from "./helpers"
 
 test("Notebook anlegen und Text-Quelle hinzufügen", async ({ page }) => {
   await register(page)
@@ -7,8 +7,9 @@ test("Notebook anlegen und Text-Quelle hinzufügen", async ({ page }) => {
   await page.getByRole("button", { name: "Neu erstellen" }).click()
   await expect(page).toHaveURL(/\/notebook\/[0-9a-f-]+$/)
   await expect(page.getByRole("button", { name: "Unbenanntes Notebook" })).toBeVisible()
+  await waitForHydration(page)
 
-  await page.getByRole("button", { name: "Quellen hinzufügen" }).click()
+  // Ein leeres Notebook öffnet den Quellen-Dialog von selbst.
   await page.getByRole("button", { name: "Text einfügen" }).click()
   await page.getByPlaceholder("Titel (optional)").fill("Meine Notizen")
   await page.getByPlaceholder("Text hier einfügen…").fill("Die Mitochondrien sind die Kraftwerke der Zelle.")

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { expectHome, register } from "./helpers"
+import { expectHome, gotoPage, register } from "./helpers"
 
 test("Registrieren, abmelden und wieder anmelden", async ({ page }) => {
   const account = await register(page)
@@ -18,7 +18,7 @@ test("Falsches Passwort wird abgelehnt", async ({ page }) => {
   const account = await register(page)
   await page.context().clearCookies()
 
-  await page.goto("/login")
+  await gotoPage(page, "/login")
   await page.getByPlaceholder("E-Mail").fill(account.email)
   await page.getByPlaceholder("Passwort").fill("falsches-passwort")
   await page.getByRole("button", { name: "Anmelden", exact: true }).click()

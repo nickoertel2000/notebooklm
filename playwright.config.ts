@@ -15,8 +15,11 @@ export default defineConfig({
   // Seriell, weil der Demo-Zugang pro IP nur zwei Konten pro Minute anlegt.
   workers: 1,
   forbidOnly: !!process.env.CI,
-  // Der Dev-Server kompiliert jede Route beim ersten Aufruf.
+  // Der Dev-Server kompiliert jede Route beim ersten Aufruf und lädt die Seite neu, wenn Vite dabei
+  // neue Abhängigkeiten optimiert. Die Wiederholung läuft dann gegen den aufgewärmten Server.
+  timeout: 60_000,
   expect: { timeout: 15_000 },
+  retries: process.env.CI ? 1 : 0,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: "http://localhost:3000",
