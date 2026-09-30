@@ -3,19 +3,15 @@ import type { Metadata } from "next"
 import localFont from "next/font/local"
 
 const googleSans = localFont({
-  src: [
-    { path: "./fonts/GoogleSans-Regular.woff2", weight: "400", style: "normal" },
-    { path: "./fonts/GoogleSans-Medium.woff2", weight: "500", style: "normal" },
-    { path: "./fonts/GoogleSans-SemiBold.woff2", weight: "600", style: "normal" },
-    { path: "./fonts/GoogleSans-Bold.woff2", weight: "700", style: "normal" }
-  ],
+  src: [{ path: "./fonts/GoogleSansFlex.woff2", weight: "400 700", style: "normal" }],
   variable: "--font-google-sans",
   fallback: ["Arial", "sans-serif"],
   display: "swap"
 })
 
 export const metadata: Metadata = {
-  title: "NotebookLM Clone",
+  title: "NotebookLM Klon",
+  description: "Demo-Projekt: Nachbau von Google NotebookLM mit RAG-Chat, Zitaten sowie Audio- und Video-Übersichten.",
   icons: {
     icon: [
       { url: "/favicon/favicon-16x16.png", sizes: "16x16", type: "image/png" },

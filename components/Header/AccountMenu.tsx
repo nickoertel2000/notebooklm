@@ -20,7 +20,6 @@ export default function AccountMenu({ name, email, image }: AccountMenuProps) {
 
   const initial = name?.charAt(0).toUpperCase() || "?"
   const firstName = name?.trim().split(/\s+/)[0] || name
-  const domain = email?.split("@")[1] ?? ""
 
   useEffect(() => {
     if (!open) return
@@ -72,11 +71,6 @@ export default function AccountMenu({ name, email, image }: AccountMenuProps) {
           </button>
 
           <p className={styles.email}>{email}</p>
-          {domain && <p className={styles.managed}>Verwaltet von {domain}</p>}
-
-          <a className={styles.adminLink} href="#" onClick={(e) => e.preventDefault()}>
-            Admin-Konsole
-          </a>
 
           <div className={styles.avatar}>
             {image ? (
@@ -85,36 +79,15 @@ export default function AccountMenu({ name, email, image }: AccountMenuProps) {
             ) : (
               <span className={styles.avatarInitial}>{initial}</span>
             )}
-            <span className={styles.cameraBadge}>
-              <span className="material-symbols-outlined">photo_camera</span>
-            </span>
           </div>
 
           <p className={styles.greeting}>Hallo {firstName}!</p>
 
-          <button className={styles.manageBtn} type="button" onClick={(e) => e.preventDefault()}>
-            Google-Konto verwalten
-          </button>
-
           <div className={styles.actions}>
-            <button className={styles.actionBtn} type="button">
-              <span className="material-symbols-outlined">add</span>
-              Konto hinzufügen
-            </button>
             <button className={styles.actionBtn} type="button" onClick={handleSignOut} disabled={signingOut}>
               <span className="material-symbols-outlined">logout</span>
               Abmelden
             </button>
-          </div>
-
-          <div className={styles.footer}>
-            <a href="#" onClick={(e) => e.preventDefault()}>
-              Datenschutzerklärung
-            </a>
-            <span className={styles.dot}>·</span>
-            <a href="#" onClick={(e) => e.preventDefault()}>
-              Nutzungsbedingungen
-            </a>
           </div>
         </div>
       )}

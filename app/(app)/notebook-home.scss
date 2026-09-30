@@ -40,111 +40,14 @@ $transition: 0.15s ease;
 .nlm-topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
-}
-
-.nlm-chip {
-  background: var(--chip);
-  color: var(--text);
-  border: none;
-  border-radius: $radius-pill;
-  padding: 9px 22px;
-  font: inherit;
-  font-size: 15px;
-  cursor: pointer;
-  transition: background $transition;
-
-  &:hover {
-    background: #3a3b3f;
-  }
 }
 
 .nlm-actions {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.nlm-icon-btn {
-  width: 42px;
-  height: 42px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--text);
-  cursor: pointer;
-  transition: background $transition;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.08);
-  }
-}
-
-.nlm-toggle {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  background: var(--toggle);
-  border-radius: 16px;
-  overflow: hidden;
-  height: 44px;
-}
-
-.nlm-toggle-group {
-  display: flex;
-  gap: 0;
-
-  .nlm-toggle-btn {
-    width: 38px;
-  }
-}
-
-.nlm-toggle-btn {
-  width: 48px;
-  height: 100%;
-  border-radius: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--text);
-  cursor: pointer;
-  transition: background $transition;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  &.active {
-    background: var(--indigo-hi);
-
-    &:hover {
-      background: #555ba0;
-    }
-  }
-}
-
-.nlm-dropdown {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--chip);
-  color: var(--text);
-  border: none;
-  border-radius: $radius-pill;
-  padding: 10px 14px 10px 18px;
-  font: inherit;
-  font-size: 15px;
-  cursor: pointer;
-  transition: background $transition;
-
-  &:hover {
-    background: #3a3b3f;
-  }
 }
 
 .nlm-create-btn {
