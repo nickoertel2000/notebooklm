@@ -7,29 +7,30 @@ paths:
   - "lib/useDictation.ts"
 ---
 
-# Pages, Components & Styling
+# Seiten, Komponenten & Styling
 
-## Server / Client split
+## Server-/Client-Trennung
 
-- Pages are async Server Components: `getSessionUser()` → `redirect("/login")`, ownership via `getNotebookForUser` → `notFound()`, load data, serialize dates to ISO strings, pass as `initialX` props to one Client Component. Reference: `app/(app)/notebook/[notebookId]/page.tsx` + `NotebookView.tsx`.
-- Client Components never fetch initial data or check auth; they call `app/api/` (or the Notebook-CRUD Server Actions) and poll job status (see `jobs-worker.md`).
-- `app/(app)/layout.tsx` does no auth (protection is `proxy.ts` + page guard) but sets `dynamic = "force-dynamic"`: vinext can't detect `headers()` at build time, and these pages must never be cached.
-- Item types shared between page and view are exported from the view (`NotebookView.tsx`); payload types of modals are exported next to the modal (`AudioOptions`, `ReportGeneratePayload`, …).
-- `NotebookView.tsx` is already very large — put new self-contained UI into `components/` instead of growing it further.
+- Seiten sind asynchrone Server Components: `getSessionUser()` → `redirect("/login")`, Besitzprüfung über `getNotebookForUser` → `notFound()`, Daten laden, Datumswerte in ISO-Strings serialisieren, als `initialX`-Props an eine Client Component übergeben. Referenz: `app/(app)/notebook/[notebookId]/page.tsx` + `NotebookView.tsx`.
+- Client Components laden nie Initialdaten und prüfen nie die Authentifizierung; sie rufen `app/api/` (oder die Notebook-CRUD-Server-Actions) auf und pollen den Job-Status (siehe `jobs-worker.md`).
+- `app/(app)/layout.tsx` macht keine Authentifizierung (der Schutz ist `proxy.ts` + Page-Guard), setzt aber `dynamic = "force-dynamic"`: vinext kann `headers()` zur Build-Zeit nicht erkennen, und diese Seiten dürfen nie gecacht werden.
+- Item-Typen, die sich Seite und View teilen, werden aus der View exportiert (`NotebookView.tsx`); Payload-Typen von Modals werden neben dem Modal exportiert (`AudioOptions`, `ReportGeneratePayload`, …).
+- `NotebookView.tsx` ist bereits sehr groß – neue, in sich geschlossene UI in `components/` ablegen, statt die Datei weiter wachsen zu lassen.
 
-## Components
+## Komponenten
 
-- One folder per component in `components/<Name>/` with `<Name>.tsx` + `<Name>.module.scss` (PascalCase for new files; some older SCSS files are lowercase, leave them).
-- Modals live together in `components/popup/`: `"use client"`, controlled via `onClose`/`onCreate` callbacks, `role="dialog" aria-modal="true"`, overlay click closes, inner `onClick={(e) => e.stopPropagation()}`.
-- `lib/useDictation.ts`: Web Speech API (`de-DE`, Chrome/Edge only); `supported` comes from `useSyncExternalStore` with server snapshot `false` for SSR safety.
-- `eslint-plugin-react-hooks` 7 forbids synchronous `setState` in effects (`react-hooks/set-state-in-effect`). Syncing state from changed props happens during render with a stored previous value (see `NotebookTitle.tsx`), browser capabilities via `useSyncExternalStore`.
+- Ein Ordner pro Komponente in `components/<Name>/` mit `<Name>.tsx` + `<Name>.module.scss` (PascalCase für neue Dateien; einige ältere SCSS-Dateien sind kleingeschrieben, so belassen).
+- Modals liegen gemeinsam in `components/popup/`: `"use client"`, gesteuert über `onClose`-/`onCreate`-Callbacks, `role="dialog" aria-modal="true"`, Klick auf das Overlay schließt, inneres `onClick={(e) => e.stopPropagation()}`.
+- `lib/useDictation.ts`: Web Speech API (`de-DE`, nur Chrome/Edge); `supported` kommt aus `useSyncExternalStore` mit Server-Snapshot `false` für SSR-Sicherheit.
+- `eslint-plugin-react-hooks` 7 verbietet synchrones `setState` in Effects (`react-hooks/set-state-in-effect`). State aus geänderten Props wird während des Renderns mit einem gespeicherten Vorgängerwert synchronisiert (siehe `NotebookTitle.tsx`), Browser-Fähigkeiten über `useSyncExternalStore`.
 
 ## Styling
 
-- SCSS Modules everywhere (`components/**`, `app/login/login.module.scss`, `app/(app)/notebook/notebook.module.scss`). Only exception: the home page `app/(app)/notebook-home.scss` is plain global SCSS, scoped under `.nlm` with `nlm-*` class names — don't add new global stylesheets.
-- `styles/globals.scss` holds only resets, the base font and the icon defaults. No colors there.
-- The app is dark-only. Design tokens are CSS custom properties defined locally on the page root (`.shell` in `notebook.module.scss`, `.nlm` in `notebook-home.scss`): `var(--bg)`, `var(--surface)`, `var(--text)`, `var(--text-muted)`, `var(--accent)`, `var(--radius-*)`. Reuse them instead of new hex values.
-- Font: Google Sans via `next/font/local` in `app/layout.tsx` as `--font-google-sans`; inputs/buttons use `font-family: inherit`.
-- Icons only from `material-symbols` (`import "material-symbols"` in the page/component) as `<span className="material-symbols-outlined">icon_name</span>`. Weight/fill/size defaults are in `globals.scss`. To style icons inside a module, nest `:global(.material-symbols-outlined)` (or `span`): CSS Modules hash every class name (`generateScopedName` in `vite.config.ts`), so a plain nested `.material-symbols-outlined` never matches. Older rules in `notebook.module.scss` still have this bug.
-- Breakpoints are desktop-first `max-width`. No shared breakpoint variables exist yet; stick to the values already used in the file you edit.
-- Dates in the UI: `Intl.DateTimeFormat("de-DE")`.
+- Überall SCSS-Module (`components/**`, `app/login/login.module.scss`, `app/(app)/notebook/notebook.module.scss`). Einzige Ausnahme: Die Startseite `app/(app)/notebook-home.scss` ist plain globales SCSS, gescopt unter `.nlm` mit `nlm-*`-Klassennamen – keine neuen globalen Stylesheets anlegen.
+- `styles/globals.scss` enthält nur Resets, die Basisschrift und die Icon-Defaults. Keine Farben dort.
+- Die App ist ausschließlich dunkel. Design-Tokens sind CSS Custom Properties, die lokal auf dem Seiten-Root definiert werden (`.shell` in `notebook.module.scss`, `.nlm` in `notebook-home.scss`): `var(--bg)`, `var(--surface)`, `var(--text)`, `var(--text-muted)`, `var(--accent)`, `var(--radius-*)`. Diese wiederverwenden statt neuer Hex-Werte.
+- Schrift: Google Sans Flex (SIL OFL, Lizenz in `app/fonts/OFL.txt`, Latin-Subset als eine Variable-Datei) über `next/font/local` in `app/layout.tsx` als `--font-google-sans`; Inputs/Buttons verwenden `font-family: inherit`. Die proprietäre Google Sans darf nicht zurück ins Repo.
+- Das Aussehen orientiert sich an NotebookLM, die App darf aber nicht als Google-Produkt durchgehen: keine Links auf Googles Nutzungsbedingungen oder Datenschutzseiten, keine nicht funktionierenden Nachbildungen von Google-Konto-Funktionen (Kontoverwaltung, App-Launcher, Einstellungen). Ein Button funktioniert entweder oder existiert nicht; die deaktivierte Google-Anmeldung ist der einzige Platzhalter und als solcher gekennzeichnet.
+- Icons nur aus `material-symbols` (`import "material-symbols"` in der Seite/Komponente) als `<span className="material-symbols-outlined">icon_name</span>`. Die Defaults für Gewicht/Fill/Größe stehen in `globals.scss`. Um Icons in einem Modul zu stylen, `:global(.material-symbols-outlined)` (oder `span`) verschachteln: CSS-Module hashen jeden Klassennamen (`generateScopedName` in `vite.config.ts`), daher trifft ein schlichtes verschachteltes `.material-symbols-outlined` nie. Ältere Regeln in `notebook.module.scss` haben diesen Fehler noch.
+- Breakpoints sind Desktop-first mit `max-width`. Gemeinsame Breakpoint-Variablen gibt es noch nicht; bei den Werten bleiben, die in der bearbeiteten Datei schon verwendet werden.
+- Datumswerte in der UI: `Intl.DateTimeFormat("de-DE")`.

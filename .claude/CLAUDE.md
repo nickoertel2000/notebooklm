@@ -1,61 +1,65 @@
 # CLAUDE.md
 
-Guidance for Claude Code when working in this repository.
+Leitfaden für Claude Code in diesem Repository.
 
-NotebookLM clone: users create **Notebooks**, add **Quellen** (PDF, URL, text), chat with them via RAG with inline citations and generate **Studio** content (Berichte, Audio-Übersicht, Video-Übersicht). Next.js App Router API on **vinext** (Vite 8, no `next` package) + React 19, Drizzle on Neon Postgres/pgvector via Hyperdrive, Better Auth. German-only UI.
+NotebookLM-Klon: Nutzer erstellen **Notebooks**, fügen **Quellen** hinzu (PDF, URL, Text), chatten per RAG mit Inline-Citations darüber und generieren **Studio**-Inhalte (Berichte, Audio-Übersicht, Video-Übersicht). Next.js-App-Router-API auf **vinext** (Vite 8, kein `next`-Paket) + React 19, Drizzle auf Neon Postgres/pgvector über Hyperdrive, Better Auth. Ausschließlich deutsche UI.
 
-- AI: Google Gemini on the free tier for everything text (chat, reports, scripts), embeddings (Gemini Embedding 2, 1024 dim) and TTS. Web search for new sources (discover): Tavily free tier. Slide images of the Video-Übersicht: Workers AI (FLUX.2), capped to the daily free allocation. The demo must run without AI costs.
-- Hosting: Cloudflare. Worker `notebooklm` (the app) + Worker `notebooklm-jobs` (`workers/jobs`: Cloudflare Workflows for everything long-running, plus the ffmpeg container `containers/video-renderer`). Storage R2, DB via Hyperdrive. Setup, env and deployment: `.claude/rules/env-und-cloudflare.md`.
+- KI: Google Gemini im Gratis-Tarif für alles Textuelle (Chat, Berichte, Skripte), Embeddings (Gemini Embedding 2, 1024 dim) und TTS. Websuche für neue Quellen (discover): Tavily-Gratis-Tarif. Folienbilder der Video-Übersicht: Workers AI (FLUX.2), begrenzt auf das tägliche Gratis-Kontingent. Die Demo muss ohne KI-Kosten laufen.
+- Hosting: Cloudflare. Worker `notebooklm` (die App) + Worker `notebooklm-jobs` (`workers/jobs`: Cloudflare Workflows für alles Langlaufende, dazu der ffmpeg-Container `containers/video-renderer`). Storage R2, DB über Hyperdrive. Setup, Env und Deployment: `.claude/rules/env-und-cloudflare.md`.
 
-Area-specific details live in `.claude/rules/` and load automatically when matching files are touched (API routes, async jobs/Workflows, DB, storage, auth, UI/styling, env/Cloudflare).
+Bereichsspezifische Details liegen in `.claude/rules/` und werden automatisch geladen, wenn passende Dateien berührt werden (API-Routen, asynchrone Jobs/Workflows, DB, Storage, Auth, UI/Styling, Env/Cloudflare).
 
-## Domain Language
+## Fachsprache
 
-UI strings, error messages, prompts and comments are German. Domain terms used in code and UI: `Notebook`, `Quelle` (DB: `sources`), `Bericht` (`reports`), `Audio-Übersicht` (`audio_overviews`), `Video-Übersicht` (`video_overviews`), `Studio`. Keep them when explaining things.
+UI-Texte, Fehlermeldungen, Prompts und Kommentare sind deutsch. Fachbegriffe in Code und UI: `Notebook`, `Quelle` (DB: `sources`), `Bericht` (`reports`), `Audio-Übersicht` (`audio_overviews`), `Video-Übersicht` (`video_overviews`), `Studio`. Beim Erklären beibehalten.
 
-## Hard Rules — Never Violate
+Alle Dateien für Claude Code (`.claude/`, `AGENTS.md`) sind deutsch. Neue Regeln, Agents und Commands ebenfalls auf Deutsch schreiben.
 
-These rules apply unconditionally, even if I explicitly ask you to break them:
+## Harte Regeln – nie verletzen
 
-- Never see or output secret values: no reading `.env.local` or `dist/*/.dev.vars` (Read, cat, grep …), no values in commands, files, logs or chat. Processes may load them (`pnpm db:*`, `pnpm dev`, `node --env-file=.env.local script.mjs`), as long as their output contains no values: scripts print only query results, errors only as `message`/`code`, never the connection string. `.env.production` and `.env.development` (only `NEXT_PUBLIC_` values) may and should be read.
-- Never add or remove dependencies without asking first.
-- There is a single database (`DATABASE_URL`, Neon) — treat it as production data. `pnpm db:migrate` only after I confirmed the generated SQL. Every data change outside the app (insert, update, delete via SQL, `db:studio`, scripts) needs my explicit approval in the current conversation: show the exact statement and why, then wait.
-- Never `git push --force`. Commit and push only when I tell you to.
-- Never import server secrets or server-only modules (`@/db`, `@/auth`, `lib/storage.ts`, `lib/jobs/*`, `lib/gemini.ts`, `lib/embeddings.ts`, `lib/tavily.ts`, anything importing `cloudflare:workers`) into Client Components (`"use client"`).
-- Never log env variables, include them in API responses, or expose them in error messages.
-- Every notebook-bound access goes through `getNotebookForUser(notebookId, user.id)` (`lib/notebooks.ts`). Child records (sources, reports, audio, video) are additionally filtered by `notebookId`. No query on user content without this ownership chain (single exception: copying the demo template in `lib/demo.ts`, see `.claude/rules/auth.md`).
-- Never hardcode values that belong in env (keys, bucket names, URLs, model IDs).
+Diese Regeln gelten unbedingt, auch wenn ich ausdrücklich verlange, sie zu brechen:
 
-## Workflow for New Features
+- Nie Secret-Werte sehen oder ausgeben: `.env.local` oder `dist/*/.dev.vars` nicht lesen (Read, cat, grep …), keine Werte in Befehlen, Dateien, Logs oder im Chat. Prozesse dürfen sie laden (`pnpm db:*`, `pnpm dev`, `node --env-file=.env.local script.mjs`), solange ihre Ausgabe keine Werte enthält: Skripte geben nur Abfrageergebnisse aus, Fehler nur als `message`/`code`, nie den Connection-String. `.env.production` und `.env.development` (nur `NEXT_PUBLIC_`-Werte) dürfen und sollen gelesen werden.
+- Nie ohne Rückfrage Dependencies hinzufügen oder entfernen.
+- Es gibt eine einzige Datenbank (`DATABASE_URL`, Neon) – als Produktivdaten behandeln. `pnpm db:migrate` erst, nachdem ich das generierte SQL bestätigt habe. Jede Datenänderung außerhalb der App (Insert, Update, Delete per SQL, `db:studio`, Skripte) braucht meine ausdrückliche Zustimmung in der aktuellen Unterhaltung: das genaue Statement und den Grund zeigen, dann warten.
+- Nie `git push --force`. Nur dann committen und pushen, wenn ich es sage.
+- Nie Server-Secrets oder reine Server-Module (`@/db`, `@/auth`, `lib/storage.ts`, `lib/jobs/*`, `lib/gemini.ts`, `lib/embeddings.ts`, `lib/tavily.ts`, alles, was `cloudflare:workers` importiert) in Client Components (`"use client"`) importieren.
+- Nie Env-Variablen loggen, in API-Antworten aufnehmen oder in Fehlermeldungen preisgeben.
+- Jeder Notebook-gebundene Zugriff läuft über `getNotebookForUser(notebookId, user.id)` (`lib/notebooks.ts`). Kind-Datensätze (Quellen, Berichte, Audio, Video) werden zusätzlich nach `notebookId` gefiltert. Keine Abfrage auf Nutzerinhalte ohne diese Ownership-Kette (einzige Ausnahme: das Kopieren des Demo-Templates in `lib/demo.ts`, siehe `.claude/rules/auth.md`).
+- Nie Werte hartcodieren, die in die Env gehören (Keys, Bucket-Namen, URLs, Modell-IDs).
 
-1. Find existing patterns before building anything new. Example: a new Studio format follows how Audio-Übersicht works end to end (modal → route → Workflow → polling → file route → player).
-2. For DB changes: edit `db/schema.ts` first and wait for my confirmation. Only then run `pnpm db:generate`. Show me the generated migration SQL before `pnpm db:migrate` runs.
-3. Server Components (auth + data fetching) and Client Components (interactivity) stay strictly separated.
-4. Anything that can take longer than a few seconds (LLM generation, TTS, rendering, ingestion) runs as a Workflow in the jobs Worker, not inside a request — see `.claude/rules/jobs-worker.md`. The RAG chat is the only synchronous (streamed) LLM call.
-5. After any code change: run `pnpm check` (lint, typecheck, tests; after Worker config changes first `pnpm cf-typegen`), fix errors before reporting "done". Unit tests (Vitest) cover pure logic in `lib/`, E2E tests (Playwright) need Docker and are verified in CI (`.claude/rules/tests.md`); for UI changes, check the flow in the browser (`pnpm dev`).
-6. All code is formatted with Prettier (`.prettierrc`). The PostToolUse hook formats edited files automatically (and flags `ae`/`oe`/`ue` spellings in comments); files created or changed any other way (scripts, generators, `sed`) get `pnpm exec prettier --write <file>`.
-7. When a feature is finished, check whether it introduced a convention, pitfall or architectural decision that cannot be read from the code. If so, extend the matching rule in `.claude/rules/` or propose a new rule with `paths:`, and show me the diff. Plain feature descriptions do not belong there.
+## Ablauf für neue Features
+
+1. Vor dem Bauen von etwas Neuem bestehende Muster suchen. Beispiel: Ein neues Studio-Format folgt dem durchgängigen Ablauf der Audio-Übersicht (Modal → Route → Workflow → Polling → Datei-Route → Player).
+2. Bei DB-Änderungen: zuerst `db/schema.ts` bearbeiten und auf meine Bestätigung warten. Erst dann `pnpm db:generate` ausführen. Mir das generierte Migrations-SQL zeigen, bevor `pnpm db:migrate` läuft.
+3. Server Components (Auth + Datenabruf) und Client Components (Interaktivität) strikt getrennt halten.
+4. Alles, was länger als ein paar Sekunden dauern kann (LLM-Generierung, TTS, Rendering, Ingestion), läuft als Workflow im Jobs-Worker, nicht innerhalb eines Requests – siehe `.claude/rules/jobs-worker.md`. Der RAG-Chat ist der einzige synchrone (gestreamte) LLM-Aufruf.
+5. Nach jeder Code-Änderung: `pnpm check` ausführen (Lint, Format-Check, Typecheck, Tests; nach Änderungen an der Worker-Konfiguration zuerst `pnpm cf-typegen`), Fehler beheben, bevor „fertig“ gemeldet wird. Unit-Tests (Vitest) decken reine Logik in `lib/` ab, E2E-Tests (Playwright) laufen lokal mit Docker über `pnpm test:e2e` (`.claude/rules/tests.md`); bei UI-Änderungen den Ablauf im Browser prüfen (`pnpm dev`).
+6. Der gesamte Code wird mit Prettier formatiert (`.prettierrc`). Der PostToolUse-Hook formatiert bearbeitete Dateien automatisch (und markiert `ae`-/`oe`-/`ue`-Schreibweisen in Kommentaren); auf anderem Weg erstellte oder geänderte Dateien (Skripte, Generatoren, `sed`) bekommen `pnpm exec prettier --write <file>`.
+7. Vor jedem Commit `/pruefen` (Prüfungen plus Subagent `reviewer`). Änderungen gehen als Pull Request über `/pr` nach `main`, nie direkt; der Workflow `claude-review.yml` reviewt jeden PR.
+8. Wenn ein Feature fertig ist, prüfen, ob es eine Konvention, Falle oder Architekturentscheidung eingeführt hat, die sich nicht aus dem Code lesen lässt. Wenn ja, die passende Regel in `.claude/rules/` erweitern oder eine neue Regel mit `paths:` vorschlagen und mir den Diff zeigen. Reine Feature-Beschreibungen gehören nicht dorthin.
 
 ## Umlaute
 
-- **UI-Text** (JSX-Inhalte, `alt`/`aria-label`/`title`, Fehlermeldungen in API-Antworten, Prompts): immer echte Umlaute und ß — `Audio-Übersicht erstellen`, nicht `Uebersicht`.
-- **Code-Bezeichner** (Variablen, Funktionen, Dateien, Ordner, Routen, JSON-Keys, DB-Tabellen und -Spalten, Enum-/Status-Werte): nie Umlaute, stattdessen `ae`/`oe`/`ue`/`ss` oder Englisch — `audio_overviews`, `"study-guide"`.
+- **UI-Text** (JSX-Inhalte, `alt`/`aria-label`/`title`, Fehlermeldungen in API-Antworten, Prompts): immer echte Umlaute und ß – `Audio-Übersicht erstellen`, nicht `Uebersicht`.
+- **Code-Bezeichner** (Variablen, Funktionen, Dateien, Ordner, Routen, JSON-Keys, DB-Tabellen und -Spalten, Enum-/Status-Werte): nie Umlaute, stattdessen `ae`/`oe`/`ue`/`ss` oder Englisch – `audio_overviews`, `"study-guide"`.
 - Kommentare sind Text für Menschen: echte Umlaute (`gehört`, `für`, `prüft`), auch wenn im selben Kommentar Bezeichner stehen. Nie vorsorglich ersetzen, die Dateien sind UTF-8.
 
-## Commands
+## Befehle
 
-- `pnpm dev` — local dev server on :3000 (vinext + jobs Worker in one process; the video container needs Docker)
-- `pnpm build` — production build of both Workers (`dist/`), `pnpm preview` runs it locally in workerd
-- `pnpm lint` — ESLint only; type-check separately with `pnpm typecheck` (app, jobs Worker, container)
-- `pnpm test` — Vitest unit tests (`lib/**/*.test.ts`)
-- `pnpm test:e2e` — Playwright E2E tests; starts and stops its own test DB via Docker (never production)
-- `pnpm check` — lint + typecheck + tests in one go (the deploy gate and CI run exactly this)
-- `pnpm cf-typegen` — regenerate `worker-configuration.d.ts` after changing a `wrangler.jsonc`
-- `pnpm run deploy:jobs` / `pnpm run deploy:app` — manual deploy (normally Workers Builds on merge into `I-######-I-PRODUKTION-I-######-I`)
-- `pnpm cf:secrets` — push production secrets from 1Password to both Workers; `pnpm cf:first-deploy` — very first deploy of both Workers incl. secrets, without building the container image (no Docker needed)
-- `pnpm format` / `pnpm format:check` — Prettier
-- `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:studio` — Drizzle (reads `.env.local`)
-- `pnpm env:pull` — regenerate `.env.local` from 1Password (`op inject`)
+- `pnpm dev` – lokaler Dev-Server auf :3000 (vinext + Jobs-Worker in einem Prozess; der Video-Container braucht Docker)
+- `pnpm build` – Production-Build beider Worker (`dist/`), `pnpm preview` führt ihn lokal in workerd aus
+- `pnpm lint` – nur ESLint; Typecheck separat mit `pnpm typecheck` (App, Jobs-Worker, Container)
+- `pnpm test` – Vitest-Unit-Tests (`lib/**/*.test.ts`)
+- `pnpm test:e2e` – Playwright-E2E-Tests; startet und stoppt seine eigene Test-DB über Docker (nie Production)
+- `pnpm check` – Lint + Format-Check + Regel-Check + Typecheck + Tests in einem Durchgang (Deploy-Gate und CI führen genau das aus)
+- `pnpm cf-typegen` – `worker-configuration.d.ts` nach Änderung einer `wrangler.jsonc` neu generieren
+- `pnpm run deploy:jobs` / `pnpm run deploy:app` – manuelles Deploy (normalerweise Workers Builds beim Merge in `I-######-I-PRODUKTION-I-######-I`)
+- `pnpm cf:secrets` – Production-Secrets aus 1Password an beide Worker pushen; `pnpm cf:first-deploy` – allererstes Deploy beider Worker inkl. Secrets, ohne das Container-Image zu bauen (kein Docker nötig)
+- `pnpm check:rules` – prüft, ob alle Dateiverweise in `.claude/` und `AGENTS.md` existieren (`scripts/check-rules.mjs`)
+- `pnpm format` / `pnpm format:check` – Prettier
+- `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:studio` – Drizzle (liest `.env.local`)
+- `pnpm env:pull` – `.env.local` aus 1Password neu erzeugen (`op inject`)
 
 ## Kommentare
 
