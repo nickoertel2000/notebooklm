@@ -6,14 +6,18 @@ import vinext from "vinext"
 import { defineConfig } from "vite"
 import { patchCssModules } from "vite-css-modules"
 
+// E2E-Tests laufen in der CI ohne Cloudflare-Login: keine Remote-Bindungen (Workers AI), kein Container-Build.
+const e2e = process.env.E2E === "1"
+
 // Ohne Docker startet der Dev-Server trotzdem, nur das Rendern der Video-Übersicht schlägt fehl.
-const dockerAvailable = spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0
+const dockerAvailable = !e2e && spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0
 
 export default defineConfig({
   plugins: [
     patchCssModules({ exportMode: "default" }),
     vinext(),
     cloudflare({
+      remoteBindings: !e2e,
       viteEnvironment: {
         name: "rsc",
         childEnvironments: ["ssr"]

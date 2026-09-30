@@ -14,3 +14,6 @@ cloudflare-env.d.ts
 db/migrations/meta/
 
 .wrangler
+
+playwright-report
+test-results

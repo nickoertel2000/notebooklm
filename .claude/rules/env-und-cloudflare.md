@@ -43,7 +43,7 @@ paths:
 
 ## Secrets
 
-Local secrets live in `.env.local` (off-limits to you, generated from 1Password via `pnpm env:pull`). Wrangler/Vite read it for the local Workers too; `vite build` copies the values into the gitignored `dist/*/.dev.vars` for `pnpm preview` – never commit `dist/`. Production secrets are Worker secrets (`secrets.required` in each config lists them).
+Local secrets live in `.env.local` (never read its contents; processes may load it, generated from 1Password via `pnpm env:pull`). Wrangler/Vite read it for the local Workers too; `vite build` copies the values into the gitignored `dist/*/.dev.vars` for `pnpm preview` – never commit `dist/`. Production secrets are Worker secrets (`secrets.required` in each config lists them).
 
 - Secrets never in client code, never hardcoded (not even as a fallback), never logged or returned. Never name a secret `NEXT_PUBLIC_…`.
 - `DATABASE_URL` / `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` must be a direct Postgres connection, never a transaction pooler: Hyperdrive pools itself and uses prepared statements. For Neon: "Connection pooling" off, host without `-pooler`, `sslmode=require`; the Hyperdrive config is "public" (no Workers VPC / Access). Production DB credentials live only in the Hyperdrive config, not as Worker secrets.

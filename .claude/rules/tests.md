@@ -3,6 +3,8 @@ paths:
   - "**/*.test.ts"
   - "vitest.config.ts"
   - "test/**"
+  - "e2e/**"
+  - "playwright.config.ts"
   - ".github/workflows/**"
 ---
 
@@ -12,5 +14,13 @@ paths:
 - `vitest.config.ts` is separate from `vite.config.ts` on purpose: tests run in Node without vinext and the Cloudflare plugin. `cloudflare:workers` is aliased to `test/cloudflare-workers.ts` (an empty `env` object); a test that needs env values sets them with `Object.assign(env, { … })`, because the generated `Cloudflare.Env` types are string literals.
 - Code that should be tested but lives in a route file moves to `lib/` (example: `lib/citations.ts` out of the chat route). Route files only export handlers.
 - Never write a literal NUL into a test either, use `String.fromCharCode(0)`.
-- No E2E suite: it would need its own database (Neon branch) and would burn the daily Gemini quotas. Don't add tests that create data in the production DB or call real APIs.
-- Deploy gate: the Workers Builds build commands of both Workers run `pnpm check` (lint, typecheck, tests) before `pnpm build`, so a red check stops the deploy of both. GitHub Actions (`.github/workflows/ci.yml`) runs the same checks on every push to `main`, for early feedback and the README badge; it does not block anything.
+- Unit tests never create data in the production DB or call real APIs.
+
+# E2E (Playwright)
+
+- `e2e/*.spec.ts`, run with `pnpm test:e2e`, only in the GitHub Actions job `e2e`: a fresh `pgvector/pgvector` service container per run. There is no dev database and no Docker locally, so they don't run locally; `playwright.config.ts` refuses to start without `E2E_DATABASE_URL` or next to a `.env.local` (it points to production).
+- `e2e/global-setup.ts` runs the Drizzle migrations and seeds the demo template (`DEMO_TEMPLATE_EMAIL` read from `wrangler.jsonc`) with a ready source, a chunk without embedding and a chat answer with citation `[1]`. Texts the specs assert on live in `e2e/seed-data.ts`.
+- Playwright starts `pnpm dev` with `E2E=1`: `vite.config.ts` then turns off remote bindings (Workers AI) and containers, so no Cloudflare login is needed. Gemini/Tavily get placeholder keys: tests never wait for AI results (ingestion ends `failed` in the background, auto-title is swallowed). Tests assert only what happens without AI.
+- One worker: `POST /api/demo` is rate-limited to 2 accounts per minute per IP, so at most one test uses the demo access. Other tests register their own account via `register()` (`e2e/helpers.ts`).
+- Locators use visible German texts and `aria-label`s; CSS-module classes only by original name (`toHaveClass(/sourceItemActive/)`, scoped names keep it).
+- Deploy gate: the Workers Builds build commands of both Workers run `pnpm check` (lint, typecheck, tests) before `pnpm build`, so a red check stops the deploy of both. GitHub Actions (`.github/workflows/ci.yml`) runs the same checks plus the E2E job on every push to `main`, for early feedback and the README badge; it does not block anything.

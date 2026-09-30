@@ -17,7 +17,7 @@ UI strings, error messages, prompts and comments are German. Domain terms used i
 
 These rules apply unconditionally, even if I explicitly ask you to break them:
 
-- Never read or output `.env.local` — it holds all secrets. `.env.production` and `.env.development` (only `NEXT_PUBLIC_` values) may and should be read.
+- Never see or output secret values: no reading `.env.local` or `dist/*/.dev.vars` (Read, cat, grep …), no values in commands, files, logs or chat. Processes may load them (`pnpm db:*`, `pnpm dev`, `node --env-file=.env.local script.mjs`), as long as their output contains no values: scripts print only query results, errors only as `message`/`code`, never the connection string. `.env.production` and `.env.development` (only `NEXT_PUBLIC_` values) may and should be read.
 - Never add or remove dependencies without asking first.
 - There is a single database (`DATABASE_URL`, Neon) — treat it as production data. `pnpm db:migrate` only after I confirmed the generated SQL. Every data change outside the app (insert, update, delete via SQL, `db:studio`, scripts) needs my explicit approval in the current conversation: show the exact statement and why, then wait.
 - Never `git push --force`. Commit and push only when I tell you to.
@@ -32,7 +32,7 @@ These rules apply unconditionally, even if I explicitly ask you to break them:
 2. For DB changes: edit `db/schema.ts` first and wait for my confirmation. Only then run `pnpm db:generate`. Show me the generated migration SQL before `pnpm db:migrate` runs.
 3. Server Components (auth + data fetching) and Client Components (interactivity) stay strictly separated.
 4. Anything that can take longer than a few seconds (LLM generation, TTS, rendering, ingestion) runs as a Workflow in the jobs Worker, not inside a request — see `.claude/rules/jobs-worker.md`. The RAG chat is the only synchronous (streamed) LLM call.
-5. After any code change: run `pnpm check` (lint, typecheck, tests; after Worker config changes first `pnpm cf-typegen`), fix errors before reporting "done". Unit tests (Vitest) cover pure logic in `lib/`, there is no E2E suite (`.claude/rules/tests.md`); for UI changes, check the flow in the browser (`pnpm dev`).
+5. After any code change: run `pnpm check` (lint, typecheck, tests; after Worker config changes first `pnpm cf-typegen`), fix errors before reporting "done". Unit tests (Vitest) cover pure logic in `lib/`, E2E tests (Playwright) run only in CI (`.claude/rules/tests.md`); for UI changes, check the flow in the browser (`pnpm dev`).
 6. All code is formatted with Prettier (`.prettierrc`). The PostToolUse hook formats edited files automatically (and flags `ae`/`oe`/`ue` spellings in comments); files created or changed any other way (scripts, generators, `sed`) get `pnpm exec prettier --write <file>`.
 7. When a feature is finished, check whether it introduced a convention, pitfall or architectural decision that cannot be read from the code. If so, extend the matching rule in `.claude/rules/` or propose a new rule with `paths:`, and show me the diff. Plain feature descriptions do not belong there.
 
