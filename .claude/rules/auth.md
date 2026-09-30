@@ -1,6 +1,8 @@
 ---
 paths:
   - "auth.ts"
+  - "lib/turnstile*.ts"
+  - "components/Turnstile/**"
   - "auth-client.ts"
   - "lib/auth/**"
   - "proxy.ts"
@@ -14,23 +16,30 @@ paths:
   - "workers/jobs/src/index.ts"
 ---
 
-# Authentication (Better Auth)
+# Authentifizierung (Better Auth)
 
-- Server config `auth.ts`: `getAuth()` builds the Better Auth instance once per request via `cacheForRequest` (the DB client from `getDb()` is request-bound). Drizzle adapter (`provider: "pg"`), email + password only (no email verification). `secret` comes from `env` (`cloudflare:workers`), `baseURL` is `NEXT_PUBLIC_APP_URL`. Sessions are DB sessions, not JWT.
-- Handler: `app/api/auth/[...all]/route.ts` passes GET/POST to `getAuth().handler(request)`.
-- Server-side session: always `getSessionUser()` (`lib/auth/session.ts`); API routes use `authorizeNotebook()`.
-- Client: `authClient` from `auth-client.ts`, created **without** `baseURL` on purpose (uses the current origin; otherwise "Failed to fetch" on other ports/hosts). Sign-in/out and sign-up only through it.
-- `proxy.ts` (Next 16 name for middleware, supported by vinext) only checks the cookie via `getSessionCookie` (no DB call) and redirects to `/login`. It is not a security boundary — pages redirect with `redirect("/login")`, API routes return 401 themselves. When adding public paths (assets, new public pages), extend the `matcher`.
-- Signup's "Nutzername" field is stored as Better Auth `name`; login is by email. There is no username plugin.
-- Login page: `page.tsx` is a Server Component that redirects a valid session to `/` (never in `proxy.ts`: it only sees the cookie, a stale session would loop between `/` and `/login`); the form is `LoginForm.tsx`. After success it navigates hard with `window.location.replace("/")` so the Server Components see the new cookie and `/login` does not stay in the history.
-- The Google button on the login page is a teaser without function (recruiters shouldn't have to connect a personal account). There is no OAuth client; re-enabling Google means `socialProviders` in `auth.ts`, two secrets and redirect URIs per domain (`…/api/auth/callback/google`).
+- Server-Konfiguration `auth.ts`: `getAuth()` baut die Better-Auth-Instanz einmal pro Request über `cacheForRequest` (der DB-Client aus `getDb()` ist request-gebunden). Drizzle-Adapter (`provider: "pg"`), nur E-Mail + Passwort (keine E-Mail-Verifizierung). `secret` kommt aus `env` (`cloudflare:workers`), `baseURL` ist `NEXT_PUBLIC_APP_URL`. Sessions sind DB-Sessions, kein JWT.
+- Handler: `app/api/auth/[...all]/route.ts` reicht GET/POST an `getAuth().handler(request)` weiter.
+- Server-seitige Session: immer `getSessionUser()` (`lib/auth/session.ts`); API-Routen nutzen `authorizeNotebook()`.
+- Client: `authClient` aus `auth-client.ts`, bewusst **ohne** `baseURL` erstellt (nutzt den aktuellen Origin; sonst „Failed to fetch“ auf anderen Ports/Hosts). Anmelden/Abmelden und Registrieren nur darüber.
+- `proxy.ts` (Next-16-Name für Middleware, von vinext unterstützt) prüft nur das Cookie über `getSessionCookie` (kein DB-Aufruf) und leitet auf `/login` um. Es ist keine Sicherheitsgrenze – Seiten leiten per `redirect("/login")` um, API-Routen liefern selbst 401. Beim Hinzufügen öffentlicher Pfade (Assets, neue öffentliche Seiten) den `matcher` erweitern.
+- Das Feld „Nutzername“ bei der Registrierung wird als Better-Auth-`name` gespeichert; der Login erfolgt per E-Mail. Es gibt kein Username-Plugin.
+- Login-Seite: `page.tsx` ist eine Server Component, die eine gültige Session auf `/` umleitet (nie in `proxy.ts`: dort ist nur das Cookie sichtbar, eine veraltete Session würde zwischen `/` und `/login` pendeln); das Formular ist `LoginForm.tsx`. Nach Erfolg wird hart mit `window.location.replace("/")` navigiert, damit die Server Components das neue Cookie sehen und `/login` nicht in der History bleibt.
+- Der Google-Button auf der Login-Seite ist ein Teaser ohne Funktion (Recruiter sollen kein privates Konto verbinden müssen). Es gibt keinen OAuth-Client; Google wieder zu aktivieren bedeutet `socialProviders` in `auth.ts`, zwei Secrets und Redirect-URIs pro Domain (`…/api/auth/callback/google`).
 
-## Demo accounts
+## Bot-Schutz (Turnstile)
 
-- `POST /api/demo` (public, excluded in the `proxy.ts` matcher) creates `demo-<random>@DEMO_EMAIL_DOMAIN` with a random password via `getAuth().api.signUpEmail`, then `cloneTemplateNotebooks` (`lib/demo.ts`) copies all notebooks of the template account (`DEMO_TEMPLATE_EMAIL`, a normal account curated in the app). The client types the credentials into the normal form, then the visitor signs in via the normal login; `lib/useDemoAccount.ts` remembers them in `localStorage`.
-- Demo accounts are recognized only by the email domain, there is no DB flag. The template email must not use that domain, otherwise the cleanup deletes it.
-- The clone is the only deliberate exception to the ownership chain: it reads the template's rows by the template's `userId`. Only `ready` rows are copied, IDs are new, citation IDs in `messages` are remapped, `createdAt` is kept (the slide image budget counts videos created today). Chunks are copied with `INSERT … SELECT` so embeddings never pass through the Worker.
-- Copied rows keep the template's R2 keys. Single-file deletes must use `deleteNotebookObject(notebookId, key)` (only deletes keys under the own notebook prefix), never a plain bucket delete. Deleting the template's notebooks breaks existing copies.
-- Protection: Rate Limiting binding `DEMO_RATE_LIMITER` per IP and `DEMO_MAX_ACCOUNTS`.
-- The template is curated only in production (local `pnpm dev` uses the same DB but an emulated R2, files would be missing). Changing its email or password: `node --env-file=.env.local scripts/demo-template-login.mjs --from <email> [--to <new email>]` (dry run, `--apply` executes; password from 1Password `DEMO_TEMPLATE_PASSWORD`). It writes to the DB, so only with the user's approval; a new email also goes into `DEMO_TEMPLATE_EMAIL`.
-- Cleanup: cron in the jobs Worker (`scheduled` → `deleteInactiveDemoAccounts`) deletes demo accounts whose latest session activity (or creation) is older than `DEMO_INACTIVE_DAYS` (`lib/demoConfig.ts`), R2 prefixes first, the rest by cascade.
+- Registrierung (`hooks.before` in `auth.ts`) und `POST /api/demo` verlangen ein Turnstile-Token im Header `TURNSTILE_HEADER` (`lib/turnstileConfig.ts`), geprüft mit `verifyTurnstile` (`lib/turnstile.ts`): `success`, passende Action (`signup`, `demo`) und der Hostname aus `NEXT_PUBLIC_APP_URL`. Ohne Token wird vor dem Aufruf von Cloudflare abgelehnt (403), in `/api/demo` sogar vor dem Rate-Limit, damit fehlende Tokens keine Demo-Plätze verbrauchen.
+- Client: `components/Turnstile/Turnstile.tsx`, explizit gerendert und `interaction-only`, also meist unsichtbar. Tokens gelten nur einmal: Nach jedem Request `reset()` aufrufen. Der jeweilige Button bleibt deaktiviert, bis ein Token da ist; lädt das Widget nicht (Werbeblocker, Netz), meldet `onError` das im Formular.
+- Site-Key öffentlich in `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, Secret `TURNSTILE_SECRET_KEY`. Das Widget kennt die Domains Produktion, `localhost` und `127.0.0.1`; eine neue Domain muss im Cloudflare-Dashboard ergänzt werden.
+- Die E2E-Tests nutzen Cloudflares Test-Keys (`playwright.config.ts`). Deren Ergebnis enthält weder Action noch echten Hostnamen und wird nur akzeptiert, wenn die App unter `localhost` läuft (`isValidSiteverify`).
+
+## Demo-Accounts
+
+- `POST /api/demo` (öffentlich, im `proxy.ts`-Matcher ausgenommen) erstellt `demo-<random>@DEMO_EMAIL_DOMAIN` mit zufälligem Passwort über `getAuth().api.signUpEmail`, danach kopiert `cloneTemplateNotebooks` (`lib/demo.ts`) alle Notebooks des Template-Accounts (`DEMO_TEMPLATE_EMAIL`, ein normaler, in der App kuratierter Account). Der Client trägt die Zugangsdaten ins normale Formular ein, danach meldet sich der Besucher über den normalen Login an; `lib/useDemoAccount.ts` merkt sie sich in `localStorage`.
+- Demo-Accounts werden nur an der E-Mail-Domain erkannt, es gibt kein DB-Flag. Die Template-E-Mail darf diese Domain nicht verwenden, sonst löscht der Cleanup sie.
+- Der Klon ist die einzige bewusste Ausnahme von der Ownership-Kette: Er liest die Zeilen des Templates über dessen `userId`. Nur `ready`-Zeilen werden kopiert, IDs sind neu, Citation-IDs in `messages` werden neu zugeordnet, `createdAt` bleibt erhalten (das Slide-Bild-Budget zählt heute erstellte Videos). Chunks werden mit `INSERT … SELECT` kopiert, damit Embeddings nie durch den Worker laufen.
+- Kopierte Zeilen behalten die R2-Keys des Templates. Einzeldatei-Löschungen müssen `deleteNotebookObject(notebookId, key)` verwenden (löscht nur Keys unter dem eigenen Notebook-Präfix), nie ein einfaches Bucket-Delete. Das Löschen der Template-Notebooks macht bestehende Kopien kaputt.
+- Schutz: Rate-Limiting-Binding `DEMO_RATE_LIMITER` pro IP und `DEMO_MAX_ACCOUNTS`. Die normale Registrierung lehnt die Demo-Domain ab (`hooks.before` in `auth.ts`), sonst könnte jeder `DEMO_MAX_ACCOUNTS` füllen; `/api/demo` ruft `signUpEmail` server-seitig ohne Request auf und ist nicht betroffen.
+- Das Template wird nur in Production kuratiert (lokales `pnpm dev` nutzt dieselbe DB, aber einen emulierten R2, Dateien würden fehlen). E-Mail oder Passwort ändern: `node --env-file=.env.local scripts/demo-template-login.mjs --from <email> [--to <new email>]` (Dry-Run, `--apply` führt aus; Passwort aus 1Password `DEMO_TEMPLATE_PASSWORD`). Das Skript schreibt in die DB, daher nur mit Zustimmung des Nutzers; eine neue E-Mail kommt auch in `DEMO_TEMPLATE_EMAIL`.
+- Cleanup: Cron im Jobs-Worker (`scheduled` → `deleteInactiveDemoAccounts`) löscht Demo-Accounts, deren letzte Session-Aktivität (oder Erstellung) älter als `DEMO_INACTIVE_DAYS` (`lib/demoConfig.ts`) ist, zuerst die R2-Präfixe, den Rest per Cascade.

@@ -6,40 +6,50 @@ paths:
 
 # API Route Handlers & Server Actions
 
-Everything notebook-content related (sources, chat, Studio, discover, auto-title) goes through Route Handlers under `app/api/notebooks/[notebookId]/`. Server Actions (`app/(app)/actions.ts`) exist only for Notebook CRUD (`createNotebook`, `renameNotebook`, `deleteNotebook`) — don't add new ones for anything that streams, polls or starts a job.
+Alles, was Notebook-Inhalte betrifft (Quellen, Chat, Studio, discover, auto-title), läuft über Route Handler unter `app/api/notebooks/[notebookId]/`. Server Actions (`app/(app)/actions.ts`) gibt es nur für Notebook-CRUD (`createNotebook`, `renameNotebook`, `deleteNotebook`) – keine neuen für etwas, das streamt, pollt oder einen Job startet.
 
-Reference: `app/api/notebooks/[notebookId]/audio/route.ts` (list + create job), `chat/route.ts` (streaming).
+Referenz: `app/api/notebooks/[notebookId]/audio/route.ts` (Liste + Job erstellen), `chat/route.ts` (Streaming).
 
 ## Auth & Ownership
 
-- `proxy.ts` only checks that a session cookie exists and redirects to `/login` — it's not an auth check. Every handler checks itself:
+- `proxy.ts` prüft nur, dass ein Session-Cookie existiert, und leitet auf `/login` um – das ist keine Auth-Prüfung. Jeder Handler prüft selbst:
   - `getSessionUser()` (`lib/auth/session.ts`) → `401 { error: "Nicht angemeldet" }`
-  - `getNotebookForUser(notebookId, user.id)` (`lib/notebooks.ts`, also validates the UUID) → `404 { error: "Notebook nicht gefunden" }`
-- Use `authorizeNotebook(notebookId)` (`lib/auth/authorizeNotebook.ts`): returns `{ error }` (ready 401/404 response) or `{ user, notebook }`. Then `const db = getDb()`.
-- Child resources: `where(and(eq(x.id, id), eq(x.notebookId, notebookId)))`. Validate child IDs with `isUuid()` first, otherwise an invalid ID ends up as a Postgres error / 500.
-- `params` is a Promise: `type RouteContext = { params: Promise<{ notebookId: string }> }` → `const { notebookId } = await params`.
+  - `getNotebookForUser(notebookId, user.id)` (`lib/notebooks.ts`, validiert auch die UUID) → `404 { error: "Notebook nicht gefunden" }`
+- `authorizeNotebook(notebookId)` (`lib/auth/authorizeNotebook.ts`) verwenden: liefert `{ error }` (fertige 401/404-Response) oder `{ user, notebook }`. Danach `const db = getDb()`.
+- Kind-Ressourcen: `where(and(eq(x.id, id), eq(x.notebookId, notebookId)))`. Kind-IDs vorher mit `isUuid()` (`lib/uuid.ts`, ohne Server-Abhängigkeiten) validieren, sonst landet eine ungültige ID als Postgres-Fehler / 500.
+- `params` ist ein Promise: `type RouteContext = { params: Promise<{ notebookId: string }> }` → `const { notebookId } = await params`.
 
 ## Responses
 
-- Errors: `NextResponse.json({ error: "<deutscher Text>" }, { status })`. 400 invalid input, 401, 404, 422 extraction failed, 500. For 500 never pass through raw error objects that could contain env values or connection strings.
-- Job created: `202` with the new row (see `jobs-worker.md`).
-- Dates are serialized server-side with `.toISOString()`; client types use `string`.
-- No Zod in the project: read bodies with `readJsonBody(req)` and validate each field manually (`optionalString`, `parseSourceIds` from `lib/api/body.ts`, `typeof`), map enum values through the lookup helpers (`getAudioFormat`, `getReportType`, `getVideoFormat`) — unknown values fall back, they are never written to the DB unchecked.
-- Optional `sourceIds`: empty/missing means "all ready sources" (`sourceIds?.length ? inArray(...) : undefined` inside `and(...)`).
+- Fehler: `NextResponse.json({ error: "<deutscher Text>" }, { status })`. 400 ungültige Eingabe, 401, 404, 422 Extraktion fehlgeschlagen, 500. Bei 500 nie rohe Error-Objekte durchreichen, die Env-Werte oder Connection-Strings enthalten könnten.
+- Job erstellt: `202` mit der neuen Zeile (siehe `jobs-worker.md`).
+- Datumswerte werden server-seitig mit `.toISOString()` serialisiert; Client-Typen verwenden `string`.
+- Kein Zod im Projekt: Bodies mit `readJsonBody(req)` lesen und jedes Feld manuell validieren (`optionalString`, `parseSourceIds` aus `lib/api/body.ts`, `typeof`), Enum-Werte über die Lookup-Helfer (`getAudioFormat`, `getReportType`, `getVideoFormat`) abbilden – unbekannte Werte fallen auf den Default zurück, sie werden nie ungeprüft in die DB geschrieben.
+- Jedes Freitextfeld hat eine maximale Länge: `lengthError([[body.x, MAX_LENGTH.y], …])` → 400. Neue Felder bekommen einen Eintrag in `MAX_LENGTH`.
+- Optionales `sourceIds`: fehlend (`null`) bedeutet „alle bereiten Quellen“, ein leeres Array bedeutet „keine ausgewählt“ → 400. `selectedIds ? inArray(...) : undefined` innerhalb von `and(...)` verwenden (drizzle macht aus `inArray(col, [])` ein `false`). `parseSourceIds` verwirft alles, was keine UUID ist.
+
+## Quotas
+
+Die Gratis-Tarife von Gemini und Tavily werden von allen Besuchern geteilt. Jede Route, die einen KI-Dienst aufruft, ist pro Nutzer begrenzt (`lib/quota.ts`), nach der Ownership-Prüfung und nach der Eingabevalidierung:
+
+- `consumeQuota(user.id, kind)` für alles, was etwas erstellt oder externes Kontingent kostet (`chat`, `discover`, `studio` für Berichte/Audio/Video, `source` für neue Quellen): Burst-Limit über das `USER_RATE_LIMITER`-Binding plus ein rollierendes 24-Stunden-Limit pro Nutzer (`DAILY_LIMITS`) und für die ganze Demo (`GLOBAL_DAILY_LIMITS`, knapp unter den Anbieter-Kontingenten), gezählt in `usage_events`. Zählen und Buchen laufen in einer Transaktion mit `pg_advisory_xact_lock` pro Art, sonst kämen gleichzeitige Anfragen beide unter dem Limit durch. Liefert eine deutsche Meldung → 429.
+- `checkRateLimit(user.id)` nur für günstige Hilfsaufrufe ohne eigene Zeile (`report-suggestions`, `auto-title`, das Emoji in `renameNotebook`).
+- Anmeldung und Registrierung sind pro IP im Better-Auth-`hooks.before` begrenzt (`auth.ts`, `AUTH_RATE_LIMITER`). Derselbe Hook lehnt Registrierungen mit der Demo-E-Mail-Domain ab, sonst könnte `DEMO_MAX_ACCOUNTS` ohne `/api/demo` ausgeschöpft werden. Server-seitige Aufrufe (`auth.api.*` ohne `ctx.request`) überspringen den Hook.
 
 ## Runtime
 
-- Routes run on Cloudflare Workers via vinext. `runtime`/`maxDuration` exports have no effect there and are not used. Synchronous LLM calls (`chat`, `discover`, `report-suggestions`, `auto-title`) have no wall-clock limit while the client is connected; everything else longer than a few seconds is a Workflow (`jobs-worker.md`).
+- Routen laufen über vinext auf Cloudflare Workers. `runtime`-/`maxDuration`-Exporte haben dort keine Wirkung und werden nicht verwendet. Synchrone LLM-Aufrufe (`chat`, `discover`, `report-suggestions`, `auto-title`) haben kein Wall-Clock-Limit, solange der Client verbunden ist; alles andere, was länger als ein paar Sekunden dauert, ist ein Workflow (`jobs-worker.md`).
 
-## Chat (RAG, streaming)
+## Chat (RAG, Streaming)
 
-- NDJSON stream (`application/x-ndjson; charset=utf-8`, `Cache-Control: no-store`) with events `{type:"text"}`, `{type:"done", messageId, citations}`, `{type:"error"}`; the stream is closed in `finally`. The client parser in `NotebookView.tsx` depends on exactly this format.
-- Retrieval: embed question (`embedQuery`) → `cosineDistance` top-8 on `source_chunks`, joined to `sources` with `status = "ready"`.
-- The user message is persisted only together with the finished answer (two separate inserts, so `created_at` keeps the order). A failed attempt must leave nothing in the history, otherwise every retry adds another unanswered question.
-- Model fallback only when opening the stream (`withFallback(chatModels(), openStream)`), never mid-stream: the client would get duplicated text. The `error` event carries `geminiErrorMessage(err)`, never the raw `ApiError`.
-- Gemini has no native citations for own documents: chunks go into the last user turn numbered `[n] Titel\nText` (n = array index + 1), the system prompt demands `[n]` after every statement. `extractCitations` reads the markers from the finished text and maps them back to `retrieved[n - 1]` — don't reorder the chunk array between building the prompt and mapping citations.
-- `MessageCitation.marker` is that `n`. The markers stay in the stored text; `components/CitedMarkdown` renders them as inline chips numbered by first appearance and links them via `marker`. History roles map `assistant` → `model`.
+- NDJSON-Stream (`application/x-ndjson; charset=utf-8`, `Cache-Control: no-store`) mit den Events `{type:"text"}`, `{type:"done", messageId, citations}`, `{type:"error"}`; der Stream wird in `finally` geschlossen. Der Client-Parser in `NotebookView.tsx` hängt genau von diesem Format ab.
+- Retrieval: Frage einbetten (`embedQuery`) → `cosineDistance` Top-8 auf `source_chunks`, gejoint mit `sources` mit `status = "ready"`. Exakte Suche, kein Vektorindex (siehe `datenbank.md`). Retrieval und Verlauf laufen, bevor der Stream geöffnet wird; ihre Fehler liefern JSON (503 mit `geminiErrorMessage`), und der Client prüft `res.ok`, bevor er NDJSON liest.
+- Nur die letzten `HISTORY_MESSAGES` Nachrichten gehen in den Prompt. Der Client kann abbrechen (Stop-Button); `cancel()` des Streams bricht die Gemini-Anfrage ab, eine abgebrochene Antwort wird nicht gespeichert.
+- Die Nutzernachricht wird nur zusammen mit der fertigen Antwort gespeichert (zwei getrennte Inserts, damit `created_at` die Reihenfolge behält). Ein fehlgeschlagener Versuch darf nichts im Verlauf hinterlassen, sonst fügt jeder Retry eine weitere unbeantwortete Frage hinzu.
+- Modell-Fallback nur beim Öffnen des Streams (`withFallback(chatModels(), openStream)`), nie mitten im Stream: Der Client bekäme doppelten Text. Das `error`-Event trägt `geminiErrorMessage(err)`, nie den rohen `ApiError`.
+- Gemini hat keine nativen Citations für eigene Dokumente: Chunks kommen nummeriert als `[n] Titel\nText` (n = Array-Index + 1) in den letzten User-Turn, der System-Prompt verlangt `[n]` hinter jeder Aussage. `extractCitations` liest die Marker aus dem fertigen Text und ordnet sie zurück auf `retrieved[n - 1]` – das Chunk-Array zwischen Prompt-Aufbau und Citation-Zuordnung nicht umsortieren.
+- `MessageCitation.marker` ist dieses `n`. Die Marker bleiben im gespeicherten Text; `components/CitedMarkdown` rendert sie als Inline-Chips, nummeriert nach erstem Auftreten, und verknüpft sie über `marker`. History-Rollen: `assistant` → `model`.
 
-## Web tools
+## Web-Tools
 
-`discover` searches with Tavily (`lib/tavily.ts`: `basic` = 1 credit for quick, `advanced` = 2 credits for deep; free tier 1,000 credits/month, no card). Gemini's Google Search grounding is not usable: its free-tier quota is 0 (429 on the first call). A second `generateText` call picks up to 8 hits and writes German descriptions; only URLs present in the Tavily hits are accepted, without usable JSON the Tavily order and excerpts are returned. Tavily 432/433 (credits used up) → 503 with a German message, never the raw error. The prompt must keep demanding "nur ein JSON-Array". `report-suggestions` is a plain `generateText` call without web access.
+`discover` sucht mit Tavily (`lib/tavily.ts`: `basic` = 1 Credit für quick, `advanced` = 2 Credits für deep; Gratis-Tarif 1.000 Credits/Monat, keine Karte). Das Google-Search-Grounding von Gemini ist nicht nutzbar: Sein Free-Tier-Kontingent ist 0 (429 beim ersten Aufruf). Ein zweiter `generateText`-Aufruf wählt bis zu 8 Treffer aus und schreibt deutsche Beschreibungen; nur URLs, die in den Tavily-Treffern vorkommen, werden akzeptiert, ohne brauchbares JSON werden Tavily-Reihenfolge und -Auszüge zurückgegeben. Tavily 432/433 (Credits aufgebraucht) → 503 mit deutscher Meldung, nie der rohe Fehler. Der Prompt muss weiter „nur ein JSON-Array“ verlangen. `report-suggestions` ist ein einfacher `generateText`-Aufruf ohne Webzugriff.
