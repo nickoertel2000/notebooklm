@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { parseScript } from "./audio"
+import { parseScript, splitDialog } from "./audio"
 import { deriveReportTitle } from "./reports"
 
 describe("parseScript", () => {
@@ -20,6 +20,31 @@ describe("parseScript", () => {
 
   it("kürzt überlange Titel auf 120 Zeichen", () => {
     expect(parseScript(`TITEL: ${"x".repeat(200)}\nText`, "Ersatz").title).toHaveLength(120)
+  })
+})
+
+describe("splitDialog", () => {
+  it("zerlegt das Skript in Redebeiträge je Sprecher", () => {
+    expect(splitDialog("Sprecher 1: Hallo.\n\nSprecher 2:Hi!\nSprecher 1:   Los geht's.")).toEqual([
+      { speaker: "Sprecher 1", text: "Hallo." },
+      { speaker: "Sprecher 2", text: "Hi!" },
+      { speaker: "Sprecher 1", text: "Los geht's." }
+    ])
+  })
+
+  it("hängt Zeilen ohne Label an den vorigen Beitrag an", () => {
+    expect(splitDialog("Sprecher 2: Erster Satz.\nZweiter Satz.")).toEqual([{ speaker: "Sprecher 2", text: "Erster Satz. Zweiter Satz." }])
+  })
+
+  it("gibt Text vor dem ersten Label dem ersten Sprecher", () => {
+    expect(splitDialog("Einleitung.\nSprecher 2: Antwort.")).toEqual([
+      { speaker: "Sprecher 1", text: "Einleitung." },
+      { speaker: "Sprecher 2", text: "Antwort." }
+    ])
+  })
+
+  it("verwirft leere Beiträge", () => {
+    expect(splitDialog("Sprecher 1:\nSprecher 2: Nur ich.")).toEqual([{ speaker: "Sprecher 2", text: "Nur ich." }])
   })
 })
 

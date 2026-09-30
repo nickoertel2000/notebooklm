@@ -1,6 +1,6 @@
 import { ApiError, GoogleGenAI, ThinkingLevel } from "@google/genai"
 import { env } from "cloudflare:workers"
-import { SPEAKER_LABELS } from "./audio"
+import { SPEAKER_LABELS, splitDialog } from "./audio"
 import { pcmSeconds, pcmToWav, stripWavHeader } from "./wav"
 
 let client: GoogleGenAI | null = null
@@ -81,7 +81,7 @@ const VOICES = ["Kore", "Puck"] as const
 
 export type SynthesisResult = { wav: Buffer; durationSeconds: number }
 
-// Bei speakers === 2 muss jede Zeile mit einem der SPEAKER_LABELS beginnen.
+// Bei speakers === 2 muss jede Wortmeldung mit einem der SPEAKER_LABELS beginnen.
 export async function synthesizeSpeech(script: string, speakers: 1 | 2): Promise<SynthesisResult> {
   const speechConfig =
     speakers === 2
@@ -95,14 +95,16 @@ export async function synthesizeSpeech(script: string, speakers: 1 | 2): Promise
         }
       : { voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICES[0] } } }
 
-  // Bei Dialog eine kurze Anweisung voranstellen, damit das Modell die Labels
-  // als Sprecher erkennt statt sie vorzulesen.
-  const prompt = speakers === 2 ? `Lies das folgende Gespräch zwischen ${SPEAKER_LABELS[0]} und ${SPEAKER_LABELS[1]} vor:\n\n${script}` : script
+  // Die Lite-TTS-Modelle verlangen bei mehreren Stimmen jede Wortmeldung als eigenen Part
+  // mit speechMetadata.speaker, ein Part ohne Sprecher (auch eine Anweisung) ergibt 400.
+  const parts =
+    speakers === 2 ? splitDialog(script).map((turn) => ({ text: turn.text, speechMetadata: { speaker: turn.speaker } })) : [{ text: script }]
+  if (parts.length === 0) throw new Error("Skript ohne Sprechtext")
 
   const response = await withFallback(modelChain(env.GEMINI_TTS_MODELS), (model) =>
     getGemini().models.generateContent({
       model,
-      contents: [{ parts: [{ text: prompt }] }],
+      contents: [{ role: "user", parts }],
       config: { responseModalities: ["AUDIO"], speechConfig }
     })
   )

@@ -57,6 +57,26 @@ export function getAudioFormat(id: string): AudioFormat | undefined {
 
 export const SPEAKER_LABELS = ["Sprecher 1", "Sprecher 2"] as const
 
+export type DialogTurn = { speaker: (typeof SPEAKER_LABELS)[number]; text: string }
+
+export function splitDialog(script: string): DialogTurn[] {
+  const turns: DialogTurn[] = []
+  for (const raw of script.split("\n")) {
+    const line = raw.trim()
+    if (!line) continue
+    const speaker = SPEAKER_LABELS.find((label) => line.startsWith(`${label}:`))
+    if (speaker) {
+      turns.push({ speaker, text: line.slice(speaker.length + 1).trim() })
+    } else if (turns.length) {
+      const last = turns[turns.length - 1]
+      last.text = last.text ? `${last.text} ${line}` : line
+    } else {
+      turns.push({ speaker: SPEAKER_LABELS[0], text: line })
+    }
+  }
+  return turns.filter((turn) => turn.text)
+}
+
 // Das Skript muss in einen einzelnen TTS-Call passen.
 const LENGTH_HINT: Record<AudioLength, string> = {
   kurz: "Halte es kurz: ca. 150–250 Wörter (etwa 1–2 Minuten gesprochen).",

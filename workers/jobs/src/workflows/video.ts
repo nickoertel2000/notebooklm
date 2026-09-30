@@ -100,7 +100,7 @@ export class VideoWorkflow extends WorkflowEntrypoint<JobsEnv, VideoParams> {
         const manifest = {
           width: SLIDE_WIDTH,
           height: SLIDE_HEIGHT,
-          slides: segments.map((segment, i) => ({ ...layoutSlide(segment, i, segments.length), background: slides[i].background }))
+          slides: segments.map((segment, i) => ({ ...layoutSlide(segment, i, segments.length), background: slides[i].background, seconds: slides[i].seconds }))
         }
         const form = new FormData()
         form.append("manifest", JSON.stringify(manifest))

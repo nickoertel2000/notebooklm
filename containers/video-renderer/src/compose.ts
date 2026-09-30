@@ -11,6 +11,7 @@ export type RenderSlide = {
   footer: string
   titleLines: number
   background: "png" | "jpg" | "webp" | null
+  seconds: number
 }
 
 export type RenderManifest = {
@@ -61,7 +62,11 @@ export async function composeVideo(dir: string, manifest: RenderManifest): Promi
       ? ["-loop", "1", "-framerate", "2", "-i", `slide${i}.${slide.background}`]
       : ["-f", "lavfi", "-i", `color=c=0x0b1020:s=${manifest.width}x${manifest.height}:r=2`]
 
+    if (!Number.isFinite(slide.seconds) || slide.seconds <= 0) throw new Error(`Ungültige Dauer für Folie ${i + 1}`)
+
     const clip = `clip${i}.mp4`
+    // -t statt -shortest: libx264 puffert bei 2 fps rund 20 s Frames im Voraus, -shortest
+    // schneidet erst danach ab, jede Folie stünde dann so lange stumm im Bild.
     await run([
       "-y",
       ...videoInput,
@@ -83,7 +88,8 @@ export async function composeVideo(dir: string, manifest: RenderManifest): Promi
       "48000",
       "-ac",
       "2",
-      "-shortest",
+      "-t",
+      slide.seconds.toFixed(3),
       clip
     ])
     clips.push(clip)
