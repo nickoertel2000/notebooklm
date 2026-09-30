@@ -111,6 +111,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(initialSources.map((s) => s.id)))
   const [input, setInput] = useState("")
   const [streaming, setStreaming] = useState(false)
+  const chatAbortRef = useRef<AbortController | null>(null)
   const [activeSourceId, setActiveSourceId] = useState<string | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
@@ -501,14 +502,20 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       { id: assistantId, role: "assistant", content: "", citations: null }
     ])
     setStreaming(true)
+    const controller = new AbortController()
+    chatAbortRef.current = controller
+    const appendToAnswer = (note: string) =>
+      setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: m.content ? `${m.content}\n\n${note}` : note } : m)))
 
     try {
       const res = await fetch(`/api/notebooks/${notebookId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed, sourceIds: selectedReadyIds })
+        body: JSON.stringify({ message: trimmed, sourceIds: selectedReadyIds }),
+        signal: controller.signal
       })
-      if (!res.body) throw new Error("Kein Stream")
+      if (!res.ok) throw new Error(await readError(res, "Die Frage konnte nicht gesendet werden."))
+      if (!res.body) throw new Error("Die Antwort konnte nicht gelesen werden.")
 
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
@@ -528,13 +535,15 @@ export default function NotebookView({ notebookId, title, initialSources, initia
           } else if (evt.type === "done") {
             setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, id: evt.messageId, citations: evt.citations } : m)))
           } else if (evt.type === "error") {
-            setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: `${m.content}\n\n[Fehler: ${evt.error}]` } : m)))
+            appendToAnswer(`[Fehler: ${evt.error}]`)
           }
         }
       }
     } catch (err) {
-      setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: `${m.content}\n\n[Fehler: ${String(err)}]` } : m)))
+      if (controller.signal.aborted) appendToAnswer("[Abgebrochen]")
+      else appendToAnswer(`[Fehler: ${err instanceof Error ? err.message : String(err)}]`)
     } finally {
+      chatAbortRef.current = null
       setStreaming(false)
       maybeAutoTitle()
     }
@@ -712,9 +721,15 @@ export default function NotebookView({ notebookId, title, initialSources, initia
                   <span className="material-symbols-outlined">{dictation.listening ? "stop" : "mic"}</span>
                 </button>
               )}
-              <button className={styles.sendButton} aria-label="Senden" type="submit" disabled={streaming || !input.trim()}>
-                <span className="material-symbols-outlined">{streaming ? "progress_activity" : "arrow_forward"}</span>
-              </button>
+              {streaming ? (
+                <button className={styles.sendButton} aria-label="Antwort stoppen" type="button" onClick={() => chatAbortRef.current?.abort()}>
+                  <span className="material-symbols-outlined">stop</span>
+                </button>
+              ) : (
+                <button className={styles.sendButton} aria-label="Senden" type="submit" disabled={!input.trim() || readyCount === 0}>
+                  <span className="material-symbols-outlined">arrow_forward</span>
+                </button>
+              )}
             </form>
           </footer>
         </section>
@@ -764,7 +779,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
           }}
         />
       )}
-      {reportOpen && <ReportModal notebookId={notebookId} sourceIds={selectedReadyIds} onClose={() => setReportOpen(false)} onGenerate={handleCreateReport} />}
+      {reportOpen && <ReportModal notebookId={notebookId} onClose={() => setReportOpen(false)} onGenerate={handleCreateReport} />}
       {audioOpen && <AudioModal onClose={() => setAudioOpen(false)} onCreate={handleCreateAudio} />}
       {studioOptions && (
         <StudioOptionsModal format={studioOptions} onClose={() => setStudioOptions(null)} onCreate={(options) => handleCreateStudio(studioOptions, options)} />
