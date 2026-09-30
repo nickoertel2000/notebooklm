@@ -1,12 +1,14 @@
 "use client"
 
 import { authClient } from "@/auth-client"
+import Turnstile, { type TurnstileHandle } from "@/components/Turnstile/Turnstile"
 import { readError, readJson } from "@/lib/api/client"
 import { DEMO_INACTIVE_DAYS } from "@/lib/demoConfig"
+import { TURNSTILE_HEADER } from "@/lib/turnstileConfig"
 import { DemoAccount, saveDemoAccount, useDemoAccount } from "@/lib/useDemoAccount"
 import Image from "next/image"
 import "material-symbols"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import styles from "./login.module.scss"
 
 type Mode = "signin" | "signup"
@@ -32,6 +34,10 @@ export default function LoginForm() {
   const [demoLoading, setDemoLoading] = useState(false)
   const [filledDemo, setFilledDemo] = useState<DemoAccount | null>(null)
   const storedDemo = useDemoAccount()
+  const [demoToken, setDemoToken] = useState<string | null>(null)
+  const [signupToken, setSignupToken] = useState<string | null>(null)
+  const demoTurnstile = useRef<TurnstileHandle>(null)
+  const signupTurnstile = useRef<TurnstileHandle>(null)
 
   async function handleDemo() {
     setError(null)
@@ -39,7 +45,8 @@ export default function LoginForm() {
     try {
       let account = storedDemo
       if (!account) {
-        const res = await fetch("/api/demo", { method: "POST" })
+        const res = await fetch("/api/demo", { method: "POST", headers: { [TURNSTILE_HEADER]: demoToken ?? "" } })
+        demoTurnstile.current?.reset()
         if (!res.ok) {
           setError(await readError(res, "Das Demo-Konto konnte nicht angelegt werden."))
           return
@@ -65,9 +72,17 @@ export default function LoginForm() {
     setLoading(true)
 
     try {
-      const { error: authError } = mode === "signup" ? await authClient.signUp.email({ name, email, password }) : await authClient.signIn.email({ email, password })
+      const { error: authError } =
+        mode === "signup"
+          ? await authClient.signUp.email({ name, email, password, fetchOptions: { headers: { [TURNSTILE_HEADER]: signupToken ?? "" } } })
+          : await authClient.signIn.email({ email, password })
+      if (mode === "signup") signupTurnstile.current?.reset()
 
       if (authError) {
+        if (authError.status === 429) {
+          setError("Zu viele Versuche. Bitte warte eine Minute.")
+          return
+        }
         // Scheitert der Login mit dem gespeicherten Demo-Konto, wurde es nach Inaktivität gelöscht.
         if (mode === "signin" && storedDemo && email === storedDemo.email) {
           saveDemoAccount(null)
@@ -102,7 +117,7 @@ export default function LoginForm() {
   return (
     <main className={styles.page}>
       <div className={styles.card}>
-        <Image src="/notebook-logo.svg" alt="NotebookLM" width={1253} height={132} priority className={styles.logo} />
+        <Image src="/notebook-logo.svg" alt="NotebookLM Klon" width={1253} height={132} priority className={styles.logo} />
 
         <p className={styles.tagline}>Dein persönlicher KI-Assistent für Notizen</p>
 
@@ -113,7 +128,8 @@ export default function LoginForm() {
               ? `Dein Demo-Konto ist in diesem Browser gespeichert und bleibt ${DEMO_INACTIVE_DAYS} Tage nach dem letzten Login erhalten.`
               : "Ohne eigenes Konto ausprobieren: Ein Klick legt ein Demo-Konto mit Beispiel-Notebooks an und füllt die Zugangsdaten aus."}
           </p>
-          <button type="button" className={styles.demoBtn} onClick={handleDemo} disabled={demoLoading || loading}>
+          {!storedDemo && <Turnstile ref={demoTurnstile} action="demo" onToken={setDemoToken} onError={setError} />}
+          <button type="button" className={styles.demoBtn} onClick={handleDemo} disabled={demoLoading || loading || (!storedDemo && !demoToken)}>
             {demoLoading ? "Demo wird vorbereitet …" : storedDemo ? "Mit deinem Demo-Konto fortfahren" : "Demo-Zugang erstellen"}
           </button>
         </section>
@@ -162,7 +178,8 @@ export default function LoginForm() {
           )}
           {error && <p className={styles.error}>{error}</p>}
 
-          <button type="submit" className={styles.submitBtn} disabled={loading || demoLoading}>
+          {mode === "signup" && <Turnstile ref={signupTurnstile} action="signup" onToken={setSignupToken} onError={setError} />}
+          <button type="submit" className={styles.submitBtn} disabled={loading || demoLoading || (mode === "signup" && !signupToken)}>
             {loading ? "Bitte warten …" : mode === "signup" ? "Konto erstellen" : "Anmelden"}
           </button>
         </form>
@@ -193,15 +210,10 @@ export default function LoginForm() {
         </button>
 
         <p className={styles.disclaimer}>
-          Mit der Anmeldung stimmst du den{" "}
-          <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer">
-            Nutzungsbedingungen
-          </a>{" "}
-          und der{" "}
-          <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">
-            Datenschutzerklärung
-          </a>{" "}
-          zu.
+          Demo-Projekt: ein Nachbau von Google NotebookLM, kein Google-Produkt.{" "}
+          <a href="https://github.com/nickoertel2000/notebooklm" target="_blank" rel="noopener noreferrer">
+            Quellcode auf GitHub
+          </a>
         </p>
       </div>
     </main>

@@ -18,7 +18,7 @@ const WORKERS = [
   {
     config: "wrangler.jsonc",
     built: "dist/server/wrangler.json",
-    secrets: ["BETTER_AUTH_SECRET", "GEMINI_API_KEY", "TAVILY_API_KEY"],
+    secrets: ["BETTER_AUTH_SECRET", "GEMINI_API_KEY", "TAVILY_API_KEY", "TURNSTILE_SECRET_KEY"],
     deployArgs: []
   }
 ]
