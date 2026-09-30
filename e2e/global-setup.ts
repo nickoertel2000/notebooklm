@@ -11,6 +11,9 @@ export default async function globalSetup() {
   const client = postgres(process.env.E2E_DATABASE_URL!, { max: 1, onnotice: () => {} })
   const db = drizzle(client)
   try {
+    await client`select 1`.catch(() => {
+      throw new Error("Testdatenbank nicht erreichbar. Starte sie mit: docker compose up -d")
+    })
     await migrate(db, { migrationsFolder: "db/migrations" })
     await seedDemoTemplate(db)
   } finally {

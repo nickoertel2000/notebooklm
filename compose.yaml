@@ -1,0 +1,12 @@
+# tmpfs statt Volume: Jeder Start beginnt mit einer leeren Datenbank.
+services:
+  e2e-db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: e2e
+      POSTGRES_PASSWORD: e2e
+      POSTGRES_DB: e2e
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data

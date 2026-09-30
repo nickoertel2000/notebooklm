@@ -1,12 +1,12 @@
 import { randomBytes } from "node:crypto"
-import { existsSync } from "node:fs"
 import { defineConfig, devices } from "@playwright/test"
 
-const databaseUrl = process.env.E2E_DATABASE_URL
+// Standard ist die Testdatenbank aus compose.yaml, dieselbe Adresse nutzt der Service-Container der CI.
+const databaseUrl = process.env.E2E_DATABASE_URL ?? "postgres://e2e:e2e@localhost:5433/e2e"
+process.env.E2E_DATABASE_URL = databaseUrl
 
-// Der Dev-Server lädt .env.local mit, und die zeigt auf die Produktionsdatenbank.
-if (!databaseUrl || existsSync(".env.local")) {
-  throw new Error("E2E-Tests brauchen E2E_DATABASE_URL (eigene Testdatenbank) und laufen nie neben einer .env.local.")
+if (!["localhost", "127.0.0.1"].includes(new URL(databaseUrl).hostname)) {
+  throw new Error("E2E-Tests laufen nur gegen eine lokale Testdatenbank (docker compose up -d), nie gegen Neon.")
 }
 
 export default defineConfig({
@@ -30,6 +30,10 @@ export default defineConfig({
     command: "pnpm dev",
     url: "http://localhost:3000/login",
     timeout: 180_000,
+    // Ein bereits laufendes pnpm dev hängt an der Produktionsdatenbank.
+    reuseExistingServer: false,
+    // Wrangler lädt auch hier die .env.local mit den Produktionswerten, Umgebungsvariablen haben aber
+    // Vorrang. Deshalb wird jedes Secret aus secrets.required und die Hyperdrive-Verbindung überschrieben.
     env: {
       E2E: "1",
       CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: databaseUrl,

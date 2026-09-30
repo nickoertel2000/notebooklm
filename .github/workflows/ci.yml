@@ -29,14 +29,12 @@ jobs:
           POSTGRES_PASSWORD: e2e
           POSTGRES_DB: e2e
         ports:
-          - 5432:5432
+          - 5433:5432
         options: >-
           --health-cmd "pg_isready -U e2e"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-    env:
-      E2E_DATABASE_URL: postgres://e2e:e2e@localhost:5432/e2e
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

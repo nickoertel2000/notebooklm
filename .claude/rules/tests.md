@@ -18,7 +18,8 @@ paths:
 
 # E2E (Playwright)
 
-- `e2e/*.spec.ts`, run with `pnpm test:e2e`, only in the GitHub Actions job `e2e`: a fresh `pgvector/pgvector` service container per run. There is no dev database and no Docker locally, so they don't run locally; `playwright.config.ts` refuses to start without `E2E_DATABASE_URL` or next to a `.env.local` (it points to production).
+- `e2e/*.spec.ts`, run with `pnpm test:e2e` against a throwaway Postgres on `localhost:5433`: locally `docker compose up -d` (`compose.yaml`, tmpfs, starts empty), in CI the service container of the job `e2e` on the same port. `E2E_DATABASE_URL` overrides it; `playwright.config.ts` refuses non-local hosts. Docker isn't installed on the user's machine, so you can't run them locally; verify via CI.
+- Protection against production: the dev server still loads `.env.local`, but process env wins over it (wrangler `loadDotEnv`). So `webServer.env` must override every secret in `secrets.required` of both Workers and the Hyperdrive connection string; a new required secret goes there too. `reuseExistingServer: false`, because a running `pnpm dev` talks to production.
 - `e2e/global-setup.ts` runs the Drizzle migrations and seeds the demo template (`DEMO_TEMPLATE_EMAIL` read from `wrangler.jsonc`) with a ready source, a chunk without embedding and a chat answer with citation `[1]`. Texts the specs assert on live in `e2e/seed-data.ts`.
 - Playwright starts `pnpm dev` with `E2E=1`: `vite.config.ts` then turns off remote bindings (Workers AI) and containers, so no Cloudflare login is needed. Gemini/Tavily get placeholder keys: tests never wait for AI results (ingestion ends `failed` in the background, auto-title is swallowed). Tests assert only what happens without AI.
 - One worker: `POST /api/demo` is rate-limited to 2 accounts per minute per IP, so at most one test uses the demo access. Other tests register their own account via `register()` (`e2e/helpers.ts`).
