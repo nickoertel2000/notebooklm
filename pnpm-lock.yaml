@@ -178,9 +178,6 @@ importers:
       '@mozilla/readability':
         specifier: ^0.6.0
         version: 0.6.0
-      '@vinext/cloudflare':
-        specifier: ^1.0.0
-        version: 1.0.0(@cloudflare/vite-plugin@1.62.0(@types/node@22.20.4)(vite@8.3.1(@types/node@22.20.4)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.105.0)(terser@5.51.2)(tsx@4.23.15))(wrangler@4.143.0(@types/node@22.20.4)))(vinext@1.0.0(d3556268fe7194df56b24b51f63d975c))
       better-auth:
         specifier: ^1.7.5
         version: 1.7.6(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@opentelemetry/api@1.9.1)(knex@2.4.2(mysql2@3.9.9)(pg@8.11.6)(supports-color@7.2.0))(kysely@0.28.17)(mysql2@3.9.9)(pg@8.11.6)(postgres@3.4.9))(mysql2@3.9.9)(next@16.3.5(@babel/core@7.29.7(supports-color@7.2.0))(@opentelemetry/api@1.9.1)(@types/node@22.20.4)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(sass@1.105.0))(pg@8.11.6)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.1(@opentelemetry/api@1.9.1)(@types/node@22.20.4)(vite@8.3.1(@types/node@22.20.4)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.105.0)(terser@5.51.2)(tsx@4.23.15)))
@@ -467,10 +464,6 @@ packages:
     engines: {node: '>=16'}
     cpu: [x64]
     os: [win32]
-
-  '@cloudflare/workers-response-store@1.0.0':
-    resolution: {integrity: sha512-+UnwoptK1zDFJwpn7LMH5G1NmZia3sA/WaoxMONBN1+MlWpuqpaSFIHSyFtAEyt6DBTxdx7Iy/0GbhLcI9EKoA==}
-    engines: {node: '>=22'}
 
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
@@ -2104,20 +2097,6 @@ packages:
   '@vercel/og@1.0.3':
     resolution: {integrity: sha512-/iYJ34PDu4lty1TXdL86qHEw8viveHTllG1PWLuJX8tSFfqKL7kyVJeUORJmQ250bHB0h+alcalXUlza3c/NSA==}
     engines: {node: '>=22'}
-
-  '@vinext/cloudflare@1.0.0':
-    resolution: {integrity: sha512-qgGgKYq/4uh9ivku5CRvQHQylyCjnHRdKmX1XdwuGClbN33eC45+wEyi+DJVtdJk62YA2NeXz6M8hc4HFIXzAA==}
-    engines: {node: '>=22'}
-    hasBin: true
-    peerDependencies:
-      '@cloudflare/vite-plugin': '*'
-      cf: '*'
-      vinext: ^1.0.0
-    peerDependenciesMeta:
-      '@cloudflare/vite-plugin':
-        optional: true
-      cf:
-        optional: true
 
   '@vinext/types@1.0.0':
     resolution: {integrity: sha512-pcrHH3Lhw+vmzexwQJ2aMbDzi0mZ7veYrEHXbzDp38GsGO0NWpxYbA6EXnKw9dGEVSeM+1eq0h1BZ7zt2OIhGg==}
@@ -4884,8 +4863,6 @@ snapshots:
   '@cloudflare/workerd-windows-64@1.20260926.1':
     optional: true
 
-  '@cloudflare/workers-response-store@1.0.0': {}
-
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
@@ -5990,13 +5967,6 @@ snapshots:
       sharp: 0.35.5(@types/node@22.20.4)
     transitivePeerDependencies:
       - '@types/node'
-
-  '@vinext/cloudflare@1.0.0(@cloudflare/vite-plugin@1.62.0(@types/node@22.20.4)(vite@8.3.1(@types/node@22.20.4)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.105.0)(terser@5.51.2)(tsx@4.23.15))(wrangler@4.143.0(@types/node@22.20.4)))(vinext@1.0.0(d3556268fe7194df56b24b51f63d975c))':
-    dependencies:
-      '@cloudflare/workers-response-store': 1.0.0
-      vinext: 1.0.0(d3556268fe7194df56b24b51f63d975c)
-    optionalDependencies:
-      '@cloudflare/vite-plugin': 1.62.0(@types/node@22.20.4)(vite@8.3.1(@types/node@22.20.4)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.105.0)(terser@5.51.2)(tsx@4.23.15))(wrangler@4.143.0(@types/node@22.20.4))
 
   '@vinext/types@1.0.0': {}
 
