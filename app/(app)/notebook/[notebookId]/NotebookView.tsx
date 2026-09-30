@@ -17,6 +17,7 @@ import { getStudioFormat, StudioFormat, StudioOptions } from "@/lib/studio"
 import { hostOf } from "@/lib/url"
 import { useDictation } from "@/lib/useDictation"
 import "material-symbols"
+import Image from "next/image"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import styles from "../notebook.module.scss"
 import { readError, readJson } from "@/lib/api/client"
@@ -784,7 +785,17 @@ function SourceIcon({ type, url }: { type: string; url: string | null }) {
   const host = url ? hostOf(url) : null
 
   if (host && !failed) {
-    return <img className={styles.sourceFavicon} src={`https://icons.duckduckgo.com/ip3/${host}.ico`} alt="" loading="lazy" onError={() => setFailed(true)} />
+    return (
+      <Image
+        className={styles.sourceFavicon}
+        src={`https://icons.duckduckgo.com/ip3/${host}.ico`}
+        alt=""
+        width={20}
+        height={20}
+        unoptimized
+        onError={() => setFailed(true)}
+      />
+    )
   }
 
   return <span className={`material-symbols-outlined ${styles.sourceIcon}`}>{SOURCE_ICON[type] ?? "description"}</span>

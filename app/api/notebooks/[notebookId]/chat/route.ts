@@ -2,32 +2,20 @@ import type { Content } from "@google/genai"
 import { and, asc, cosineDistance, eq, inArray } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/db"
-import { messages, MessageCitation, sourceChunks, sources } from "@/db/schema"
+import { messages, sourceChunks, sources } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { embedQuery } from "@/lib/embeddings"
 import { chatModels, geminiErrorMessage, getGemini, withFallback } from "@/lib/gemini"
 import { readJsonBody, parseSourceIds } from "@/lib/api/body"
+import { extractCitations, type RetrievedChunk } from "@/lib/citations"
 
 const TOP_K = 8
-const SNIPPET_LENGTH = 240
 
 const SYSTEM_PROMPT = `Du bist der KI-Assistent eines Notebooks. Beantworte die Frage des Nutzers ausschließlich anhand der bereitgestellten, nummerierten Quellen-Auszüge.
 - Belege jede Aussage direkt dahinter mit der Nummer des Auszugs in eckigen Klammern, z. B. [2]. Mehrere Belege schreibst du als [1][3].
 - Verwende nur Nummern, die in den Auszügen vorkommen, und erfinde keine.
 - Wenn die Antwort nicht aus den Auszügen hervorgeht, sage das offen und erfinde nichts.
 - Antworte auf Deutsch, klar und prägnant.`
-
-const MARKER_PATTERN = /\[(\d+(?:\s*,\s*\d+)*)\]/g
-
-type RetrievedChunk = {
-  chunkId: string
-  sourceId: string
-  content: string
-  sourceTitle: string
-  page: number | null
-  charStart: number | null
-  charEnd: number | null
-}
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
 
@@ -126,35 +114,4 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   return new Response(readable, {
     headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store" }
   })
-}
-
-function extractCitations(text: string, retrieved: RetrievedChunk[]): MessageCitation[] {
-  const byMarker = new Map<number, MessageCitation>()
-
-  for (const match of text.matchAll(MARKER_PATTERN)) {
-    for (const part of match[1].split(",")) {
-      const marker = Number(part.trim())
-      const chunk = retrieved[marker - 1]
-      if (!chunk || byMarker.has(marker)) continue
-      byMarker.set(marker, {
-        marker,
-        sourceId: chunk.sourceId,
-        chunkId: chunk.chunkId,
-        snippet: snippetOf(chunk.content),
-        page: chunk.page,
-        charStart: chunk.charStart,
-        charEnd: chunk.charEnd
-      })
-    }
-  }
-
-  return [...byMarker.values()]
-}
-
-function snippetOf(content: string): string {
-  const text = content.replace(/\s+/g, " ").trim()
-  if (text.length <= SNIPPET_LENGTH) return text
-  const cut = text.slice(0, SNIPPET_LENGTH)
-  const lastSpace = cut.lastIndexOf(" ")
-  return `${lastSpace > SNIPPET_LENGTH / 2 ? cut.slice(0, lastSpace) : cut}…`
 }

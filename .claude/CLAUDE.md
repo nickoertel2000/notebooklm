@@ -32,7 +32,7 @@ These rules apply unconditionally, even if I explicitly ask you to break them:
 2. For DB changes: edit `db/schema.ts` first and wait for my confirmation. Only then run `pnpm db:generate`. Show me the generated migration SQL before `pnpm db:migrate` runs.
 3. Server Components (auth + data fetching) and Client Components (interactivity) stay strictly separated.
 4. Anything that can take longer than a few seconds (LLM generation, TTS, rendering, ingestion) runs as a Workflow in the jobs Worker, not inside a request — see `.claude/rules/jobs-worker.md`. The RAG chat is the only synchronous (streamed) LLM call.
-5. After any code change: run `pnpm lint` and `pnpm typecheck` (after Worker config changes first `pnpm cf-typegen`), fix errors before reporting "done". There is no test suite; for UI changes, check the flow in the browser (`pnpm dev`).
+5. After any code change: run `pnpm lint`, `pnpm typecheck` and `pnpm test` (after Worker config changes first `pnpm cf-typegen`), fix errors before reporting "done". Unit tests (Vitest) cover pure logic in `lib/`, there is no E2E suite (`.claude/rules/tests.md`); for UI changes, check the flow in the browser (`pnpm dev`).
 6. All code is formatted with Prettier (`.prettierrc`). The PostToolUse hook formats edited files automatically (and flags `ae`/`oe`/`ue` spellings in comments); files created or changed any other way (scripts, generators, `sed`) get `pnpm exec prettier --write <file>`.
 7. When a feature is finished, check whether it introduced a convention, pitfall or architectural decision that cannot be read from the code. If so, extend the matching rule in `.claude/rules/` or propose a new rule with `paths:`, and show me the diff. Plain feature descriptions do not belong there.
 
@@ -47,6 +47,7 @@ These rules apply unconditionally, even if I explicitly ask you to break them:
 - `pnpm dev` — local dev server on :3000 (vinext + jobs Worker in one process; the video container needs Docker)
 - `pnpm build` — production build of both Workers (`dist/`), `pnpm preview` runs it locally in workerd
 - `pnpm lint` — ESLint only; type-check separately with `pnpm typecheck` (app, jobs Worker, container)
+- `pnpm test` — Vitest unit tests (`lib/**/*.test.ts`)
 - `pnpm cf-typegen` — regenerate `worker-configuration.d.ts` after changing a `wrangler.jsonc`
 - `pnpm run deploy:jobs` / `pnpm run deploy:app` — manual deploy (normally Workers Builds on merge into `I-######-I-PRODUKTION-I-######-I`)
 - `pnpm cf:secrets` — push production secrets from 1Password to both Workers; `pnpm cf:first-deploy` — very first deploy of both Workers incl. secrets, without building the container image (no Docker needed)

@@ -15,4 +15,6 @@ Hyperdrive hält einen eigenen Connection-Pool. Ob der Scale-to-Zero verhindert,
 
 ## 3. Tests
 
-automatisierte tests mit e2e und playwirtght (falls sinnvoll)
+Unit-Tests (Vitest), Deploy-Sperre in Workers Builds und GitHub Actions sind eingerichtet.
+
+- [ ] E2E-Tests mit Playwright (3–5 Abläufe ohne KI: Login, Demo-Zugang, Notebook anlegen, Text-Quelle, Demo-Notebook mit Zitaten öffnen). Voraussetzung: eigener Neon-Branch für Entwicklung und Tests.

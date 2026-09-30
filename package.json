@@ -12,6 +12,7 @@
     "deploy:jobs": "wrangler deploy --config dist/notebooklm_jobs/wrangler.json",
     "lint": "eslint",
     "typecheck": "tsc --noEmit && tsc --noEmit -p containers/video-renderer",
+    "test": "vitest run",
     "cf-typegen": "wrangler types -c wrangler.jsonc -c workers/jobs/wrangler.jsonc && wrangler types -c workers/jobs/wrangler.jsonc --include-runtime=false --env-interface JobsEnv workers/jobs/worker-configuration.d.ts",
     "cf:secrets": "node scripts/cf.mjs secrets",
     "cf:first-deploy": "node scripts/cf.mjs first-deploy",
@@ -56,6 +57,7 @@
     "typescript": "^5.9.3",
     "vite": "^8.3.1",
     "vite-css-modules": "^1.16.0",
+    "vitest": "5.0.1",
     "wrangler": "^4.143.0"
   }
 }
