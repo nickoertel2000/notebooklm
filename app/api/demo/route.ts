@@ -5,12 +5,21 @@ import { getAuth } from "@/auth"
 import { getDb } from "@/db"
 import { user } from "@/db/schema"
 import { cloneTemplateNotebooks, countDemoAccounts, demoEmail } from "@/lib/demo"
+import { verifyTurnstile } from "@/lib/turnstile"
+import { TURNSTILE_HEADER } from "@/lib/turnstileConfig"
 
 // Bewusst ohne Session-Prüfung: öffentlich, im Matcher von proxy.ts ausgenommen.
 export async function POST(req: NextRequest) {
+  const turnstileToken = req.headers.get(TURNSTILE_HEADER)
+  if (!turnstileToken) return NextResponse.json({ error: "Die Sicherheitsprüfung fehlt. Bitte lade die Seite neu." }, { status: 403 })
+
   const ip = req.headers.get("cf-connecting-ip") ?? "local"
   const { success } = await env.DEMO_RATE_LIMITER.limit({ key: ip })
   if (!success) return NextResponse.json({ error: "Zu viele Demo-Konten in kurzer Zeit. Bitte warte eine Minute." }, { status: 429 })
+
+  if (!(await verifyTurnstile(turnstileToken, "demo", req.headers.get("cf-connecting-ip")))) {
+    return NextResponse.json({ error: "Die Sicherheitsprüfung ist fehlgeschlagen. Bitte versuche es erneut." }, { status: 403 })
+  }
 
   if ((await countDemoAccounts()) >= Number(env.DEMO_MAX_ACCOUNTS)) {
     return NextResponse.json({ error: "Die Demo ist gerade ausgelastet. Bitte versuche es später erneut." }, { status: 503 })

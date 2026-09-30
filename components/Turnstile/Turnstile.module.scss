@@ -1,0 +1,8 @@
+.widget {
+  display: flex;
+  justify-content: center;
+
+  &:empty {
+    display: none;
+  }
+}
