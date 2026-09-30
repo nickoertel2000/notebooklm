@@ -94,6 +94,7 @@ Browser-basiertes Diktat für Chat-Eingaben ([`lib/useDictation.ts`](lib/useDict
 | **KI**              | Google Gemini – Chat, Berichte, Skripte (Flash), Embeddings (Gemini Embedding 2), TTS · FLUX.2 über Workers AI (Folienbilder) · Tavily (Websuche) |
 | **Infrastruktur**   | Cloudflare Workers, Workflows, R2 (EU), Hyperdrive, Containers (ffmpeg) · Deployment über Workers Builds                                          |
 | **Quellen-Parsing** | `unpdf` (PDF), `@mozilla/readability` + `linkedom` (Web)                                                                                          |
+| **Tests & CI**      | Vitest (Unit-Tests), GitHub Actions (Lint, Typecheck, Tests bei jedem Push), Prüfungen in Workers Builds vor jedem Deploy                         |
 | **Tooling**         | pnpm, Wrangler, ESLint 9, Prettier, 1Password CLI (Secret-Management)                                                                             |
 
 ---
