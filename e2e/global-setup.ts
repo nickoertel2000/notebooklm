@@ -4,8 +4,8 @@ import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js"
 import { migrate } from "drizzle-orm/postgres-js/migrator"
 import postgres from "postgres"
 import { unstable_readConfig } from "wrangler"
-import { messages, notebooks, sourceChunks, sources, user } from "../db/schema"
-import { demoNotebook } from "./seed-data"
+import { audioOverviews, messages, notebooks, reports, sourceChunks, sources, user, videoOverviews } from "../db/schema"
+import { demoNotebook, templateIds } from "./seed-data"
 import { startTestDatabase, stopTestDatabase, testDatabaseUrl } from "./test-database"
 
 export default async function globalSetup() {
@@ -33,10 +33,20 @@ async function seedDemoTemplate(db: PostgresJsDatabase) {
     const userId = randomUUID()
     await tx.insert(user).values({ id: userId, name: "Demo-Vorlage", email, emailVerified: false, createdAt: now, updatedAt: now })
 
-    const [notebook] = await tx.insert(notebooks).values({ userId, title: demoNotebook.title, emoji: "🌱" }).returning({ id: notebooks.id })
+    const [notebook] = await tx
+      .insert(notebooks)
+      .values({ id: templateIds.notebook, userId, title: demoNotebook.title, emoji: "🌱" })
+      .returning({ id: notebooks.id })
     const [source] = await tx
       .insert(sources)
-      .values({ notebookId: notebook.id, type: "text", title: demoNotebook.sourceTitle, status: "ready", charCount: demoNotebook.snippet.length })
+      .values({
+        id: templateIds.source,
+        notebookId: notebook.id,
+        type: "text",
+        title: demoNotebook.sourceTitle,
+        status: "ready",
+        charCount: demoNotebook.snippet.length
+      })
       .returning({ id: sources.id })
     const [chunk] = await tx
       .insert(sourceChunks)
@@ -55,5 +65,12 @@ async function seedDemoTemplate(db: PostgresJsDatabase) {
         createdAt: now
       }
     ])
+
+    // Ohne Dateien in R2: Die Tests prüfen nur, dass fremde Nutzer die Einträge nicht erreichen.
+    await tx
+      .insert(reports)
+      .values({ id: templateIds.report, notebookId: notebook.id, type: "briefing", title: "Überblick", content: "Kurzfassung", status: "ready" })
+    await tx.insert(audioOverviews).values({ id: templateIds.audio, notebookId: notebook.id, format: "brief", title: "Zusammenfassung", status: "ready" })
+    await tx.insert(videoOverviews).values({ id: templateIds.video, notebookId: notebook.id, format: "summary", title: "Zusammenfassung", status: "ready" })
   })
 }
