@@ -13,8 +13,7 @@ export const AUDIO_FORMATS: AudioFormat[] = [
   {
     id: "deep-dive",
     label: "Detaillierte Analyse",
-    description:
-      "Eine lebhafte Unterhaltung zwischen zwei KI-Moderatoren, bei der die Themen in Ihren Quellen analysiert und in Zusammenhang gebracht werden.",
+    description: "Eine lebhafte Unterhaltung zwischen zwei KI-Moderatoren, bei der die Themen in Ihren Quellen analysiert und in Zusammenhang gebracht werden.",
     icon: "graphic_eq",
     speakers: 2,
     instruction:
@@ -32,8 +31,7 @@ export const AUDIO_FORMATS: AudioFormat[] = [
   {
     id: "critique",
     label: "Kritische Bewertung",
-    description:
-      "Eine sachkundige Bewertung Ihrer Quellen mit konstruktivem Feedback, anhand dessen Sie Ihre Quellen verbessern können.",
+    description: "Eine sachkundige Bewertung Ihrer Quellen mit konstruktivem Feedback, anhand dessen Sie Ihre Quellen verbessern können.",
     icon: "rate_review",
     speakers: 1,
     instruction:
@@ -42,8 +40,7 @@ export const AUDIO_FORMATS: AudioFormat[] = [
   {
     id: "debate",
     label: "Diskussion",
-    description:
-      "Eine aufschlussreiche Diskussion zwischen zwei KI-Moderatoren, die Ihre Quellen aus verschiedenen Perspektiven beleuchtet.",
+    description: "Eine aufschlussreiche Diskussion zwischen zwei KI-Moderatoren, die Ihre Quellen aus verschiedenen Perspektiven beleuchtet.",
     icon: "forum",
     speakers: 2,
     instruction:
