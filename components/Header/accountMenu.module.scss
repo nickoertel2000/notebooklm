@@ -75,27 +75,6 @@
   color: #e3e3e3;
 }
 
-.managed {
-  margin: 2px 0 0;
-  text-align: center;
-  font-size: 12px;
-  color: #9aa0a6;
-}
-
-.adminLink {
-  display: block;
-  margin: 14px 0 0;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 500;
-  color: #8ab4f8;
-  text-decoration: none;
-
-  &:hover {
-    text-decoration: underline;
-  }
-}
-
 .avatar {
   position: relative;
   width: 80px;
@@ -123,50 +102,12 @@
   display: block;
 }
 
-.cameraBadge {
-  position: absolute;
-  bottom: -2px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background-color: #3c4043;
-  border: 2px solid #2a2a2a;
-
-  span {
-    font-size: 16px;
-    color: #e3e3e3;
-  }
-}
-
 .greeting {
   margin: 14px 0 0;
   text-align: center;
   font-size: 22px;
   font-weight: 400;
   color: #e3e3e3;
-}
-
-.manageBtn {
-  display: block;
-  margin: 16px auto 0;
-  padding: 9px 24px;
-  border: 1px solid #5f6368;
-  border-radius: 999px;
-  background: transparent;
-  color: #8ab4f8;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-
-  &:hover {
-    background-color: rgba(138, 180, 248, 0.08);
-  }
 }
 
 .actions {
@@ -194,13 +135,7 @@
     font-size: 20px;
   }
 
-  &:first-child {
-    border-radius: 24px 4px 4px 24px;
-  }
-
-  &:last-child {
-    border-radius: 4px 24px 24px 4px;
-  }
+  border-radius: 24px;
 
   &:hover {
     background-color: #3f4042;
@@ -210,27 +145,4 @@
     opacity: 0.6;
     cursor: default;
   }
-}
-
-.footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 18px;
-
-  a {
-    color: #9aa0a6;
-    font-size: 12px;
-    text-decoration: none;
-
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-}
-
-.dot {
-  color: #9aa0a6;
-  font-size: 12px;
 }

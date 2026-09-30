@@ -31,20 +31,6 @@ export default function NotebookHeader({ notebookId, title, emoji, user }: Noteb
           </button>
         </form>
 
-        <button type="button" className={styles.pillBtn}>
-          <span className="material-symbols-outlined">share</span>
-          Freigeben
-        </button>
-
-        <button type="button" className={styles.pillBtn}>
-          <span className="material-symbols-outlined">settings</span>
-          Einstellungen
-        </button>
-
-        <button type="button" className={styles.iconBtn} aria-label="Google Apps">
-          <span className="material-symbols-outlined">apps</span>
-        </button>
-
         <AccountMenu name={user.name ?? ""} email={user.email ?? ""} image={user.image} />
       </div>
     </header>
