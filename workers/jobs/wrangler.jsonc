@@ -80,7 +80,7 @@
   "vars": {
     "GEMINI_REPORT_MODELS": "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite",
     "GEMINI_EMBEDDING_MODEL": "gemini-embedding-2",
-    "GEMINI_TTS_MODELS": "gemini-3.8-flash-tts,gemini-3.8-flash-lite-tts",
+    "GEMINI_TTS_MODELS": "gemini-3.8-flash-tts,gemini-3.8-flash-lite-tts,gemini-3.1-flash-tts-preview,gemini-2.5-flash-preview-tts",
     "IMAGE_MODEL": "@cf/black-forest-labs/flux-2-klein-4b",
     // Das Gratis-Kontingent (10.000 Neuronen/Tag) reicht für ca. 125 Bilder.
     "IMAGE_DAILY_LIMIT": "100",

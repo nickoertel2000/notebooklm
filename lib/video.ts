@@ -106,7 +106,7 @@ Pro Folie:
 - "slideTitle": kurze, plakative Folien-Überschrift (max. ~6 Wörter), KEIN Markdown.
 - "bullets": 2–4 sehr knappe Stichpunkte (je max. ~7 Wörter), KEIN Markdown, kein Satzzeichen am Ende. Werden auf der Folie ANGEZEIGT.
 - "narration": natürlicher, gesprochener Fließtext für eine einzelne Erzählstimme. KEIN Markdown, keine Aufzählungszeichen. Erklärt die Folie, liest die Stichpunkte aber nicht wörtlich vor.
-- "imageHint": ein KURZER englischer Bildmotiv-Hinweis (3–8 Wörter) für eine passende Hintergrund-Illustration, OHNE Text/Wörter im Bild (z. B. "rocket launching over stock charts").
+- "imageHint": ein KURZER englischer Bildmotiv-Hinweis (3–15 Wörter) für eine passende Hintergrund-Illustration, OHNE Text/Wörter im Bild (z. B. "rocket launching over stock charts"). Geht es um ein reales, bekanntes Objekt (Bauwerk, Fahrzeug, Instrument, Lebewesen), nenne es beim Namen und beschreibe sein typisches Aussehen konkret (Form, Farben, Materialien) statt eines allgemeinen Begriffs, z. B. "James Webb Space Telescope, golden hexagonal segmented mirror, large silver five-layer sunshield" statt "space telescope".
 
 Antworte AUSSCHLIESSLICH mit gültigem JSON in exakt dieser Form, ohne Code-Fences, ohne erklärenden Text davor oder danach:
 {"title":"<Gesamttitel der Video-Übersicht>","segments":[{"slideTitle":"...","bullets":["...","..."],"narration":"...","imageHint":"..."}]}`

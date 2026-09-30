@@ -2,7 +2,7 @@
 
 Stand: 29.09.2026. Plan für die Notebooks im Vorlage-Konto `demo@notebooklm.invalid`. Jedes neue Demo-Konto bekommt eine Kopie davon (siehe [`anleitung-google-account.md`](anleitung-google-account.md), Abschnitt „Demo-Vorlage“).
 
-Ablauf: Notebook 1 lokal mit `pnpm dev` anlegen, danach Deploy in Produktion, Notebook 2 und 3 dort.
+Ablauf: Alle Notebooks in Produktion anlegen. Lokal nutzt `pnpm dev` zwar dieselbe Datenbank, aber nur ein nachgebildetes R2: Quelltexte, Audio und Video eines lokal angelegten Notebooks fehlen in Produktion und in jeder Demo-Kopie.
 
 ## Vorher beachten
 
@@ -10,7 +10,6 @@ Ablauf: Notebook 1 lokal mit `pnpm dev` anlegen, danach Deploy in Produktion, No
   ```sh
   node --env-file=.env.local scripts/demo-template-login.mjs --from demo@notebooklm.invalid --apply
   ```
-- **Video lokal nur mit Docker.** Ohne Docker schlägt der Schritt `render` fehl. Dann das Video nach dem Deploy in Produktion erzeugen. Lokal und Produktion nutzen dieselbe Datenbank, das Notebook ist dort sofort vorhanden.
 - **Nur Fertiges wird kopiert.** Quellen, Berichte, Audios und Videos im Status „fehlgeschlagen“ oder „in Bearbeitung“ landen nicht in den Demo-Konten.
 - **Nichts löschen**, solange Demo-Konten existieren. Die Kopien verweisen auf die Dateien der Vorlage.
 
@@ -92,7 +91,7 @@ Nacheinander stellen, damit der Verlauf im Demo-Konto zu sehen ist:
 
 ### Studio
 
-Die Video-Übersicht zuerst erzeugen: Gemini-TTS erlaubt im Gratis-Tarif nur 10 Anfragen pro Tag, das Video braucht 3 bis 4 davon, das Audio eine. Alle Studio-Inhalte zusammen brauchen 7 der 20 Anfragen pro Tag an das Studio-Modell. Notebook 3 deshalb erst am nächsten Tag anlegen.
+Die Video-Übersicht zuerst erzeugen. Kontingente pro Tag über alle Modellketten: rund 40 TTS-Anfragen (Video 3 bis 4, Audio 1), 80 Anfragen für Studio-Texte (alle Studio-Inhalte eines Notebooks brauchen etwa 8) und 100 Folienbilder. Alle drei Notebooks passen damit in einen Tag. Die Kontingente setzen um 9:00 Uhr deutscher Zeit zurück.
 
 **1. Video-Übersicht**
 
@@ -106,7 +105,7 @@ Die Video-Übersicht zuerst erzeugen: Gemini-TTS erlaubt im Gratis-Tarif nur 10 
 
 - Fokus:
 
-  > Erkläre für Laien in dieser Reihenfolge: was Webb ist und wofür es gebaut wurde, wie Spiegel und Sonnenschild funktionieren, warum Webb am Lagrange-Punkt L2 steht, und was die ersten Bilder vom Juli 2022 gezeigt haben.
+  > Erkläre für Laien in dieser Reihenfolge: was Webb ist und wofür es gebaut wurde, wie Spiegel und Sonnenschild funktionieren, warum Webb am Lagrange-Punkt L2 steht, und was die ersten Bilder vom Juli 2022 gezeigt haben. Für die Folienbilder: Wo das Teleskop selbst zu sehen ist, beschreibe es originalgetreu als James Webb Space Telescope mit goldenem Wabenspiegel aus 18 sechseckigen Segmenten über einem großen, silbern-violett schimmernden, fünflagigen Sonnenschild in Rautenform. Für die letzte Folie ein echtes Webb-Motiv wie die Carina-Nebel-Klippen in Gold und Orange.
 
 **2. Audio-Übersicht**
 

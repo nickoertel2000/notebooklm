@@ -1,4 +1,4 @@
-import { ApiError, GoogleGenAI, ThinkingLevel } from "@google/genai"
+import { ApiError, GoogleGenAI, ThinkingLevel, type Part } from "@google/genai"
 import { env } from "cloudflare:workers"
 import { SPEAKER_LABELS, splitDialog } from "./audio"
 import { pcmSeconds, pcmToWav, stripWavHeader } from "./wav"
@@ -28,6 +28,7 @@ export const reportModels = () => modelChain(env.GEMINI_REPORT_MODELS)
 
 const isOverloaded = (err: unknown) => err instanceof ApiError && err.status >= 500
 const isQuotaExceeded = (err: unknown) => err instanceof ApiError && err.status === 429
+const isSpeechMetadataUnsupported = (err: unknown) => err instanceof ApiError && err.status === 400 && err.message.includes("Speech metadata is not supported")
 
 // Überlastung und Kontingent gelten pro Modell, das nächste Modell der Kette kann dann
 // noch antworten. run() muss vor der ersten Ausgabe scheitern, sonst käme Text doppelt.
@@ -95,19 +96,31 @@ export async function synthesizeSpeech(script: string, speakers: 1 | 2): Promise
         }
       : { voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICES[0] } } }
 
-  // Die Lite-TTS-Modelle verlangen bei mehreren Stimmen jede Wortmeldung als eigenen Part
-  // mit speechMetadata.speaker, ein Part ohne Sprecher (auch eine Anweisung) ergibt 400.
-  const parts =
-    speakers === 2 ? splitDialog(script).map((turn) => ({ text: turn.text, speechMetadata: { speaker: turn.speaker } })) : [{ text: script }]
-  if (parts.length === 0) throw new Error("Skript ohne Sprechtext")
-
-  const response = await withFallback(modelChain(env.GEMINI_TTS_MODELS), (model) =>
+  const request = (model: string, parts: Part[]) =>
     getGemini().models.generateContent({
       model,
       contents: [{ role: "user", parts }],
       config: { responseModalities: ["AUDIO"], speechConfig }
     })
-  )
+
+  const turns = speakers === 2 ? splitDialog(script) : []
+  if (speakers === 2 && turns.length === 0) throw new Error("Skript ohne Sprechtext")
+
+  const response = await withFallback(modelChain(env.GEMINI_TTS_MODELS), async (model) => {
+    if (speakers === 1) return request(model, [{ text: script }])
+    // Dialog-Format hängt vom Modell ab: Lite-TTS verlangt jede Wortmeldung als Part mit
+    // speechMetadata.speaker, ältere Modelle lehnen speechMetadata ab und wollen einen Textblock mit Labels.
+    try {
+      return await request(
+        model,
+        turns.map((turn) => ({ text: turn.text, speechMetadata: { speaker: turn.speaker } }))
+      )
+    } catch (err) {
+      if (!isSpeechMetadataUnsupported(err)) throw err
+      const dialog = turns.map((turn) => `${turn.speaker}: ${turn.text}`).join("\n")
+      return request(model, [{ text: `Lies das folgende Gespräch zwischen ${SPEAKER_LABELS[0]} und ${SPEAKER_LABELS[1]} vor:\n\n${dialog}` }])
+    }
+  })
 
   const data = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data
   if (!data) throw new Error("Gemini TTS lieferte keine Audiodaten")
