@@ -207,7 +207,7 @@ pnpm test       # Unit-Tests (Vitest)
 pnpm test:e2e   # E2E-Tests (Playwright), --ui zum Zuschauen
 ```
 
-`pnpm test:e2e` braucht nur ein laufendes Docker Desktop und erledigt den Rest selbst: Es startet eine frische Testdatenbank ([`compose.yaml`](compose.yaml)), migriert sie, legt Testdaten an, startet einen eigenen Dev-Server und räumt danach wieder auf. Secrets und Datenbankverbindung werden dabei überschrieben, sodass kein Test die Produktionsdatenbank oder eine KI-API erreicht.
+`pnpm test:e2e` braucht ein laufendes Docker Desktop und einmalig den Testbrowser (`pnpm exec playwright install chromium`). Den Rest erledigt es selbst: Es startet eine frische Testdatenbank ([`compose.yaml`](compose.yaml)), migriert sie, legt Testdaten an, startet einen eigenen Dev-Server und räumt danach wieder auf. Secrets und Datenbankverbindung werden dabei überschrieben, sodass kein Test die Produktionsdatenbank oder eine KI-API erreicht.
 
 ---
 
