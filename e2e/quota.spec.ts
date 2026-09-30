@@ -1,0 +1,19 @@
+import { expect, test } from "@playwright/test"
+import { register } from "./helpers"
+
+test("Das Tageslimit pro Konto stoppt weitere Websuchen", async ({ page }) => {
+  await register(page)
+  await page.getByRole("button", { name: "Neu erstellen" }).click()
+  await expect(page).toHaveURL(/\/notebook\/[0-9a-f-]+$/)
+  const discover = `/api/notebooks/${page.url().split("/").pop()}/discover`
+
+  // Das Kontingent wird vor dem Tavily-Aufruf gebucht. Mit dem Platzhalter-Key scheitert die Suche
+  // selbst, jede Anfrage zählt trotzdem.
+  for (let i = 0; i < 5; i++) {
+    expect((await page.request.post(discover, { data: { query: `Suche ${i}` } })).status()).not.toBe(429)
+  }
+
+  const blocked = await page.request.post(discover, { data: { query: "Eine zu viel" } })
+  expect(blocked.status()).toBe(429)
+  expect(((await blocked.json()) as { error: string }).error).toContain("Tageslimit erreicht")
+})

@@ -25,3 +25,14 @@ test("Falsches Passwort wird abgelehnt", async ({ page }) => {
   await expect(page.getByText("Anmeldung fehlgeschlagen")).toBeVisible()
   await expect(page).toHaveURL(/\/login$/)
 })
+
+test("Registrierung und Demo-Zugang ohne Sicherheitsprüfung werden abgelehnt", async ({ request }) => {
+  const signup = await request.post("/api/auth/sign-up/email", {
+    data: { name: "Bot", email: `bot-${Date.now()}@example.test`, password: "Passwort-123" },
+    headers: { Origin: "http://localhost:3000" }
+  })
+  expect(signup.status()).toBe(403)
+
+  const demo = await request.post("/api/demo")
+  expect(demo.status()).toBe(403)
+})

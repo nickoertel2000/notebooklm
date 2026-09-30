@@ -32,7 +32,10 @@ export default defineConfig({
       CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: testDatabaseUrl,
       BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
       GEMINI_API_KEY: "e2e-ohne-ki",
-      TAVILY_API_KEY: "e2e-ohne-ki"
+      TAVILY_API_KEY: "e2e-ohne-ki",
+      // Cloudflares Test-Keys: Das Widget liefert immer ein gültiges Token, siteverify bestätigt es.
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+      TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA"
     }
   }
 })
