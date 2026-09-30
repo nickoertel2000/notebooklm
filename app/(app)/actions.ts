@@ -6,9 +6,11 @@ import { redirect } from "next/navigation"
 import { getDb } from "@/db"
 import { audioOverviews, notebooks, reports, videoOverviews } from "@/db/schema"
 import { getSessionUser } from "@/lib/auth/session"
+import { MAX_LENGTH } from "@/lib/api/body"
 import { pickNotebookEmoji } from "@/lib/notebookIcons"
 import { getNotebookForUser } from "@/lib/notebooks"
 import { cancelJob } from "@/lib/jobs/start"
+import { checkRateLimit } from "@/lib/quota"
 import { deleteByPrefix, notebookPrefix } from "@/lib/storage"
 
 export async function createNotebook() {
@@ -55,10 +57,11 @@ export async function renameNotebook(notebookId: string, title: string) {
   const user = await getSessionUser()
   if (!user) redirect("/login")
 
-  const trimmed = title.trim()
+  const trimmed = title.trim().slice(0, MAX_LENGTH.title)
   if (!trimmed) return null
+  if (!(await getNotebookForUser(notebookId, user.id))) return null
 
-  const emoji = await pickNotebookEmoji(trimmed)
+  const emoji = (await checkRateLimit(user.id)) ? null : await pickNotebookEmoji(trimmed)
 
   await getDb()
     .update(notebooks)

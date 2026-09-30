@@ -4,7 +4,7 @@ import { getDb } from "@/db"
 import { reports } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { cancelJob } from "@/lib/jobs/start"
-import { isUuid } from "@/lib/notebooks"
+import { isUuid } from "@/lib/uuid"
 
 type RouteContext = { params: Promise<{ notebookId: string; reportId: string }> }
 
@@ -35,7 +35,8 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
     .delete(reports)
     .where(and(eq(reports.id, reportId), eq(reports.notebookId, notebookId)))
     .returning({ status: reports.status })
-  if (deleted?.status === "processing") await cancelJob("report", reportId)
+  if (!deleted) return NextResponse.json({ error: "Bericht nicht gefunden" }, { status: 404 })
+  if (deleted.status === "processing") await cancelJob("report", reportId)
 
   return NextResponse.json({ ok: true })
 }

@@ -4,7 +4,7 @@ import { getDb } from "@/db"
 import { sources } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { startIngestSource } from "@/lib/jobs/start"
-import { isUuid } from "@/lib/notebooks"
+import { isUuid } from "@/lib/uuid"
 import { putObject, sourceKey } from "@/lib/storage"
 
 // Der Import hält das ganze PDF im Speicher, Worker-Limit 128 MB.
@@ -24,23 +24,28 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
   if (req.headers.get("content-type") !== "application/pdf") return NextResponse.json({ error: "Nur PDF-Dateien werden unterstützt" }, { status: 415 })
 
   const db = getDb()
-  // Nur einmal hochladbar: storageKey ist erst nach erfolgreichem Upload gesetzt.
-  const [row] = await db
-    .select({ id: sources.id })
-    .from(sources)
-    .where(and(eq(sources.id, sourceId), eq(sources.notebookId, notebookId), eq(sources.type, "pdf"), isNull(sources.storageKey)))
-    .limit(1)
-  if (!row) return NextResponse.json({ error: "Quelle nicht gefunden oder bereits hochgeladen" }, { status: 404 })
-
   // Fester Dateiname, damit der Nutzer-Dateiname nie ungeprüft im R2-Key landet.
   const key = sourceKey(notebookId, sourceId, "original.pdf")
+  // Nur einmal hochladbar. Der Key wird vor dem Upload gesetzt, damit zwei parallele Uploads nicht beide durchkommen.
+  const [row] = await db
+    .update(sources)
+    .set({ storageKey: key, updatedAt: new Date() })
+    .where(and(eq(sources.id, sourceId), eq(sources.notebookId, notebookId), eq(sources.type, "pdf"), isNull(sources.storageKey)))
+    .returning({ id: sources.id })
+  if (!row) return NextResponse.json({ error: "Quelle nicht gefunden oder bereits hochgeladen" }, { status: 404 })
+
+  let uploaded = false
   try {
     await putObject(key, req.body, "application/pdf")
-    await db.update(sources).set({ storageKey: key, updatedAt: new Date() }).where(eq(sources.id, sourceId))
+    uploaded = true
     await startIngestSource({ sourceId, notebookId, key, isPdf: true })
   } catch (err) {
     console.error("PDF-Upload fehlgeschlagen:", err)
-    await db.update(sources).set({ status: "failed", error: "Upload fehlgeschlagen", updatedAt: new Date() }).where(eq(sources.id, sourceId))
+    // Ohne Datei in R2 den Key freigeben, sonst bliebe die Quelle für einen neuen Upload gesperrt.
+    await db
+      .update(sources)
+      .set({ status: "failed", error: "Upload fehlgeschlagen", ...(uploaded ? {} : { storageKey: null }), updatedAt: new Date() })
+      .where(eq(sources.id, sourceId))
     return NextResponse.json({ error: "Upload fehlgeschlagen" }, { status: 500 })
   }
 

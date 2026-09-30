@@ -3,16 +3,16 @@ import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/db"
 import { sources } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
-import { extractFromUrl } from "@/lib/extract"
+import { lengthError, MAX_LENGTH, optionalString, readJsonBody } from "@/lib/api/body"
+import { ExtractError, extractFromUrl } from "@/lib/extract"
 import { startIngestSource } from "@/lib/jobs/start"
+import { consumeQuota } from "@/lib/quota"
 import { putObject, sourceKey } from "@/lib/storage"
 
 // Fängt auch PDF-Quellen ab, deren Upload nie angekommen ist.
 const STALE_PROCESSING_MS = 15 * 60 * 1000
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
-
-type CreateSourceBody = { type: "pdf"; filename?: string } | { type: "url"; url?: string } | { type: "text"; text?: string; title?: string }
 
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
@@ -48,42 +48,59 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const auth = await authorizeNotebook(notebookId)
   if (auth.error) return auth.error
 
-  const db = getDb()
-  const body = (await req.json()) as CreateSourceBody
+  const body = await readJsonBody(req)
+  const type = body.type
+  if (type !== "pdf" && type !== "url" && type !== "text") return NextResponse.json({ error: "Unbekannter Quelltyp" }, { status: 400 })
 
-  if (body.type === "pdf") {
-    const filename = body.filename?.trim() || "dokument.pdf"
-    const [row] = await db.insert(sources).values({ notebookId, type: "pdf", title: filename, status: "processing" }).returning({ id: sources.id })
+  const tooLong = lengthError([
+    [body.filename, MAX_LENGTH.title],
+    [body.title, MAX_LENGTH.title],
+    [body.url, MAX_LENGTH.url],
+    [body.text, MAX_LENGTH.text]
+  ])
+  if (tooLong) return NextResponse.json({ error: tooLong }, { status: 400 })
+
+  const url = type === "url" ? optionalString(body.url) : null
+  const text = type === "text" ? optionalString(body.text) : null
+  if (type === "url" && !url) return NextResponse.json({ error: "URL fehlt" }, { status: 400 })
+  if (type === "text" && !text) return NextResponse.json({ error: "Text fehlt" }, { status: 400 })
+
+  const quotaError = await consumeQuota(auth.user.id, "source")
+  if (quotaError) return NextResponse.json({ error: quotaError }, { status: 429 })
+
+  const db = getDb()
+
+  if (type === "pdf") {
+    const title = optionalString(body.filename) ?? "dokument.pdf"
+    const [row] = await db.insert(sources).values({ notebookId, type: "pdf", title, status: "processing" }).returning({ id: sources.id })
     return NextResponse.json({ sourceId: row.id })
   }
 
   let title: string
-  let text: string
+  let content: string
   let sourceUrl: string | null = null
 
-  if (body.type === "url") {
-    if (!body.url) return NextResponse.json({ error: "URL fehlt" }, { status: 400 })
+  if (url) {
     try {
-      const extracted = await extractFromUrl(body.url)
-      title = extracted.title
-      text = extracted.text
-      sourceUrl = body.url
+      const extracted = await extractFromUrl(url)
+      title = extracted.title.slice(0, MAX_LENGTH.title)
+      content = extracted.text
+      sourceUrl = extracted.url
     } catch (err) {
-      return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 422 })
+      if (err instanceof ExtractError) return NextResponse.json({ error: err.message }, { status: 422 })
+      console.error("URL-Import fehlgeschlagen:", err)
+      return NextResponse.json({ error: "Die Seite konnte nicht gelesen werden" }, { status: 422 })
     }
-  } else if (body.type === "text") {
-    text = body.text ?? ""
-    if (!text.trim()) return NextResponse.json({ error: "Text fehlt" }, { status: 400 })
-    title = body.title?.trim() || text.trim().split("\n")[0].slice(0, 80) || "Eingefügter Text"
   } else {
-    return NextResponse.json({ error: "Unbekannter Quelltyp" }, { status: 400 })
+    content = text!
+    title = optionalString(body.title) ?? (content.split("\n")[0].slice(0, 80) || "Eingefügter Text")
   }
 
-  const [row] = await db.insert(sources).values({ notebookId, type: body.type, title, sourceUrl, status: "processing" }).returning({ id: sources.id })
+  const [row] = await db.insert(sources).values({ notebookId, type, title, sourceUrl, status: "processing" }).returning({ id: sources.id })
 
   const key = sourceKey(notebookId, row.id, "content.txt")
   try {
-    await putObject(key, text, "text/plain; charset=utf-8")
+    await putObject(key, content, "text/plain; charset=utf-8")
     await db.update(sources).set({ storageKey: key }).where(eq(sources.id, row.id))
     await startIngestSource({ sourceId: row.id, notebookId, key, isPdf: false })
   } catch (err) {

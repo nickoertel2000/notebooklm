@@ -69,6 +69,22 @@
         // Cloudflare erlaubt nur 10 oder 60 s.
         "period": 60
       }
+    },
+    {
+      "name": "USER_RATE_LIMITER",
+      "namespace_id": "1002",
+      "simple": {
+        "limit": 20,
+        "period": 60
+      }
+    },
+    {
+      "name": "AUTH_RATE_LIMITER",
+      "namespace_id": "1003",
+      "simple": {
+        "limit": 20,
+        "period": 60
+      }
     }
   ],
   "vars": {
@@ -80,6 +96,6 @@
     "DEMO_MAX_ACCOUNTS": "300"
   },
   "secrets": {
-    "required": ["BETTER_AUTH_SECRET", "GEMINI_API_KEY", "TAVILY_API_KEY"]
+    "required": ["BETTER_AUTH_SECRET", "GEMINI_API_KEY", "TAVILY_API_KEY", "TURNSTILE_SECRET_KEY"]
   }
 }

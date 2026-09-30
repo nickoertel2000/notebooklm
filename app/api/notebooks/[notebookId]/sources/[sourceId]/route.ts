@@ -4,7 +4,8 @@ import { getDb } from "@/db"
 import { sourceChunks, sources } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { startIngestSource } from "@/lib/jobs/start"
-import { isUuid } from "@/lib/notebooks"
+import { consumeQuota } from "@/lib/quota"
+import { isUuid } from "@/lib/uuid"
 import { deleteByPrefix, sourcePrefix } from "@/lib/storage"
 
 type RouteContext = { params: Promise<{ notebookId: string; sourceId: string }> }
@@ -28,9 +29,18 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
   if (!row) return NextResponse.json({ error: "Quelle nicht gefunden" }, { status: 404 })
   if (!row.storageKey) return NextResponse.json({ error: "Kein Inhalt zum Wiederholen vorhanden" }, { status: 422 })
 
+  const quotaError = await consumeQuota(auth.user.id, "source")
+  if (quotaError) return NextResponse.json({ error: quotaError }, { status: 429 })
+
   const db = getDb()
+  // Bedingtes Update statt Lesen und Schreiben: Ein Doppelklick startet sonst zwei Importe.
+  const [claimed] = await db
+    .update(sources)
+    .set({ status: "processing", error: null, updatedAt: new Date() })
+    .where(and(eq(sources.id, sourceId), eq(sources.notebookId, notebookId), eq(sources.status, "failed")))
+    .returning({ id: sources.id })
+  if (!claimed) return NextResponse.json({ error: "Nur fehlgeschlagene Importe lassen sich wiederholen" }, { status: 409 })
   await db.delete(sourceChunks).where(eq(sourceChunks.sourceId, sourceId))
-  await db.update(sources).set({ status: "processing", error: null, updatedAt: new Date() }).where(eq(sources.id, sourceId))
 
   try {
     await startIngestSource({ sourceId, notebookId, key: row.storageKey, isPdf: row.type === "pdf" })

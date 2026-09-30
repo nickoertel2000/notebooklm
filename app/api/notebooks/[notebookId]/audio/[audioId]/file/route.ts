@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/db"
 import { audioOverviews } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
-import { isUuid } from "@/lib/notebooks"
+import { isUuid } from "@/lib/uuid"
 import { serveObject } from "@/lib/storage"
 
 type RouteContext = { params: Promise<{ notebookId: string; audioId: string }> }

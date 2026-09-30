@@ -5,7 +5,8 @@ import { audioOverviews, sources } from "@/db/schema"
 import { AudioLength, getAudioFormat } from "@/lib/audio"
 import { startAudio } from "@/lib/jobs/start"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
-import { readJsonBody, optionalString, parseSourceIds } from "@/lib/api/body"
+import { consumeQuota } from "@/lib/quota"
+import { lengthError, MAX_LENGTH, optionalString, parseSourceIds, readJsonBody } from "@/lib/api/body"
 
 // Großzügig, weil die TTS einer 'standard'-Länge lange dauern kann.
 const STALE_PROCESSING_MS = 15 * 60 * 1000
@@ -55,6 +56,11 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const db = getDb()
 
   const body = await readJsonBody(req)
+  const tooLong = lengthError([
+    [body.focus, MAX_LENGTH.focus],
+    [body.language, MAX_LENGTH.language]
+  ])
+  if (tooLong) return NextResponse.json({ error: tooLong }, { status: 400 })
   const format = getAudioFormat(String(body.format))
   if (!format) return NextResponse.json({ error: "Unbekanntes Audio-Format" }, { status: 400 })
 
@@ -66,15 +72,16 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const ready = await db
     .select({ id: sources.id })
     .from(sources)
-    .where(
-      and(eq(sources.notebookId, notebookId), eq(sources.status, "ready"), selectedIds && selectedIds.length > 0 ? inArray(sources.id, selectedIds) : undefined)
-    )
+    .where(and(eq(sources.notebookId, notebookId), eq(sources.status, "ready"), selectedIds ? inArray(sources.id, selectedIds) : undefined))
 
   if (ready.length === 0) {
     return NextResponse.json({ error: "Keine fertigen Quellen ausgewählt" }, { status: 400 })
   }
 
   const sourceCount = ready.length
+
+  const quotaError = await consumeQuota(auth.user.id, "studio")
+  if (quotaError) return NextResponse.json({ error: quotaError }, { status: 429 })
 
   const [created] = await db
     .insert(audioOverviews)

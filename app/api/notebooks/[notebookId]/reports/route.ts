@@ -5,8 +5,9 @@ import { reports, sources } from "@/db/schema"
 import { startReport } from "@/lib/jobs/start"
 import { getReportType } from "@/lib/reports"
 import { buildStudioInstruction, getAmount, getDifficulty, getStudioFormat } from "@/lib/studio"
-import { optionalString, parseSourceIds, readJsonBody } from "@/lib/api/body"
+import { lengthError, MAX_LENGTH, optionalString, parseSourceIds, readJsonBody } from "@/lib/api/body"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
+import { consumeQuota } from "@/lib/quota"
 
 const STALE_PROCESSING_MS = 10 * 60 * 1000
 
@@ -48,6 +49,13 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const db = getDb()
 
   const body = await readJsonBody(req)
+  const tooLong = lengthError([
+    [body.instruction, MAX_LENGTH.instruction],
+    [body.title, MAX_LENGTH.title],
+    [body.focus, MAX_LENGTH.focus],
+    [body.language, MAX_LENGTH.language]
+  ])
+  if (tooLong) return NextResponse.json({ error: tooLong }, { status: 400 })
 
   const studioFormat = getStudioFormat(body.format)
   const reportType = getReportType(String(body.type))
@@ -70,15 +78,16 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const ready = await db
     .select({ id: sources.id })
     .from(sources)
-    .where(
-      and(eq(sources.notebookId, notebookId), eq(sources.status, "ready"), selectedIds && selectedIds.length > 0 ? inArray(sources.id, selectedIds) : undefined)
-    )
+    .where(and(eq(sources.notebookId, notebookId), eq(sources.status, "ready"), selectedIds ? inArray(sources.id, selectedIds) : undefined))
 
   if (ready.length === 0) {
     return NextResponse.json({ error: "Keine fertigen Quellen ausgewählt" }, { status: 400 })
   }
 
   const sourceCount = ready.length
+
+  const quotaError = await consumeQuota(auth.user.id, "studio")
+  if (quotaError) return NextResponse.json({ error: quotaError }, { status: 429 })
 
   const [created] = await db
     .insert(reports)
