@@ -17,14 +17,13 @@ type ReportSuggestion = { title: string; description: string; prompt: string }
 
 type ReportModalProps = {
   notebookId: string
-  sourceIds: string[]
   onClose: () => void
   onGenerate: (payload: ReportGeneratePayload) => void
 }
 
 const LANGUAGES = ["Deutsch (Standard)", "English", "Français", "Español", "Italiano"]
 
-export default function ReportModal({ notebookId, sourceIds, onClose, onGenerate }: ReportModalProps) {
+export default function ReportModal({ notebookId, onClose, onGenerate }: ReportModalProps) {
   const [mode, setMode] = useState<"select" | "custom">("select")
   const [suggestions, setSuggestions] = useState<ReportSuggestion[] | null>(null)
   const [language, setLanguage] = useState(LANGUAGES[0])
@@ -35,9 +34,7 @@ export default function ReportModal({ notebookId, sourceIds, onClose, onGenerate
     ;(async () => {
       try {
         const res = await fetch(`/api/notebooks/${notebookId}/report-suggestions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sourceIds })
+          method: "POST"
         })
         if (!res.ok) throw new Error()
         const data = await readJson<{ suggestions?: ReportSuggestion[] }>(res)
@@ -49,7 +46,7 @@ export default function ReportModal({ notebookId, sourceIds, onClose, onGenerate
     return () => {
       cancelled = true
     }
-  }, [notebookId, sourceIds])
+  }, [notebookId])
 
   return (
     <div className={styles.overlay} onClick={onClose}>
