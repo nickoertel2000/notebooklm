@@ -2,9 +2,7 @@
 
 ## 1. Testen
 
-- [ ] Smoke-Test in Produktion: Login, Quelle (PDF/URL/Text, Status `ready`), Chat mit Zitaten, Bericht, Audio, Video.
-- [ ] Große Quelle importieren (PDF mit 30+ Seiten, mehr als 25 Chunks): Import läuft mit Pausen zwischen den Batches bis `ready` durch.
-- [ ] Demo-Vorlage fertig aufbauen ([`demo-notebooks.md`](demo-notebooks.md), Anleitung in [`anleitung-google-account.md`](anleitung-google-account.md), Abschnitt „Demo-Vorlage“).
+- [ ] Abmelden dauert auffällig lange: Ursache prüfen.
 
 ## 2. Neon beobachten
 
@@ -18,3 +16,9 @@ Hyperdrive hält einen eigenen Connection-Pool. Ob der Scale-to-Zero verhindert,
 Unit-Tests (Vitest), Deploy-Sperre in Workers Builds und GitHub Actions sind eingerichtet.
 
 - [ ] E2E-Tests mit Playwright (3–5 Abläufe ohne KI: Login, Demo-Zugang, Notebook anlegen, Text-Quelle, Demo-Notebook mit Zitaten öffnen). Voraussetzung: eigener Neon-Branch für Entwicklung und Tests.
+
+## 4. Rollenspiel: Bewertung durch einen KI-Agenten
+
+Recruiter lassen ein Projekt vermutlich von einem KI-Agenten prüfen, der einen Bericht mit Bewertung schreibt.
+
+- [ ] Das einmal simulieren: Agent bekommt Repo und Live-URL, schreibt eine Bewertung wie für einen Recruiter. Schwächen daraus beheben.

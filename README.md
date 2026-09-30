@@ -118,6 +118,14 @@ Die App ist eine öffentliche Demo und soll dauerhaft ohne laufende Kosten errei
 
 **Datenschutz:** Für Nutzer im EWR, in der Schweiz und im UK gelten bei Gemini auch im Gratis-Tarif die Datenregeln des Bezahl-Tarifs: Google verwendet die Eingaben nicht zur Produktverbesserung.
 
+**Betrieb und Monitoring:** Damit der Gratis-Betrieb nicht unbemerkt kippt, gibt es feste Kontrollpunkte:
+
+- **Gemini:** Tarif bleibt „Free“, im Google-Projekt ist bewusst keine Abrechnung eingerichtet, denn mit Zahlungsmethode wäre jeder Aufruf kostenpflichtig. Verbrauch pro Modell unter [AI Studio → Rate Limit](https://aistudio.google.com/rate-limit). Die Tageskontingente setzen um Mitternacht Pacific-Zeit zurück.
+- **Tavily:** Credits pro Monat unter [app.tavily.com](https://app.tavily.com), ohne hinterlegte Zahlungsmethode.
+- **Workers AI:** Tagesverbrauch der Folienbilder im Cloudflare-Dashboard unter AI → Workers AI.
+- **Neon:** Rechenzeit pro Tag im Neon-Dashboard unter Usage → Compute.
+- **Demo-Konten:** Ein täglicher Cron-Job löscht inaktive Konten und protokolliert die Anzahl in den Logs des Workers `notebooklm-jobs`.
+
 ---
 
 ## 🏗️ Architektur
