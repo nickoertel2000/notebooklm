@@ -16,7 +16,7 @@ paths:
 
 # Authentication (Better Auth)
 
-- Server config `auth.ts`: `getAuth()` builds the Better Auth instance per request (the DB client from `getDb()` is request-bound). Drizzle adapter (`provider: "pg"`), email + password only (no email verification). `secret` comes from `env` (`cloudflare:workers`), `baseURL` is `NEXT_PUBLIC_APP_URL`. Sessions are DB sessions, not JWT.
+- Server config `auth.ts`: `getAuth()` builds the Better Auth instance once per request via `cacheForRequest` (the DB client from `getDb()` is request-bound). Drizzle adapter (`provider: "pg"`), email + password only (no email verification). `secret` comes from `env` (`cloudflare:workers`), `baseURL` is `NEXT_PUBLIC_APP_URL`. Sessions are DB sessions, not JWT.
 - Handler: `app/api/auth/[...all]/route.ts` passes GET/POST to `getAuth().handler(request)`.
 - Server-side session: always `getSessionUser()` (`lib/auth/session.ts`); API routes use `authorizeNotebook()`.
 - Client: `authClient` from `auth-client.ts`, created **without** `baseURL` on purpose (uses the current origin; otherwise "Failed to fetch" on other ports/hosts). Sign-in/out and sign-up only through it.

@@ -10,7 +10,7 @@ paths:
 
 # Datenbank (Drizzle + Neon Postgres/pgvector über Hyperdrive)
 
-- All code (app and jobs Worker) uses `getDb()` from `@/db`: a new postgres.js client on the Hyperdrive connection string per request or Workflow step (Workers can't share sockets across requests; Hyperdrive does the pooling). Call it inside the handler after the auth check, never at module level. Prepared statements work, so no `prepare: false`.
+- All code (app and jobs Worker) uses `getDb()` from `@/db`. It is wrapped in `cacheForRequest` (`vinext/cache`): inside a request every call returns the same postgres.js client, so a page opens at most `max: 5` connections instead of one client per helper (Workers can't share sockets across requests; Hyperdrive does the pooling). Outside a request scope (Workflow steps, tests) each call creates a new client. Call it inside the handler after the auth check, never at module level. Prepared statements work, so no `prepare: false`.
 - Everything is in one file, `db/schema.ts`. Better Auth tables (`user`, `session`, `account`, `verification`, text IDs) are managed by Better Auth — don't add app columns there without checking the Better Auth schema config in `auth.ts`.
 - `drizzle.config.ts` reads `DATABASE_URL` (direct connection, no transaction pooler) from `.env.local`.
 

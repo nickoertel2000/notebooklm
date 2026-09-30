@@ -1,12 +1,13 @@
 import { env } from "cloudflare:workers"
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
+import { cacheForRequest } from "vinext/cache"
 import { getDb } from "@/db"
 import { account, session, user, verification } from "@/db/schema"
 
-// Pro Request neu aufgebaut, weil der DB-Client an den Request gebunden ist (siehe getDb).
-export function getAuth() {
-  return betterAuth({
+// Einmal pro Request, weil der DB-Client an den Request gebunden ist (siehe getDb).
+export const getAuth = cacheForRequest(() =>
+  betterAuth({
     baseURL: process.env.NEXT_PUBLIC_APP_URL,
     secret: env.BETTER_AUTH_SECRET,
     database: drizzleAdapter(getDb(), {
@@ -18,4 +19,4 @@ export function getAuth() {
       requireEmailVerification: false
     }
   })
-}
+)
