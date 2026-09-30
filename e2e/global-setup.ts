@@ -6,19 +6,19 @@ import postgres from "postgres"
 import { unstable_readConfig } from "wrangler"
 import { messages, notebooks, sourceChunks, sources, user } from "../db/schema"
 import { demoNotebook } from "./seed-data"
+import { startTestDatabase, stopTestDatabase, testDatabaseUrl } from "./test-database"
 
 export default async function globalSetup() {
-  const client = postgres(process.env.E2E_DATABASE_URL!, { max: 1, onnotice: () => {} })
-  const db = drizzle(client)
+  startTestDatabase()
+  const client = postgres(testDatabaseUrl, { max: 1, onnotice: () => {} })
   try {
-    await client`select 1`.catch(() => {
-      throw new Error("Testdatenbank nicht erreichbar. Starte sie mit: docker compose up -d")
-    })
+    const db = drizzle(client)
     await migrate(db, { migrationsFolder: "db/migrations" })
     await seedDemoTemplate(db)
   } finally {
     await client.end()
   }
+  return stopTestDatabase
 }
 
 // Die Vorlage, die POST /api/demo in jedes neue Demo-Konto kopiert. Ohne Embedding,

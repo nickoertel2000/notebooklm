@@ -13,7 +13,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit && tsc --noEmit -p containers/video-renderer",
     "test": "vitest run",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright install chromium && playwright test",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
     "cf-typegen": "wrangler types -c wrangler.jsonc -c workers/jobs/wrangler.jsonc && wrangler types -c workers/jobs/wrangler.jsonc --include-runtime=false --env-interface JobsEnv workers/jobs/worker-configuration.d.ts",
     "cf:secrets": "node scripts/cf.mjs secrets",

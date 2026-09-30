@@ -1,13 +1,6 @@
 import { randomBytes } from "node:crypto"
 import { defineConfig, devices } from "@playwright/test"
-
-// Standard ist die Testdatenbank aus compose.yaml, dieselbe Adresse nutzt der Service-Container der CI.
-const databaseUrl = process.env.E2E_DATABASE_URL ?? "postgres://e2e:e2e@localhost:5433/e2e"
-process.env.E2E_DATABASE_URL = databaseUrl
-
-if (!["localhost", "127.0.0.1"].includes(new URL(databaseUrl).hostname)) {
-  throw new Error("E2E-Tests laufen nur gegen eine lokale Testdatenbank (docker compose up -d), nie gegen Neon.")
-}
+import { testDatabaseUrl } from "./e2e/test-database"
 
 export default defineConfig({
   testDir: "e2e",
@@ -36,7 +29,7 @@ export default defineConfig({
     // Vorrang. Deshalb wird jedes Secret aus secrets.required und die Hyperdrive-Verbindung überschrieben.
     env: {
       E2E: "1",
-      CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: databaseUrl,
+      CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: testDatabaseUrl,
       BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
       GEMINI_API_KEY: "e2e-ohne-ki",
       TAVILY_API_KEY: "e2e-ohne-ki"

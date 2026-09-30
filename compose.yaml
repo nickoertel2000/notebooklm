@@ -10,3 +10,8 @@ services:
       - "5433:5432"
     tmpfs:
       - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "e2e"]
+      interval: 2s
+      timeout: 5s
+      retries: 15

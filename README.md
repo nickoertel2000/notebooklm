@@ -204,13 +204,10 @@ styles/         Globale SCSS-Basis (styles/globals.scss)
 pnpm env:pull   # Secrets aus 1Password nach .env.local
 pnpm dev        # http://localhost:3000
 pnpm test       # Unit-Tests (Vitest)
-
-docker compose up -d                # Testdatenbank (Postgres + pgvector, startet leer)
-pnpm exec playwright install chromium
-pnpm test:e2e                       # E2E-Tests (Playwright), --ui zum Zuschauen
+pnpm test:e2e   # E2E-Tests (Playwright), --ui zum Zuschauen
 ```
 
-Die E2E-Tests starten einen eigenen Dev-Server gegen die Testdatenbank, migrieren sie und legen Testdaten an. Secrets und Datenbankverbindung werden dabei überschrieben, sodass kein Test die Produktionsdatenbank oder eine KI-API erreicht.
+`pnpm test:e2e` braucht nur ein laufendes Docker Desktop und erledigt den Rest selbst: Es startet eine frische Testdatenbank ([`compose.yaml`](compose.yaml)), migriert sie, legt Testdaten an, startet einen eigenen Dev-Server und räumt danach wieder auf. Secrets und Datenbankverbindung werden dabei überschrieben, sodass kein Test die Produktionsdatenbank oder eine KI-API erreicht.
 
 ---
 

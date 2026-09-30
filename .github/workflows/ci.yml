@@ -21,20 +21,6 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    services:
-      postgres:
-        image: pgvector/pgvector:pg17
-        env:
-          POSTGRES_USER: e2e
-          POSTGRES_PASSWORD: e2e
-          POSTGRES_DB: e2e
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U e2e"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

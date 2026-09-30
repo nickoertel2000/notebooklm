@@ -48,7 +48,7 @@ These rules apply unconditionally, even if I explicitly ask you to break them:
 - `pnpm build` — production build of both Workers (`dist/`), `pnpm preview` runs it locally in workerd
 - `pnpm lint` — ESLint only; type-check separately with `pnpm typecheck` (app, jobs Worker, container)
 - `pnpm test` — Vitest unit tests (`lib/**/*.test.ts`)
-- `pnpm test:e2e` — Playwright E2E tests against the test DB from `docker compose up -d` (never production)
+- `pnpm test:e2e` — Playwright E2E tests; starts and stops its own test DB via Docker (never production)
 - `pnpm check` — lint + typecheck + tests in one go (the deploy gate and CI run exactly this)
 - `pnpm cf-typegen` — regenerate `worker-configuration.d.ts` after changing a `wrangler.jsonc`
 - `pnpm run deploy:jobs` / `pnpm run deploy:app` — manual deploy (normally Workers Builds on merge into `I-######-I-PRODUKTION-I-######-I`)
