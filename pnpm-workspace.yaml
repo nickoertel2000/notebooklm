@@ -1,5 +1,5 @@
 allowBuilds:
-  '@google/genai': false
+  "@google/genai": false
   "@parcel/watcher": true
   core-js: false
   esbuild: true

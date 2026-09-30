@@ -7,7 +7,12 @@ const { generateContent } = vi.hoisted(() => ({ generateContent: vi.fn() }))
 
 vi.mock("@google/genai", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@google/genai")>()
-  return { ...actual, GoogleGenAI: class { models = { generateContent } } }
+  return {
+    ...actual,
+    GoogleGenAI: class {
+      models = { generateContent }
+    }
+  }
 })
 
 const audio = (seconds: number) => ({
@@ -36,9 +41,7 @@ describe("synthesizeSpeech", () => {
   })
 
   it("wiederholt dasselbe Modell mit Textblock, wenn es speechMetadata ablehnt", async () => {
-    generateContent
-      .mockRejectedValueOnce(new ApiError({ message: "Speech metadata is not supported for this model.", status: 400 }))
-      .mockResolvedValueOnce(audio(1))
+    generateContent.mockRejectedValueOnce(new ApiError({ message: "Speech metadata is not supported for this model.", status: 400 })).mockResolvedValueOnce(audio(1))
     await synthesizeSpeech(DIALOG, 2)
 
     expect(generateContent.mock.calls.map(([req]) => req.model)).toEqual(["tts-neu", "tts-neu"])

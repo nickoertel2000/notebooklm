@@ -25,13 +25,7 @@ describe("parseStudioContent", () => {
     const valid = { question: "2 + 2?", options: ["3", "4", "5", "6"], answer: 1 }
     const raw = JSON.stringify({
       title: "Mathe",
-      questions: [
-        valid,
-        { ...valid, options: ["1", "2", "3"] },
-        { ...valid, answer: 4 },
-        { ...valid, answer: 1.5 },
-        { ...valid, options: ["1", "", "3", "4"] }
-      ]
+      questions: [valid, { ...valid, options: ["1", "2", "3"] }, { ...valid, answer: 4 }, { ...valid, answer: 1.5 }, { ...valid, options: ["1", "", "3", "4"] }]
     })
     expect(parseStudioContent("quiz", raw)).toEqual({
       format: "quiz",
