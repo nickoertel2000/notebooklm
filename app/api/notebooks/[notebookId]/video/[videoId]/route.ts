@@ -4,7 +4,7 @@ import { getDb } from "@/db"
 import { videoOverviews } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { cancelJob } from "@/lib/jobs/start"
-import { isUuid } from "@/lib/notebooks"
+import { isUuid } from "@/lib/uuid"
 import { deleteNotebookObject } from "@/lib/storage"
 
 type RouteContext = { params: Promise<{ notebookId: string; videoId: string }> }

@@ -4,7 +4,7 @@ import { getDb } from "@/db"
 import { sourceChunks, sources } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { chatModels, generateText } from "@/lib/gemini"
-import { readJsonBody, parseSourceIds } from "@/lib/api/body"
+import { checkRateLimit } from "@/lib/quota"
 
 export type ReportSuggestion = { title: string; description: string; prompt: string }
 
@@ -36,15 +36,14 @@ function parseSuggestions(text: string): ReportSuggestion[] {
   }
 }
 
-export async function POST(req: NextRequest, { params }: RouteContext) {
+export async function POST(_req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
 
   const auth = await authorizeNotebook(notebookId)
   if (auth.error) return auth.error
+  const rateError = await checkRateLimit(auth.user.id)
+  if (rateError) return NextResponse.json({ error: rateError }, { status: 429 })
   const db = getDb()
-
-  const body = await readJsonBody(req)
-  const selectedIds = parseSourceIds(body.sourceIds)
 
   const [sourceRows, chunkRows] = await Promise.all([
     db.select({ title: sources.title }).from(sources).where(eq(sources.notebookId, notebookId)).limit(20),
@@ -54,9 +53,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const titles = sourceRows.map((s) => `- ${s.title}`).join("\n")
   const excerpts = chunkRows.map((c) => c.content.slice(0, 500)).join("\n---\n")
   if (!titles && !excerpts) return NextResponse.json({ suggestions: [] })
-
-  // Vorschläge beziehen sich bewusst aufs ganze Notebook, nicht auf die Auswahl.
-  void selectedIds
 
   try {
     const text = await generateText({

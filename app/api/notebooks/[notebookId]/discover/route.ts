@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
+import { MAX_LENGTH, readJsonBody } from "@/lib/api/body"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { chatModels, generateText } from "@/lib/gemini"
+import { consumeQuota } from "@/lib/quota"
 import { SearchHit, SearchQuotaError, webSearch } from "@/lib/tavily"
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
@@ -43,9 +45,13 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const auth = await authorizeNotebook(notebookId)
   if (auth.error) return auth.error
 
-  const body = (await req.json()) as { query?: unknown; depth?: unknown }
+  const body = await readJsonBody(req)
   const query = typeof body.query === "string" ? body.query.trim() : ""
   if (!query) return NextResponse.json({ error: "Suchbegriff fehlt" }, { status: 400 })
+  if (query.length > MAX_LENGTH.query) return NextResponse.json({ error: "Der Suchbegriff ist zu lang" }, { status: 400 })
+
+  const quotaError = await consumeQuota(auth.user.id, "discover")
+  if (quotaError) return NextResponse.json({ error: quotaError }, { status: 429 })
 
   let hits: SearchHit[]
   try {

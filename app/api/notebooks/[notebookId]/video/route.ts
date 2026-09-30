@@ -3,9 +3,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/db"
 import { sources, videoOverviews } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
+import { consumeQuota } from "@/lib/quota"
 import { startVideo } from "@/lib/jobs/start"
 import { getVideoFormat, getVisualStyle } from "@/lib/video"
-import { readJsonBody, optionalString, parseSourceIds } from "@/lib/api/body"
+import { lengthError, MAX_LENGTH, optionalString, parseSourceIds, readJsonBody } from "@/lib/api/body"
 
 // Großzügig: Skript, TTS und Bild pro Folie, danach das Rendern.
 const STALE_PROCESSING_MS = 20 * 60 * 1000
@@ -56,6 +57,12 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const db = getDb()
 
   const body = await readJsonBody(req)
+  const tooLong = lengthError([
+    [body.focus, MAX_LENGTH.focus],
+    [body.customStyle, MAX_LENGTH.focus],
+    [body.language, MAX_LENGTH.language]
+  ])
+  if (tooLong) return NextResponse.json({ error: tooLong }, { status: 400 })
   const format = getVideoFormat(String(body.format))
   if (!format) return NextResponse.json({ error: "Unbekanntes Video-Format" }, { status: 400 })
 
@@ -70,15 +77,16 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const ready = await db
     .select({ id: sources.id })
     .from(sources)
-    .where(
-      and(eq(sources.notebookId, notebookId), eq(sources.status, "ready"), selectedIds && selectedIds.length > 0 ? inArray(sources.id, selectedIds) : undefined)
-    )
+    .where(and(eq(sources.notebookId, notebookId), eq(sources.status, "ready"), selectedIds ? inArray(sources.id, selectedIds) : undefined))
 
   if (ready.length === 0) {
     return NextResponse.json({ error: "Keine fertigen Quellen ausgewählt" }, { status: 400 })
   }
 
   const sourceCount = ready.length
+
+  const quotaError = await consumeQuota(auth.user.id, "studio")
+  if (quotaError) return NextResponse.json({ error: quotaError }, { status: 429 })
 
   const [created] = await db
     .insert(videoOverviews)
