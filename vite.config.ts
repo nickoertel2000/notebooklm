@@ -12,10 +12,19 @@ const e2e = process.env.E2E === "1"
 // Ohne Docker startet der Dev-Server trotzdem, nur das Rendern der Video-Übersicht schlägt fehl.
 const dockerAvailable = !e2e && spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0
 
+// Keine script-src/style-src: vinext bettet den RSC-Payload als Inline-Script ein, ohne Nonce bräche die App.
+const securityHeaders = [
+  { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+  { key: "Permissions-Policy", value: "camera=(), geolocation=(), microphone=(self)" }
+]
+
 export default defineConfig({
   plugins: [
     patchCssModules({ exportMode: "default" }),
-    vinext(),
+    vinext({ nextConfig: { headers: async () => [{ source: "/:path*", headers: securityHeaders }] } }),
     cloudflare({
       remoteBindings: !e2e,
       viteEnvironment: {
