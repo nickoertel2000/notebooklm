@@ -1,7 +1,7 @@
 "use client"
 
 import { Fragment, ReactNode } from "react"
-import type { Citation } from "@/app/(app)/notebook/[notebookId]/NotebookView"
+import type { Citation } from "@/lib/items"
 import Markdown from "@/components/Markdown/Markdown"
 import styles from "./CitedMarkdown.module.scss"
 

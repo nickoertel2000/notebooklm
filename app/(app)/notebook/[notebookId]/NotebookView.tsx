@@ -12,6 +12,7 @@ import ReportViewModal from "@/components/popup/ReportViewModal"
 import StudioOptionsModal from "@/components/popup/StudioOptionsModal"
 import Toast from "@/components/Toast/Toast"
 import VideoModal, { VideoOptions } from "@/components/popup/VideoModal"
+import type { AudioItem, ChatMessage, Citation, ReportItem, SourceItem, SourceType, VideoItem } from "@/lib/items"
 import { DEFAULT_NOTEBOOK_TITLE } from "@/lib/notebookTitle"
 import { replacePlaceholder } from "@/lib/placeholders"
 import { getReportType } from "@/lib/reports"
@@ -24,64 +25,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import styles from "../notebook.module.scss"
 import { errorMessage, readError, readJson, UserError } from "@/lib/api/client"
 
-export type Citation = {
-  marker: number
-  sourceId: string
-  chunkId: string
-  snippet: string
-  page: number | null
-  charStart: number | null
-  charEnd: number | null
-}
-
-export type ChatMessage = {
-  id: string
-  role: string
-  content: string
-  citations: Citation[] | null
-}
-
-export type SourceItem = {
-  id: string
-  type: string
-  title: string
-  status: string
-  error: string | null
-  sourceUrl: string | null
-  createdAt: string
-}
-
-export type ReportItem = {
-  id: string
-  type: string
-  title: string
-  sourceCount: number
-  status: string
-  createdAt: string
-}
-
-export type AudioItem = {
-  id: string
-  format: string
-  title: string
-  durationSeconds: number | null
-  sourceCount: number
-  status: string
-  createdAt: string
-}
-
-export type VideoItem = {
-  id: string
-  format: string
-  title: string
-  visualStyle: string
-  durationSeconds: number | null
-  sourceCount: number
-  status: string
-  createdAt: string
-}
-
-const SOURCE_ICON: Record<string, string> = { pdf: "picture_as_pdf", url: "link", text: "description" }
+const SOURCE_ICON: Record<SourceType, string> = { pdf: "picture_as_pdf", url: "link", text: "description" }
 
 type Props = {
   notebookId: string
@@ -821,7 +765,7 @@ function sourceTitleFor(sources: SourceItem[], sourceId: string) {
   return sources.find((s) => s.id === sourceId)?.title ?? "Quelle"
 }
 
-function SourceIcon({ type, url }: { type: string; url: string | null }) {
+function SourceIcon({ type, url }: { type: SourceType; url: string | null }) {
   const [failed, setFailed] = useState(false)
   const host = url ? hostOf(url) : null
 

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 import "material-symbols"
+import type { ReportSuggestion } from "@/lib/items"
+import { DEFAULT_LANGUAGE, STUDIO_LANGUAGES, type StudioLanguage } from "@/lib/languages"
 import { REPORT_TYPES } from "@/lib/reports"
 import styles from "./ReportModal.module.scss"
 import { errorMessage, readError, readJson, UserError } from "@/lib/api/client"
@@ -10,10 +12,8 @@ export type ReportGeneratePayload = {
   type?: string
   instruction?: string
   title?: string
-  language?: string
+  language?: StudioLanguage
 }
-
-type ReportSuggestion = { title: string; description: string; prompt: string }
 
 type ReportModalProps = {
   notebookId: string
@@ -21,13 +21,11 @@ type ReportModalProps = {
   onGenerate: (payload: ReportGeneratePayload) => void
 }
 
-const LANGUAGES = ["Deutsch (Standard)", "English", "Français", "Español", "Italiano"]
-
 export default function ReportModal({ notebookId, onClose, onGenerate }: ReportModalProps) {
   const [mode, setMode] = useState<"select" | "custom">("select")
   const [suggestions, setSuggestions] = useState<ReportSuggestion[] | null>(null)
   const [suggestError, setSuggestError] = useState("")
-  const [language, setLanguage] = useState(LANGUAGES[0])
+  const [language, setLanguage] = useState<StudioLanguage>(DEFAULT_LANGUAGE)
   const [customText, setCustomText] = useState("")
 
   useEffect(() => {
@@ -112,8 +110,8 @@ export default function ReportModal({ notebookId, onClose, onGenerate }: ReportM
         ) : (
           <div className={styles.body}>
             <p className={styles.fieldLabel}>Sprache auswählen</p>
-            <select className={styles.langSelect} value={language} onChange={(e) => setLanguage(e.target.value)}>
-              {LANGUAGES.map((l) => (
+            <select className={styles.langSelect} value={language} onChange={(e) => setLanguage(e.target.value as StudioLanguage)}>
+              {STUDIO_LANGUAGES.map((l) => (
                 <option key={l} value={l}>
                   {l}
                 </option>

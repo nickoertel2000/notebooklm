@@ -5,7 +5,6 @@ export const MAX_LENGTH = {
   title: 200,
   instruction: 2000,
   focus: 500,
-  language: 40,
   query: 300,
   url: 2048,
   text: 500_000

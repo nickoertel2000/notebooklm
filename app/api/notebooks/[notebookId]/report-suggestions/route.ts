@@ -3,11 +3,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/db"
 import { sourceChunks, sources } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
+import type { ReportSuggestion } from "@/lib/items"
 import { chatModels, generateText } from "@/lib/gemini"
 import { SOURCES_ARE_DATA, wrapSources } from "@/lib/prompts"
 import { consumeQuota } from "@/lib/quota"
-
-export type ReportSuggestion = { title: string; description: string; prompt: string }
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
 

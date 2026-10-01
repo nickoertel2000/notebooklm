@@ -4,6 +4,7 @@ import { getDb } from "@/db"
 import { sourceChunks, sources } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { startIngestSource } from "@/lib/jobs/start"
+import { sourceRetryable } from "@/lib/notebookItems"
 import { consumeQuota } from "@/lib/quota"
 import { isUuid } from "@/lib/uuid"
 import { deleteByPrefix, sourcePrefix } from "@/lib/storage"
@@ -37,7 +38,7 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
   const [claimed] = await db
     .update(sources)
     .set({ status: "processing", error: null, updatedAt: new Date() })
-    .where(and(eq(sources.id, sourceId), eq(sources.notebookId, notebookId), eq(sources.status, "failed")))
+    .where(and(eq(sources.id, sourceId), eq(sources.notebookId, notebookId), sourceRetryable))
     .returning({ id: sources.id })
   if (!claimed) return NextResponse.json({ error: "Nur fehlgeschlagene Importe lassen sich wiederholen" }, { status: 409 })
   await db.delete(sourceChunks).where(eq(sourceChunks.sourceId, sourceId))

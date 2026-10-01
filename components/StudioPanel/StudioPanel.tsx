@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import "material-symbols"
-import type { AudioItem, ReportItem, VideoItem } from "@/app/(app)/notebook/[notebookId]/NotebookView"
+import type { AudioItem, ReportItem, VideoItem } from "@/lib/items"
 import { getAudioFormat } from "@/lib/audio"
 import { getReportType } from "@/lib/reports"
 import { getStudioFormat, STUDIO_FORMATS, StudioFormatId } from "@/lib/studio"
