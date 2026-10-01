@@ -2,6 +2,7 @@
 paths:
   - "app/**/*.tsx"
   - "app/**/*.scss"
+  - "app/(app)/notebook/**"
   - "components/**"
   - "styles/**"
   - "lib/useDictation.ts"

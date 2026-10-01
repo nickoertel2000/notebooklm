@@ -18,6 +18,7 @@ paths:
   - "app/api/notebooks/*/audio/**"
   - "app/api/notebooks/*/video/**"
   - "components/popup/**"
+  - "app/(app)/notebook/**/use*.ts"
 ---
 
 # Asynchrone Jobs (Cloudflare Workflows)

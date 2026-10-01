@@ -6,6 +6,7 @@ paths:
   - "lib/languages.ts"
   - "lib/prompts.ts"
   - "lib/quota.ts"
+  - "lib/chatStream.ts"
 ---
 
 # API Route Handlers & Server Actions
