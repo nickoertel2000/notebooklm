@@ -3,12 +3,13 @@
 import { useState } from "react"
 import "material-symbols"
 import { AudioFormat, AudioLength, AUDIO_FORMATS } from "@/lib/audio"
+import { DEFAULT_LANGUAGE, STUDIO_LANGUAGES, type StudioLanguage } from "@/lib/languages"
 import styles from "./AudioModal.module.scss"
 
 export type AudioOptions = {
   format: AudioFormat
   length: AudioLength
-  language: string
+  language: StudioLanguage
   focus: string
 }
 
@@ -17,12 +18,10 @@ type AudioModalProps = {
   onCreate: (options: AudioOptions) => void
 }
 
-const LANGUAGES = ["Deutsch", "English", "Français", "Español", "Italiano"]
-
 export default function AudioModal({ onClose, onCreate }: AudioModalProps) {
   const [formatId, setFormatId] = useState(AUDIO_FORMATS[0].id)
   const [length, setLength] = useState<AudioLength>("standard")
-  const [language, setLanguage] = useState("Deutsch")
+  const [language, setLanguage] = useState<StudioLanguage>(DEFAULT_LANGUAGE)
   const [focus, setFocus] = useState("")
 
   function submit() {
@@ -64,8 +63,8 @@ export default function AudioModal({ onClose, onCreate }: AudioModalProps) {
           <div className={styles.row}>
             <div className={styles.field}>
               <p className={styles.sectionLabel}>Sprache auswählen</p>
-              <select className={styles.select} value={language} onChange={(e) => setLanguage(e.target.value)}>
-                {LANGUAGES.map((l) => (
+              <select className={styles.select} value={language} onChange={(e) => setLanguage(e.target.value as StudioLanguage)}>
+                {STUDIO_LANGUAGES.map((l) => (
                   <option key={l} value={l}>
                     {l}
                   </option>

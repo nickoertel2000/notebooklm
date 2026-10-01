@@ -3,11 +3,12 @@
 import { useState } from "react"
 import "material-symbols"
 import { VideoFormat, VIDEO_FORMATS, VisualStyle, VISUAL_STYLES } from "@/lib/video"
+import { DEFAULT_LANGUAGE, STUDIO_LANGUAGES, type StudioLanguage } from "@/lib/languages"
 import styles from "./VideoModal.module.scss"
 
 export type VideoOptions = {
   format: VideoFormat
-  language: string
+  language: StudioLanguage
   visualStyle: VisualStyle
   customStyle: string
   focus: string
@@ -18,11 +19,9 @@ type VideoModalProps = {
   onCreate: (options: VideoOptions) => void
 }
 
-const LANGUAGES = ["Deutsch", "English", "Français", "Español", "Italiano"]
-
 export default function VideoModal({ onClose, onCreate }: VideoModalProps) {
   const [formatId, setFormatId] = useState(VIDEO_FORMATS[0].id)
-  const [language, setLanguage] = useState("Deutsch")
+  const [language, setLanguage] = useState<StudioLanguage>(DEFAULT_LANGUAGE)
   const [styleId, setStyleId] = useState(VISUAL_STYLES[0].id)
   const [customStyle, setCustomStyle] = useState("")
   const [focus, setFocus] = useState("")
@@ -65,8 +64,8 @@ export default function VideoModal({ onClose, onCreate }: VideoModalProps) {
           </div>
 
           <p className={styles.sectionLabel}>Sprache auswählen</p>
-          <select className={styles.select} value={language} onChange={(e) => setLanguage(e.target.value)}>
-            {LANGUAGES.map((l) => (
+          <select className={styles.select} value={language} onChange={(e) => setLanguage(e.target.value as StudioLanguage)}>
+            {STUDIO_LANGUAGES.map((l) => (
               <option key={l} value={l}>
                 {l}
               </option>

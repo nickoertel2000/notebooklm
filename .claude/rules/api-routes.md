@@ -10,6 +10,10 @@ Alles, was Notebook-Inhalte betrifft (Quellen, Chat, Studio, discover, auto-titl
 
 Referenz: `app/api/notebooks/[notebookId]/audio/route.ts` (Liste + Job erstellen), `chat/route.ts` (Streaming).
 
+- Listen-`GET` und die Notebook-Seite laden über dieselben Funktionen aus `lib/notebookItems.ts` (`listSources`, `listReports`, …). Ein GET schreibt nie in die DB.
+- Studio-Jobs (Bericht, Audio, Video) validieren ihre Felder selbst und übergeben dann an `createStudioJob` (`lib/jobs/studioJob.ts`): fertige Quellen prüfen, Kontingent `studio` buchen, Zeile anlegen, Workflow starten, bei einem Startfehler die Zeile auf `failed` setzen. Ein neues Studio-Format nutzt denselben Helper.
+- Die Sprache für Studio-Inhalte kommt nur aus `STUDIO_LANGUAGES` (`parseLanguage`, `lib/languages.ts`), weil sie im System-Prompt landet. Die Modals nutzen dieselbe Liste.
+
 ## Auth & Ownership
 
 - `proxy.ts` prüft nur, dass ein Session-Cookie existiert, und leitet auf `/login` um – das ist keine Auth-Prüfung. Jeder Handler prüft selbst:

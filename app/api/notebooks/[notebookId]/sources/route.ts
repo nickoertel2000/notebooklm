@@ -1,4 +1,4 @@
-import { and, asc, eq, lt } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/db"
 import { sources } from "@/db/schema"
@@ -6,11 +6,9 @@ import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { lengthError, MAX_LENGTH, optionalString, readJsonBody } from "@/lib/api/body"
 import { ExtractError, extractFromUrl } from "@/lib/extract"
 import { startIngestSource } from "@/lib/jobs/start"
+import { listSources } from "@/lib/notebookItems"
 import { consumeQuota } from "@/lib/quota"
 import { putObject, sourceKey } from "@/lib/storage"
-
-// Fängt auch PDF-Quellen ab, deren Upload nie angekommen ist.
-const STALE_PROCESSING_MS = 15 * 60 * 1000
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
 
@@ -19,27 +17,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   const auth = await authorizeNotebook(notebookId)
   if (auth.error) return auth.error
 
-  const db = getDb()
-  await db
-    .update(sources)
-    .set({ status: "failed", error: "Zeitüberschreitung beim Import", updatedAt: new Date() })
-    .where(and(eq(sources.notebookId, notebookId), eq(sources.status, "processing"), lt(sources.updatedAt, new Date(Date.now() - STALE_PROCESSING_MS))))
-
-  const rows = await db
-    .select({
-      id: sources.id,
-      type: sources.type,
-      title: sources.title,
-      status: sources.status,
-      error: sources.error,
-      sourceUrl: sources.sourceUrl,
-      createdAt: sources.createdAt
-    })
-    .from(sources)
-    .where(eq(sources.notebookId, notebookId))
-    .orderBy(asc(sources.createdAt))
-
-  return NextResponse.json({ sources: rows })
+  return NextResponse.json({ sources: await listSources(getDb(), notebookId) })
 }
 
 // PDF: nur die Zeile anlegen, den Import startet erst der Upload per PUT auf sources/[sourceId]/file.
