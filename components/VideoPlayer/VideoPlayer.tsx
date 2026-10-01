@@ -2,6 +2,7 @@
 
 import "material-symbols"
 import styles from "./VideoPlayer.module.scss"
+import Modal from "@/components/Modal/Modal"
 
 type VideoPlayerProps = {
   title: string
@@ -11,16 +12,14 @@ type VideoPlayerProps = {
 
 export default function VideoPlayer({ title, src, onClose }: VideoPlayerProps) {
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-        <header className={styles.header}>
-          <span className={styles.title}>{title}</span>
-          <button type="button" className={styles.close} onClick={onClose} aria-label="Schließen">
-            <span className="material-symbols-outlined">close</span>
-          </button>
-        </header>
-        <video className={styles.video} src={src} controls autoPlay playsInline />
-      </div>
-    </div>
+    <Modal label={title} className={styles.modal} onClose={onClose}>
+      <header className={styles.header}>
+        <span className={styles.title}>{title}</span>
+        <button type="button" className={styles.close} onClick={onClose} aria-label="Schließen">
+          <span className="material-symbols-outlined">close</span>
+        </button>
+      </header>
+      <video className={styles.video} src={src} controls autoPlay playsInline />
+    </Modal>
   )
 }

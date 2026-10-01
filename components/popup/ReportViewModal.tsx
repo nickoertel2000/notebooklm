@@ -10,6 +10,7 @@ import QuizView from "@/components/QuizView/QuizView"
 import { getStudioFormat, parseStudioContent, StudioContent } from "@/lib/studio"
 import styles from "./ReportModal.module.scss"
 import { errorMessage, readJson, UserError } from "@/lib/api/client"
+import Modal from "@/components/Modal/Modal"
 
 type ReportViewModalProps = {
   notebookId: string
@@ -62,32 +63,30 @@ export default function ReportViewModal({ notebookId, reportId, title, onClose }
   }
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={`${styles.modal} ${wide ? styles.modalWide : ""}`} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-        <header className={styles.header}>
-          <h2 className={styles.title}>{title}</h2>
-          <button type="button" className={styles.close} onClick={onClose} aria-label="Schließen">
-            <span className="material-symbols-outlined">close</span>
-          </button>
-        </header>
+    <Modal label={title} className={`${styles.modal} ${wide ? styles.modalWide : ""}`} onClose={onClose}>
+      <header className={styles.header}>
+        <h2 className={styles.title}>{title}</h2>
+        <button type="button" className={styles.close} onClick={onClose} aria-label="Schließen">
+          <span className="material-symbols-outlined">close</span>
+        </button>
+      </header>
 
-        <div className={styles.body}>
-          {error && <p className={styles.error}>{error}</p>}
-          {!loaded && !error && <p className={styles.loading}>Wird geladen…</p>}
-          {loaded?.kind === "markdown" && <Markdown>{loaded.content}</Markdown>}
-          {loaded?.kind === "studio" && <StudioContentView content={loaded.content} />}
-        </div>
-
-        {copyText && (
-          <footer className={styles.footer}>
-            <button type="button" className={styles.copyBtn} onClick={copy}>
-              <span className="material-symbols-outlined">{copied ? "check" : "content_copy"}</span>
-              {copied ? "Kopiert" : "Kopieren"}
-            </button>
-          </footer>
-        )}
+      <div className={styles.body}>
+        {error && <p className={styles.error}>{error}</p>}
+        {!loaded && !error && <p className={styles.loading}>Wird geladen…</p>}
+        {loaded?.kind === "markdown" && <Markdown>{loaded.content}</Markdown>}
+        {loaded?.kind === "studio" && <StudioContentView content={loaded.content} />}
       </div>
-    </div>
+
+      {copyText && (
+        <footer className={styles.footer}>
+          <button type="button" className={styles.copyBtn} onClick={copy}>
+            <span className="material-symbols-outlined">{copied ? "check" : "content_copy"}</span>
+            {copied ? "Kopiert" : "Kopieren"}
+          </button>
+        </footer>
+      )}
+    </Modal>
   )
 }
 
