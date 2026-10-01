@@ -10,6 +10,7 @@ import AudioModal, { AudioOptions } from "@/components/popup/AudioModal"
 import ReportModal, { ReportGeneratePayload } from "@/components/popup/ReportModal"
 import ReportViewModal from "@/components/popup/ReportViewModal"
 import StudioOptionsModal from "@/components/popup/StudioOptionsModal"
+import Toast from "@/components/Toast/Toast"
 import VideoModal, { VideoOptions } from "@/components/popup/VideoModal"
 import { DEFAULT_NOTEBOOK_TITLE } from "@/lib/notebookTitle"
 import { getReportType } from "@/lib/reports"
@@ -20,7 +21,7 @@ import "material-symbols"
 import Image from "next/image"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import styles from "../notebook.module.scss"
-import { readError, readJson } from "@/lib/api/client"
+import { errorMessage, readError, readJson } from "@/lib/api/client"
 
 export type Citation = {
   marker: number
@@ -114,6 +115,8 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   const chatAbortRef = useRef<AbortController | null>(null)
   const [activeSourceId, setActiveSourceId] = useState<string | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const [toast, setToast] = useState<{ id: number; message: string } | null>(null)
+  const showError = (message: string) => setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message }))
 
   const dictation = useDictation("de-DE")
   const dictationBaseRef = useRef("")
@@ -251,7 +254,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "text", title: payload.title, text: payload.text })
       })
-      if (!res.ok) throw new Error("Text fehlgeschlagen")
+      if (!res.ok) throw new Error(await readError(res, "Text fehlgeschlagen"))
       newId = (await readJson<{ sourceId: string }>(res)).sourceId
     }
     if (newId) setSelectedIds((prev) => new Set(prev).add(newId!))
@@ -262,6 +265,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
 
   async function handleImportSources(urls: string[]) {
     const newIds: string[] = []
+    const errors: string[] = []
     for (const url of urls) {
       try {
         const res = await fetch(`/api/notebooks/${notebookId}/sources`, {
@@ -269,14 +273,14 @@ export default function NotebookView({ notebookId, title, initialSources, initia
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "url", url })
         })
-        if (res.ok) {
-          const { sourceId } = await readJson<{ sourceId: string }>(res)
-          if (sourceId) newIds.push(sourceId)
-        }
-      } catch {
-        // Einzelne fehlgeschlagene URL überspringen.
+        if (!res.ok) throw new Error(await readError(res, "Import fehlgeschlagen"))
+        const { sourceId } = await readJson<{ sourceId: string }>(res)
+        newIds.push(sourceId)
+      } catch (err) {
+        errors.push(`${hostOf(url)}: ${errorMessage(err, "Import fehlgeschlagen")}`)
       }
     }
+    if (errors.length > 0) showError(`${errors.length} von ${urls.length} Quellen konnten nicht importiert werden. ${errors[0]}`)
     if (newIds.length > 0) {
       setSelectedIds((prev) => {
         const next = new Set(prev)
@@ -292,16 +296,21 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     setSources((prev) => prev.map((s) => (s.id === sourceId ? { ...s, status: "processing", error: null } : s)))
     try {
       const res = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}`, { method: "POST" })
-      if (!res.ok) throw new Error()
-    } catch {
+      if (!res.ok) throw new Error(await readError(res, "Der Import konnte nicht neu gestartet werden."))
+    } catch (err) {
       setSources((prev) => prev.map((s) => (s.id === sourceId ? { ...s, status: "failed" } : s)))
+      showError(errorMessage(err, "Der Import konnte nicht neu gestartet werden."))
       return
     }
     await refreshSources()
   }
 
   async function handleDeleteSource(sourceId: string) {
-    await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}`, { method: "DELETE" })
+    const res = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}`, { method: "DELETE" }).catch(() => null)
+    if (!res?.ok) {
+      showError(res ? await readError(res, "Die Quelle konnte nicht gelöscht werden.") : "Die Quelle konnte nicht gelöscht werden.")
+      return
+    }
     setSelectedIds((prev) => {
       const next = new Set(prev)
       next.delete(sourceId)
@@ -342,15 +351,16 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       if (!res.ok) throw new Error(await readError(res, "Bericht fehlgeschlagen"))
       const { report } = await readJson<{ report: ReportItem }>(res)
       setReports((prev) => prev.map((r) => (r.id === tempId ? report : r)))
-    } catch {
-      setReports((prev) => prev.map((r) => (r.id === tempId ? { ...r, status: "failed" } : r)))
+    } catch (err) {
+      setReports((prev) => prev.filter((r) => r.id !== tempId))
+      showError(errorMessage(err, "Bericht fehlgeschlagen"))
     }
   }
 
   async function handleDeleteReport(reportId: string) {
     setReports((prev) => prev.filter((r) => r.id !== reportId))
     if (!reportId.startsWith("temp-")) {
-      await fetch(`/api/notebooks/${notebookId}/reports/${reportId}`, { method: "DELETE" })
+      await deleteOnServer(`/api/notebooks/${notebookId}/reports/${reportId}`, "Der Eintrag konnte nicht gelöscht werden.", refreshReports)
     }
   }
 
@@ -383,8 +393,9 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       if (!res.ok) throw new Error(await readError(res, "Audio fehlgeschlagen"))
       const { audio } = await readJson<{ audio: AudioItem }>(res)
       setAudios((prev) => prev.map((a) => (a.id === tempId ? audio : a)))
-    } catch {
-      setAudios((prev) => prev.map((a) => (a.id === tempId ? { ...a, status: "failed" } : a)))
+    } catch (err) {
+      setAudios((prev) => prev.filter((a) => a.id !== tempId))
+      showError(errorMessage(err, "Audio fehlgeschlagen"))
     }
   }
 
@@ -395,7 +406,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       setAudioPlaying(false)
     }
     if (!audioId.startsWith("temp-")) {
-      await fetch(`/api/notebooks/${notebookId}/audio/${audioId}`, { method: "DELETE" })
+      await deleteOnServer(`/api/notebooks/${notebookId}/audio/${audioId}`, "Die Audio-Übersicht konnte nicht gelöscht werden.", refreshAudios)
     }
   }
 
@@ -405,8 +416,8 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       setAudioPlaying(false)
       return
     }
-    const res = await fetch(`/api/notebooks/${notebookId}/audio/${audioId}`)
-    if (!res.ok) return
+    const res = await fetch(`/api/notebooks/${notebookId}/audio/${audioId}`).catch(() => null)
+    if (!res?.ok) return showError("Die Audio-Übersicht konnte nicht geladen werden.")
     const { audio } = await readJson<{ audio: { title: string; url: string | null } }>(res)
     if (audio.url) setPlayingAudio({ id: audioId, url: audio.url, title: audio.title })
   }
@@ -442,8 +453,9 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       if (!res.ok) throw new Error(await readError(res, "Video fehlgeschlagen"))
       const { video } = await readJson<{ video: VideoItem }>(res)
       setVideos((prev) => prev.map((v) => (v.id === tempId ? video : v)))
-    } catch {
-      setVideos((prev) => prev.map((v) => (v.id === tempId ? { ...v, status: "failed" } : v)))
+    } catch (err) {
+      setVideos((prev) => prev.filter((v) => v.id !== tempId))
+      showError(errorMessage(err, "Video fehlgeschlagen"))
     }
   }
 
@@ -451,15 +463,23 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     setVideos((prev) => prev.filter((v) => v.id !== videoId))
     if (playingVideo?.id === videoId) setPlayingVideo(null)
     if (!videoId.startsWith("temp-")) {
-      await fetch(`/api/notebooks/${notebookId}/video/${videoId}`, { method: "DELETE" })
+      await deleteOnServer(`/api/notebooks/${notebookId}/video/${videoId}`, "Die Video-Übersicht konnte nicht gelöscht werden.", refreshVideos)
     }
   }
 
   async function handlePlayVideo(videoId: string) {
-    const res = await fetch(`/api/notebooks/${notebookId}/video/${videoId}`)
-    if (!res.ok) return
+    const res = await fetch(`/api/notebooks/${notebookId}/video/${videoId}`).catch(() => null)
+    if (!res?.ok) return showError("Die Video-Übersicht konnte nicht geladen werden.")
     const { video } = await readJson<{ video: { title: string; url: string | null } }>(res)
     if (video.url) setPlayingVideo({ id: videoId, url: video.url, title: video.title })
+  }
+
+  // Der Eintrag ist schon optimistisch entfernt. Scheitert das Löschen, holt refresh ihn zurück.
+  async function deleteOnServer(url: string, failure: string, refresh: () => Promise<void>) {
+    const res = await fetch(url, { method: "DELETE" }).catch(() => null)
+    if (res?.ok) return
+    showError(res ? await readError(res, failure) : failure)
+    await refresh()
   }
 
   function handleOpenTool(tool: StudioTool) {
@@ -787,6 +807,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       {videoOpen && <VideoModal onClose={() => setVideoOpen(false)} onCreate={handleCreateVideo} />}
       {viewReport && <ReportViewModal notebookId={notebookId} reportId={viewReport.id} title={viewReport.title} onClose={() => setViewReport(null)} />}
       {playingVideo && <VideoPlayer title={playingVideo.title} src={playingVideo.url} onClose={() => setPlayingVideo(null)} />}
+      {toast && <Toast key={toast.id} message={toast.message} onClose={() => setToast(null)} />}
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import "material-symbols"
 import { REPORT_TYPES } from "@/lib/reports"
 import styles from "./ReportModal.module.scss"
-import { readJson } from "@/lib/api/client"
+import { errorMessage, readError, readJson } from "@/lib/api/client"
 
 export type ReportGeneratePayload = {
   type?: string
@@ -26,6 +26,7 @@ const LANGUAGES = ["Deutsch (Standard)", "English", "Français", "Español", "It
 export default function ReportModal({ notebookId, onClose, onGenerate }: ReportModalProps) {
   const [mode, setMode] = useState<"select" | "custom">("select")
   const [suggestions, setSuggestions] = useState<ReportSuggestion[] | null>(null)
+  const [suggestError, setSuggestError] = useState("")
   const [language, setLanguage] = useState(LANGUAGES[0])
   const [customText, setCustomText] = useState("")
 
@@ -36,11 +37,13 @@ export default function ReportModal({ notebookId, onClose, onGenerate }: ReportM
         const res = await fetch(`/api/notebooks/${notebookId}/report-suggestions`, {
           method: "POST"
         })
-        if (!res.ok) throw new Error()
+        if (!res.ok) throw new Error(await readError(res, ""))
         const data = await readJson<{ suggestions?: ReportSuggestion[] }>(res)
         if (!cancelled) setSuggestions(data.suggestions ?? [])
-      } catch {
-        if (!cancelled) setSuggestions([])
+      } catch (err) {
+        if (cancelled) return
+        setSuggestions([])
+        setSuggestError(errorMessage(err, ""))
       }
     })()
     return () => {
@@ -91,7 +94,10 @@ export default function ReportModal({ notebookId, onClose, onGenerate }: ReportM
                 ))}
               </div>
             ) : suggestions.length === 0 ? (
-              <p className={styles.suggestHint}>Keine Vorschläge verfügbar – wähle ein Format oben oder erstelle einen eigenen Bericht.</p>
+              <p className={styles.suggestHint}>
+                {suggestError ? `${suggestError} ` : "Keine Vorschläge verfügbar. "}
+                Wähle ein Format oben oder erstelle einen eigenen Bericht.
+              </p>
             ) : (
               <div className={styles.formatGrid}>
                 {suggestions.map((s, i) => (
