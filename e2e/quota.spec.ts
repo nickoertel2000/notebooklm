@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test"
 import postgres from "postgres"
 import { MAX_NOTEBOOKS_PER_USER } from "../lib/demoConfig"
-import { expectHome, register } from "./helpers"
+import { expectHome, signInAsNewUser } from "./helpers"
 import { testDatabaseUrl } from "./test-database"
 
 test("Das Tageslimit pro Konto stoppt weitere Websuchen", async ({ page }) => {
-  await register(page)
+  await signInAsNewUser(page)
   await page.getByRole("button", { name: "Neu erstellen" }).click()
   await expect(page).toHaveURL(/\/notebook\/[0-9a-f-]+$/)
   const discover = `/api/notebooks/${page.url().split("/").pop()}/discover`
@@ -22,7 +22,7 @@ test("Das Tageslimit pro Konto stoppt weitere Websuchen", async ({ page }) => {
 })
 
 test("Die Obergrenze für Notebooks zeigt einen Hinweis statt ein weiteres anzulegen", async ({ page }) => {
-  const account = await register(page)
+  const account = await signInAsNewUser(page)
   const sql = postgres(testDatabaseUrl, { max: 1, onnotice: () => {} })
   try {
     await sql`insert into notebooks (user_id) select id from "user", generate_series(1, ${MAX_NOTEBOOKS_PER_USER}::int) where email = ${account.email}`
