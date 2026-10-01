@@ -10,17 +10,18 @@ import { MAX_LENGTH } from "@/lib/api/body"
 import { pickNotebookEmoji } from "@/lib/notebookIcons"
 import { getNotebookForUser } from "@/lib/notebooks"
 import { cancelJob } from "@/lib/jobs/start"
-import { checkRateLimit, consumeQuota, MAX_NOTEBOOKS_PER_USER } from "@/lib/quota"
+import { MAX_NOTEBOOKS_PER_USER } from "@/lib/demoConfig"
+import { checkRateLimit, consumeQuota } from "@/lib/quota"
 import { deleteByPrefix, notebookPrefix } from "@/lib/storage"
 
 export async function createNotebook() {
   const user = await getSessionUser()
   if (!user) redirect("/login")
 
+  if (await checkRateLimit(user.id)) redirect("/?hinweis=rate-limit")
   const db = getDb()
   const [{ n }] = await db.select({ n: count() }).from(notebooks).where(eq(notebooks.userId, user.id))
   if (n >= MAX_NOTEBOOKS_PER_USER) redirect("/?hinweis=notebook-limit")
-  if (await checkRateLimit(user.id)) redirect("/?hinweis=rate-limit")
 
   const [row] = await db.insert(notebooks).values({ userId: user.id }).returning({ id: notebooks.id })
 

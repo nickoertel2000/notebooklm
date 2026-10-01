@@ -4,7 +4,7 @@ import Header from "@/components/Header/Header"
 import NotebookCard from "@/components/NotebookCard/NotebookCard"
 import { getSessionUser } from "@/lib/auth/session"
 import { getNotebooksForUser } from "@/lib/notebooks"
-import { MAX_NOTEBOOKS_PER_USER } from "@/lib/quota"
+import { MAX_NOTEBOOKS_PER_USER } from "@/lib/demoConfig"
 import { createNotebook } from "./actions"
 import "./notebook-home.scss"
 

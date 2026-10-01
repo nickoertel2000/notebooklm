@@ -21,9 +21,6 @@ const LIMIT_LABELS: Record<UsageKind, string> = {
   assist: "KI-Vorschläge"
 }
 
-// Gegen Skripte, die die Gratis-Datenbank mit leeren Notebooks füllen.
-export const MAX_NOTEBOOKS_PER_USER = 30
-
 export async function checkRateLimit(userId: string): Promise<string | null> {
   const { success } = await env.USER_RATE_LIMITER.limit({ key: userId })
   return success ? null : "Zu viele Anfragen in kurzer Zeit. Bitte warte einen Moment."
