@@ -22,7 +22,8 @@ export function useSources(notebookId: string, initial: SourceItem[], { onError,
 
   const refresh = useCallback(async () => {
     const res = await fetch(base).catch(() => null)
-    if (res?.ok) setSources((await readJson<{ sources: SourceItem[] }>(res)).sources)
+    const data = res?.ok ? await readJson<{ sources: SourceItem[] }>(res).catch(() => null) : null
+    if (data) setSources(data.sources)
   }, [base])
 
   const polling = sources.some((s) => s.status === "processing")
@@ -55,7 +56,8 @@ export function useSources(notebookId: string, initial: SourceItem[], { onError,
     return (await readJson<{ sourceId: string }>(res)).sourceId
   }
 
-  // Wirft UserError, damit der Dialog die Meldung neben dem Formular zeigt.
+  // Wirft UserError, damit der Dialog die Meldung neben dem Formular zeigt. Kehrt zurück, sobald die
+  // Quelle angelegt ist: Ein Fehler beim Neuladen der Liste darf nicht zu einem zweiten Versuch führen.
   async function add(payload: AddSourcePayload) {
     let sourceId: string
     if (payload.type === "pdf") {
@@ -68,8 +70,7 @@ export function useSources(notebookId: string, initial: SourceItem[], { onError,
       sourceId = await post({ type: "text", title: payload.title, text: payload.text }, "Text fehlgeschlagen")
     }
     select([sourceId])
-    await refresh()
-    onAdded()
+    void refresh().then(onAdded)
   }
 
   async function importUrls(urls: string[]) {

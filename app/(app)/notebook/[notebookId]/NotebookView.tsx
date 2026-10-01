@@ -49,6 +49,8 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
   const api = `/api/notebooks/${notebookId}`
   const notebookTitle = useNotebookTitle()
   const autoTitlingRef = useRef(false)
+  // Nach einem Fehler nicht bei jeder weiteren Chat-Antwort erneut versuchen: Jeder Versuch kostet Kontingent.
+  const autoTitleFailedRef = useRef(false)
   const [dialog, setDialog] = useState<Dialog | null>(initialSources.length === 0 ? { kind: "addSource" } : null)
   const [activeSourceId, setActiveSourceId] = useState<string | null>(null)
   const [playingAudio, setPlayingAudio] = useState<Media | null>(null)
@@ -66,15 +68,19 @@ export default function NotebookView({ notebookId, initialSources, initialMessag
 
   // Fehler bleiben still: Der Titel ist ein Komfort und lässt sich jederzeit von Hand setzen.
   async function maybeAutoTitle() {
-    if (notebookTitle.title !== DEFAULT_NOTEBOOK_TITLE || autoTitlingRef.current) return
+    if (notebookTitle.title !== DEFAULT_NOTEBOOK_TITLE || autoTitlingRef.current || autoTitleFailedRef.current) return
     autoTitlingRef.current = true
     try {
       const res = await fetch(`${api}/auto-title`, { method: "POST" })
-      if (!res.ok) return
-      const data = await readJson<{ title?: string; emoji?: string | null; generated: boolean }>(res)
-      if (data.generated && data.title) notebookTitle.setTitle(data.title, data.emoji)
+      if (!res.ok) {
+        autoTitleFailedRef.current = true
+        return
+      }
+      const data = await readJson<{ title?: string; emoji?: string | null }>(res)
+      // Auch ohne neue Generierung: Der Titel kann inzwischen anderswo gesetzt worden sein.
+      if (data.title && data.title !== notebookTitle.title) notebookTitle.setTitle(data.title, data.emoji)
     } catch {
-      // siehe oben
+      autoTitleFailedRef.current = true
     } finally {
       autoTitlingRef.current = false
     }

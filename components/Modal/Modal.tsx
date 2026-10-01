@@ -3,7 +3,8 @@
 import { useEffect, useEffectEvent, useRef, type ReactNode } from "react"
 import styles from "./Modal.module.scss"
 
-const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), video[controls], audio[controls], summary, [contenteditable="true"], [tabindex]:not([tabindex="-1"])'
 
 type ModalProps = {
   // Name des Dialogs für Screenreader, meist der Titel im Header.
@@ -39,6 +40,12 @@ export default function Modal({ label, className, onClose, children }: ModalProp
       const first = focusable[0]
       const last = focusable[focusable.length - 1]
       const active = document.activeElement
+      // Entfernt ein Moduswechsel den fokussierten Button, liegt der Fokus auf body und Tab liefe zur Seite dahinter.
+      if (!dialog.contains(active)) {
+        event.preventDefault()
+        ;(event.shiftKey ? last : first).focus()
+        return
+      }
       if (event.shiftKey && (active === first || active === dialog)) {
         event.preventDefault()
         last.focus()

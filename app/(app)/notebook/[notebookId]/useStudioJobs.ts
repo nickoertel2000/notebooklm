@@ -26,7 +26,8 @@ export function useStudioJobs<T extends JobItem>({ url, listKey, itemKey, pollMs
   const refresh = useCallback(async () => {
     const res = await fetch(url).catch(() => null)
     if (!res?.ok) return
-    const data = await readJson<Record<string, T[]>>(res)
+    const data = await readJson<Record<string, T[]>>(res).catch(() => null)
+    if (!data?.[listKey]) return
     // Platzhalter gehören zu noch laufenden Anfragen und fehlen im Server-Stand.
     setItems((prev) => [...prev.filter((item) => isPlaceholder(item.id)), ...data[listKey]])
   }, [url, listKey])
