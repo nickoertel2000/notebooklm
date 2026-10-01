@@ -1,6 +1,6 @@
 "use server"
 
-import { and, eq } from "drizzle-orm"
+import { and, count, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { getDb } from "@/db"
@@ -10,14 +10,19 @@ import { MAX_LENGTH } from "@/lib/api/body"
 import { pickNotebookEmoji } from "@/lib/notebookIcons"
 import { getNotebookForUser } from "@/lib/notebooks"
 import { cancelJob } from "@/lib/jobs/start"
-import { checkRateLimit } from "@/lib/quota"
+import { checkRateLimit, consumeQuota, MAX_NOTEBOOKS_PER_USER } from "@/lib/quota"
 import { deleteByPrefix, notebookPrefix } from "@/lib/storage"
 
 export async function createNotebook() {
   const user = await getSessionUser()
   if (!user) redirect("/login")
 
-  const [row] = await getDb().insert(notebooks).values({ userId: user.id }).returning({ id: notebooks.id })
+  const db = getDb()
+  const [{ n }] = await db.select({ n: count() }).from(notebooks).where(eq(notebooks.userId, user.id))
+  if (n >= MAX_NOTEBOOKS_PER_USER) redirect("/?hinweis=notebook-limit")
+  if (await checkRateLimit(user.id)) redirect("/?hinweis=rate-limit")
+
+  const [row] = await db.insert(notebooks).values({ userId: user.id }).returning({ id: notebooks.id })
 
   redirect(`/notebook/${row.id}`)
 }
@@ -61,7 +66,7 @@ export async function renameNotebook(notebookId: string, title: string) {
   if (!trimmed) return null
   if (!(await getNotebookForUser(notebookId, user.id))) return null
 
-  const emoji = (await checkRateLimit(user.id)) ? null : await pickNotebookEmoji(trimmed)
+  const emoji = (await consumeQuota(user.id, "assist")) ? null : await pickNotebookEmoji(trimmed)
 
   await getDb()
     .update(notebooks)

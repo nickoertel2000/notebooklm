@@ -4,7 +4,7 @@ import { getDb } from "@/db"
 import { sourceChunks, sources } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { chatModels, generateText } from "@/lib/gemini"
-import { checkRateLimit } from "@/lib/quota"
+import { consumeQuota } from "@/lib/quota"
 
 export type ReportSuggestion = { title: string; description: string; prompt: string }
 
@@ -41,8 +41,6 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
 
   const auth = await authorizeNotebook(notebookId)
   if (auth.error) return auth.error
-  const rateError = await checkRateLimit(auth.user.id)
-  if (rateError) return NextResponse.json({ error: rateError }, { status: 429 })
   const db = getDb()
 
   const [sourceRows, chunkRows] = await Promise.all([
@@ -53,6 +51,9 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
   const titles = sourceRows.map((s) => `- ${s.title}`).join("\n")
   const excerpts = chunkRows.map((c) => c.content.slice(0, 500)).join("\n---\n")
   if (!titles && !excerpts) return NextResponse.json({ suggestions: [] })
+
+  const quotaError = await consumeQuota(auth.user.id, "assist")
+  if (quotaError) return NextResponse.json({ error: quotaError }, { status: 429 })
 
   try {
     const text = await generateText({

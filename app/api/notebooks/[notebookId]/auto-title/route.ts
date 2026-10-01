@@ -8,7 +8,7 @@ import { chatModels, generateText } from "@/lib/gemini"
 import { pickNotebookEmoji } from "@/lib/notebookIcons"
 import { DEFAULT_NOTEBOOK_TITLE } from "@/lib/notebookTitle"
 import { readJsonBody } from "@/lib/api/body"
-import { checkRateLimit } from "@/lib/quota"
+import { consumeQuota } from "@/lib/quota"
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
 
@@ -58,8 +58,8 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ title: notebook.title, generated: false })
   }
 
-  const rateError = await checkRateLimit(user.id)
-  if (rateError) return NextResponse.json({ error: rateError }, { status: 429 })
+  const quotaError = await consumeQuota(user.id, "assist")
+  if (quotaError) return NextResponse.json({ error: quotaError }, { status: 429 })
 
   try {
     const raw = await generateText({

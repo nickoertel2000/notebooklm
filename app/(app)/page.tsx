@@ -4,16 +4,25 @@ import Header from "@/components/Header/Header"
 import NotebookCard from "@/components/NotebookCard/NotebookCard"
 import { getSessionUser } from "@/lib/auth/session"
 import { getNotebooksForUser } from "@/lib/notebooks"
+import { MAX_NOTEBOOKS_PER_USER } from "@/lib/quota"
 import { createNotebook } from "./actions"
 import "./notebook-home.scss"
 
 const dateFormat = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })
 
-export default async function NotebookLMHome() {
+const HINWEISE = new Map([
+  ["notebook-limit", `In dieser Demo sind höchstens ${MAX_NOTEBOOKS_PER_USER} Notebooks pro Konto möglich. Lösche ein Notebook, um ein neues anzulegen.`],
+  ["rate-limit", "Zu viele Anfragen in kurzer Zeit. Bitte warte einen Moment."]
+])
+
+type HomeProps = { searchParams: Promise<{ hinweis?: string }> }
+
+export default async function NotebookLMHome({ searchParams }: HomeProps) {
   const user = await getSessionUser()
   if (!user) redirect("/login")
 
-  const notebookList = await getNotebooksForUser(user.id)
+  const [notebookList, { hinweis }] = await Promise.all([getNotebooksForUser(user.id), searchParams])
+  const notice = hinweis ? HINWEISE.get(hinweis) : undefined
 
   return (
     <>
@@ -29,6 +38,12 @@ export default async function NotebookLMHome() {
             </form>
           </div>
         </header>
+
+        {notice && (
+          <p className="nlm-notice" role="alert">
+            {notice}
+          </p>
+        )}
 
         <h2 className="nlm-heading">Zuletzt geöffnete Notebooks</h2>
         <div className="nlm-grid">
