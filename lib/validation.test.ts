@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { lengthError, optionalString, parseSourceIds, readJsonBody } from "./api/body"
-import { stripNul, toErrorMessage } from "./jobs/errors"
+import { stripNul, toErrorMessage, toUserErrorMessage, USER_ERRORS } from "./jobs/errors"
 import { isUuid } from "./uuid"
 import { hostOf, parsePublicUrl } from "./url"
 
@@ -75,6 +75,21 @@ describe("stripNul und toErrorMessage", () => {
     expect(toErrorMessage(new Error(`kaputt${NUL}`))).toBe("kaputt")
     expect(toErrorMessage("nur Text")).toBe("nur Text")
     expect(toErrorMessage(new Error("x".repeat(600)))).toHaveLength(500)
+  })
+})
+
+describe("toUserErrorMessage", () => {
+  it("gibt nur bekannte Meldungen an die UI weiter", () => {
+    expect(toUserErrorMessage(new Error(USER_ERRORS.noText))).toBe(USER_ERRORS.noText)
+    expect(toUserErrorMessage(new Error('duplicate key value violates unique constraint "sources_pkey"'))).toBe(
+      "Die Verarbeitung ist fehlgeschlagen. Bitte versuche es erneut."
+    )
+  })
+
+  it("erkennt ein erschöpftes KI-Kontingent", () => {
+    expect(toUserErrorMessage(new Error('{"error":{"code":429,"status":"RESOURCE_EXHAUSTED"}}'))).toBe(
+      "Das Kontingent der KI ist gerade ausgeschöpft. Bitte versuche es später erneut."
+    )
   })
 })
 
