@@ -2,7 +2,10 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import styles from "./notebookHeader.module.scss"
-import { readJson } from "@/lib/api/client"
+import Toast from "@/components/Toast/Toast"
+import { errorMessage, readError, readJson, UserError } from "@/lib/api/client"
+
+const TITLE_ERROR = "Der Titel konnte nicht erzeugt werden."
 
 type NotebookTitleProps = {
   notebookId: string
@@ -17,6 +20,7 @@ export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, 
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(initialTitle)
   const [generating, setGenerating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const [prevInitial, setPrevInitial] = useState({ title: initialTitle, emoji: initialEmoji })
@@ -83,20 +87,22 @@ export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ force: true })
       })
-      if (!res.ok) return
-      const data = await readJson<{ title?: string; emoji?: string | null; generated: boolean }>(res)
-      if (data.generated && data.title) {
-        setTitle(data.title)
-        setDraft(data.title)
-        if (data.emoji) setEmoji(data.emoji)
-        setEditing(false)
-      }
-    } catch {
-      // KI-Vorschlag ist optional.
+      if (!res.ok) throw new UserError(await readError(res, TITLE_ERROR))
+      const data = await readJson<{ title?: string; emoji?: string | null; generated: boolean; reason?: "empty" }>(res)
+      if (data.reason === "empty") throw new UserError("Für einen Titelvorschlag braucht das Notebook erst Quellen oder Fragen.")
+      if (!data.generated || !data.title) throw new UserError(TITLE_ERROR)
+      setTitle(data.title)
+      setDraft(data.title)
+      if (data.emoji) setEmoji(data.emoji)
+      setEditing(false)
+    } catch (err) {
+      setError(errorMessage(err, TITLE_ERROR))
     } finally {
       setGenerating(false)
     }
   }
+
+  const toast = error && <Toast message={error} placement="top" onClose={() => setError(null)} />
 
   if (editing) {
     return (
@@ -136,6 +142,7 @@ export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, 
         <span className={styles.titleEmoji} role="img" aria-label="Notebook-Icon">
           {emoji}
         </span>
+        {toast}
       </>
     )
   }
@@ -148,6 +155,7 @@ export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, 
       <span className={styles.titleEmoji} role="img" aria-label="Notebook-Icon">
         {emoji}
       </span>
+      {toast}
     </>
   )
 }

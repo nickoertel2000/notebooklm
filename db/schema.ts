@@ -243,7 +243,7 @@ export const usageEvents = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    // 'chat' | 'discover' | 'studio' | 'source' (lib/quota.ts)
+    // 'chat' | 'discover' | 'studio' | 'source' | 'assist' (lib/quota.ts)
     kind: text("kind").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull()
   },

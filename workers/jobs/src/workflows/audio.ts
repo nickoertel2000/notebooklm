@@ -6,7 +6,7 @@ import { audioOverviews } from "@/db/schema"
 import { type AudioLength, buildScriptSystemPrompt, getAudioFormat, parseScript } from "@/lib/audio"
 import { generateText, reportModels, synthesizeSpeech } from "@/lib/gemini"
 import { buildContext } from "@/lib/jobs/context"
-import { toErrorMessage } from "@/lib/jobs/errors"
+import { toUserErrorMessage } from "@/lib/jobs/errors"
 import type { AudioParams } from "@/lib/jobs/types"
 import { audioKey, putObject } from "@/lib/storage"
 import { API_STEP, DB_STEP } from "./shared"
@@ -50,7 +50,7 @@ export class AudioWorkflow extends WorkflowEntrypoint<JobsEnv, AudioParams> {
       await step.do("mark-failed", DB_STEP, async () => {
         await getDb()
           .update(audioOverviews)
-          .set({ status: "failed", error: toErrorMessage(err) })
+          .set({ status: "failed", error: toUserErrorMessage(err) })
           .where(eq(audioOverviews.id, job.audioId))
       })
       throw err

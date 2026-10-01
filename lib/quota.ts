@@ -3,21 +3,22 @@ import { and, count, eq, gte, lt, sql } from "drizzle-orm"
 import { getDb } from "@/db"
 import { usageEvents } from "@/db/schema"
 
-export type UsageKind = "chat" | "discover" | "studio" | "source"
+export type UsageKind = "chat" | "discover" | "studio" | "source" | "assist"
 
 // Die Gratis-Kontingente von Gemini und Tavily teilen sich alle Besucher. Ohne Tageslimit
 // pro Konto könnte ein einzelnes Skript die Demo für alle lahmlegen.
-export const DAILY_LIMITS: Record<UsageKind, number> = { chat: 50, discover: 5, studio: 8, source: 30 }
+export const DAILY_LIMITS: Record<UsageKind, number> = { chat: 50, discover: 5, studio: 8, source: 30, assist: 30 }
 
 // Knapp unter den Tageskontingenten der Anbieter (Flash-Lite, Tavily pro Monat, TTS-Kette), damit
 // die Demo mit einer klaren Meldung stoppt statt mit einem 429 mitten in einem Workflow.
-export const GLOBAL_DAILY_LIMITS: Record<UsageKind, number> = { chat: 400, discover: 30, studio: 30, source: 300 }
+export const GLOBAL_DAILY_LIMITS: Record<UsageKind, number> = { chat: 400, discover: 30, studio: 30, source: 300, assist: 200 }
 
 const LIMIT_LABELS: Record<UsageKind, string> = {
   chat: "Chat-Fragen",
   discover: "Websuchen",
   studio: "Studio-Inhalte",
-  source: "neue Quellen"
+  source: "neue Quellen",
+  assist: "KI-Vorschläge"
 }
 
 export async function checkRateLimit(userId: string): Promise<string | null> {

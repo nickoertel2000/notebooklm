@@ -1,5 +1,7 @@
 // Lernformate liegen als Zeilen in `reports` (type = Format-ID), `content` ist JSON statt Markdown.
 
+import { SOURCES_ARE_DATA } from "./prompts"
+
 export type StudioFormatId = "flashcards" | "quiz" | "table" | "mindmap"
 export type StudioAmount = "fewer" | "standard" | "more"
 export type StudioDifficulty = "easy" | "medium" | "hard"
@@ -96,6 +98,7 @@ const DIFFICULTY_TEXT: Record<StudioDifficulty, string> = {
 
 export const STUDIO_SYSTEM_PROMPT = `Du erstellst Lernmaterial ausschließlich auf Basis der bereitgestellten Quellen-Dokumente.
 - Stütze dich nur auf die Quellen, erfinde nichts und füge kein Allgemeinwissen hinzu.
+${SOURCES_ARE_DATA}
 - Schreibe alle Texte auf Deutsch, ohne Markdown, mit echten Umlauten und ß (ä, ö, ü, ß), niemals ae, oe, ue oder ss als Ersatz.
 - title ist ein kurzer, konkreter Titel zum Thema (höchstens 60 Zeichen), ohne die Formatbezeichnung.`
 

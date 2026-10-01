@@ -26,7 +26,7 @@ Alles Langlaufende (Quellen-Import, Berichte, Audio-Übersicht, Video-Übersicht
 
 1. Die Route fügt die Zeile mit `status: "processing"` ein, dann `startX(params)` aus `lib/jobs/start.ts` → antwortet mit `202`. Wirft `create()`, setzt die Route die Zeile auf `failed` und gibt 500 zurück.
 2. Instanz-ID = Zeilen-ID (Berichte/Audio/Video). Quellen bekommen `${sourceId}-${Date.now()}`, weil sie erneut importiert werden können und IDs pro Workflow eindeutig sind.
-3. Jeder Workflow: Steps mit den Retry-Konfigurationen `API_STEP` / `DB_STEP` (`workflows/shared.ts`); der `run()`-Body ist in try/catch gewickelt, der catch führt einen `mark-failed`-Step aus (`toErrorMessage`: NUL-bereinigt, 500 Zeichen) und wirft erneut, sodass die Instanz als errored endet. Validierungsprobleme werfen `NonRetryableError`.
+3. Jeder Workflow: Steps mit den Retry-Konfigurationen `API_STEP` / `DB_STEP` (`workflows/shared.ts`); der `run()`-Body ist in try/catch gewickelt, der catch führt einen `mark-failed`-Step aus und wirft erneut, sodass die Instanz als errored endet und der Rohfehler im Workflow-Log steht. In die Spalte `error` (die UI zeigt sie an) kommt nur `toUserErrorMessage(err)`: Meldungen aus `USER_ERRORS` (`lib/jobs/errors.ts`), ein erschöpftes KI-Kontingent oder ein allgemeiner Text, nie Postgres- oder Gemini-Rohfehler. Eine neue Meldung für Nutzer kommt in `USER_ERRORS`. Validierungsprobleme werfen `NonRetryableError`.
 4. Das Löschen eines laufenden Berichts/Audios/Videos ruft `cancelJob(kind, id)` auf (terminate, Fehler ignoriert); `deleteNotebook` bricht alle laufenden ab. Gelöschte Quellen erkennt der Import selbst (`assertSourceExists` → `NonRetryableError`).
 5. Der Client pollt den Listen-Endpoint nur, solange ein Element `processing` ist (`NotebookView.tsx`: Quellen 2,5 s, Berichte 3 s, Audio 4 s, Video 5 s).
 6. Das Stale Healing im Listen-`GET` bleibt als Sicherheitsnetz (Quellen 15 min über `updatedAt`, Berichte 10, Audio 15, Video 20 min über `createdAt`) – die Schwellen müssen den schlimmsten Fall inklusive Step-Retries übersteigen. Ein neuer Job-Typ braucht dasselbe.
@@ -46,7 +46,7 @@ PDF über `unpdf` (`mergePages: true`, daher ist `page` immer `null`), sonst `Te
 
 ## Generierung
 
-- Berichte/Audio/Video verwenden keine Vektorsuche: `buildContext` (`lib/jobs/context.ts`) lädt alle Chunks der gewählten Quellen bis 150k Zeichen.
+- Berichte/Audio/Video verwenden keine Vektorsuche: `buildContext` (`lib/jobs/context.ts`) lädt die Chunks der gewählten Quellen bis 150k Zeichen (höchstens 500 Chunks) und liefert sie bereits in `wrapSources()` eingeschlossen.
 - Modelle kommen aus den Worker-`vars` über `chatModels()`/`reportModels()`/`env`. Modell-IDs nie hartcodieren. Text- und TTS-Modelle sind kommagetrennte Fallback-Ketten (`GEMINI_CHAT_MODELS` in der App, `GEMINI_REPORT_MODELS` und `GEMINI_TTS_MODELS` im Jobs-Worker); `GEMINI_EMBEDDING_MODEL` und `IMAGE_MODEL` sind einzelne Modelle.
 - Textgenerierung läuft über `generateText()` (`lib/gemini.ts`). Die Thinking-Tokens von Gemini zählen gegen `maxOutputTokens`: Kleine Budgets brauchen `minimalThinking`, Skript-Budgets großzügig setzen (der Prompt steuert die Länge).
 - Alles läuft im Gemini-Gratis-Tarif. Auf diesem Google-Projekt nie Billing aktivieren: Dadurch wird jeder Aufruf des Projekts kostenpflichtig, in einem bezahlten Projekt gibt es kein Gratis-Kontingent.

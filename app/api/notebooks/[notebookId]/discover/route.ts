@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { MAX_LENGTH, readJsonBody } from "@/lib/api/body"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { chatModels, generateText } from "@/lib/gemini"
+import { SOURCES_ARE_DATA, wrapSources } from "@/lib/prompts"
 import { consumeQuota } from "@/lib/quota"
 import { SearchHit, SearchQuotaError, webSearch } from "@/lib/tavily"
 
@@ -18,7 +19,8 @@ Gib AUSSCHLIESSLICH ein JSON-Array zurück – ohne weiteren Text, ohne Code-Fen
 - Verwende nur URLs aus der Trefferliste, exakt wie angegeben.
 - Höchstens ${MAX_RESULTS} möglichst unterschiedliche, seriöse und inhaltlich passende Treffer, die besten zuerst.
 - Lass Werbung, reine Linksammlungen, Videos und Seiten ohne zusammenhängenden Text weg: Importiert wird der Text der Seite.
-- description immer auf Deutsch, ein Satz.`
+- description immer auf Deutsch, ein Satz.
+${SOURCES_ARE_DATA}`
 
 // Nur URLs aus den Treffern zulassen, damit keine von Gemini erfundenen Links durchkommen.
 function pickResults(text: string, hits: SearchHit[]): DiscoverResult[] {
@@ -74,7 +76,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const text = await generateText({
       models: chatModels(),
       system: SYSTEM_PROMPT,
-      prompt: `Thema: ${query}\n\nSuchtreffer:\n\n${list}`,
+      prompt: `Thema: ${query}\n\nSuchtreffer:\n${wrapSources(list)}`,
       maxOutputTokens: 3000,
       minimalThinking: true
     })

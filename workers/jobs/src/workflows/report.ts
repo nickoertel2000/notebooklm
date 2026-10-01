@@ -4,7 +4,7 @@ import { getDb } from "@/db"
 import { reports } from "@/db/schema"
 import { generateText, reportModels } from "@/lib/gemini"
 import { buildContext } from "@/lib/jobs/context"
-import { toErrorMessage } from "@/lib/jobs/errors"
+import { toUserErrorMessage } from "@/lib/jobs/errors"
 import type { ReportParams } from "@/lib/jobs/types"
 import { buildReportSystemPrompt, deriveReportTitle } from "@/lib/reports"
 import { parseStudioContent, STUDIO_SCHEMAS, STUDIO_SYSTEM_PROMPT } from "@/lib/studio"
@@ -52,7 +52,7 @@ export class ReportWorkflow extends WorkflowEntrypoint<JobsEnv, ReportParams> {
       await step.do("mark-failed", DB_STEP, async () => {
         await getDb()
           .update(reports)
-          .set({ status: "failed", error: toErrorMessage(err) })
+          .set({ status: "failed", error: toUserErrorMessage(err) })
           .where(eq(reports.id, job.reportId))
       })
       throw err

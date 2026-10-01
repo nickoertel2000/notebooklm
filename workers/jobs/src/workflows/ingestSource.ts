@@ -5,7 +5,7 @@ import { extractText } from "unpdf"
 import { getDb, type Db } from "@/db"
 import { sourceChunks, sources } from "@/db/schema"
 import { chunkText } from "@/lib/chunk"
-import { stripNul, toErrorMessage } from "@/lib/jobs/errors"
+import { stripNul, toUserErrorMessage, USER_ERRORS } from "@/lib/jobs/errors"
 import type { IngestSourceParams } from "@/lib/jobs/types"
 import { getObject } from "@/lib/storage"
 import { embedTexts } from "@/lib/embeddings"
@@ -18,7 +18,7 @@ const INSERT_BATCH = 500
 
 async function assertSourceExists(db: Db, sourceId: string) {
   const [row] = await db.select({ id: sources.id }).from(sources).where(eq(sources.id, sourceId)).limit(1)
-  if (!row) throw new NonRetryableError("Quelle wurde gelöscht")
+  if (!row) throw new NonRetryableError(USER_ERRORS.sourceDeleted)
 }
 
 // Chunks ohne Embedding sind unkritisch: Chat und Generierung sehen sie erst, wenn die Quelle ready ist.
@@ -32,7 +32,7 @@ export class IngestSourceWorkflow extends WorkflowEntrypoint<JobsEnv, IngestSour
         await assertSourceExists(db, sourceId)
 
         const object = await getObject(key)
-        if (!object) throw new NonRetryableError("Hochgeladene Datei nicht gefunden")
+        if (!object) throw new NonRetryableError(USER_ERRORS.fileMissing)
         const bytes = new Uint8Array(await object.arrayBuffer())
 
         let text: string
@@ -43,7 +43,7 @@ export class IngestSourceWorkflow extends WorkflowEntrypoint<JobsEnv, IngestSour
           text = new TextDecoder("utf-8").decode(bytes)
         }
         text = stripNul(text)
-        if (!text.trim()) throw new NonRetryableError("Kein Text in der Quelle gefunden")
+        if (!text.trim()) throw new NonRetryableError(USER_ERRORS.noText)
 
         const chunks = chunkText(text)
         await db.transaction(async (tx) => {
@@ -100,7 +100,7 @@ export class IngestSourceWorkflow extends WorkflowEntrypoint<JobsEnv, IngestSour
       await step.do("mark-failed", DB_STEP, async () => {
         await getDb()
           .update(sources)
-          .set({ status: "failed", error: toErrorMessage(err), updatedAt: new Date() })
+          .set({ status: "failed", error: toUserErrorMessage(err), updatedAt: new Date() })
           .where(eq(sources.id, sourceId))
       })
       throw err

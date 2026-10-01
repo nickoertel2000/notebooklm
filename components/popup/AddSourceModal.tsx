@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import WebSourceSearch from "@/components/WebSourceSearch/WebSourceSearch"
 import styles from "./AddSourceModal.module.scss"
+import { errorMessage } from "@/lib/api/client"
 
 const ROTATING_WORDS = ["Deine Dokumente", "Websites", "Deine Notizen"] as const
 
@@ -51,7 +52,7 @@ export default function AddSourceModal({ notebookId, onClose, onAdd, onImportUrl
     try {
       await onAdd(payload)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(errorMessage(err, "Die Quelle konnte nicht hinzugefügt werden."))
       setBusy(false)
     }
   }

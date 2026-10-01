@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import "material-symbols"
-import { readError, readJson } from "@/lib/api/client"
+import { errorMessage, readError, readJson, UserError } from "@/lib/api/client"
 import { hostOf } from "@/lib/url"
 import styles from "./WebSourceSearch.module.scss"
 
@@ -51,12 +51,12 @@ export default function WebSourceSearch({ notebookId, onImport, variant = "panel
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: q, depth })
       })
-      if (!res.ok) throw new Error(await readError(res, "Suche fehlgeschlagen"))
+      if (!res.ok) throw new UserError(await readError(res, "Suche fehlgeschlagen"))
       const found = (await readJson<{ results?: WebResult[] }>(res)).results ?? []
       setResults(found)
       setSelected(new Set(found.map((r) => r.url)))
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(errorMessage(err, "Suche fehlgeschlagen"))
     } finally {
       setSearching(false)
     }

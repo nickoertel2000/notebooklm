@@ -8,6 +8,7 @@ import { embedQuery } from "@/lib/embeddings"
 import { chatModels, geminiErrorMessage, getGemini, withFallback } from "@/lib/gemini"
 import { MAX_LENGTH, parseSourceIds, readJsonBody } from "@/lib/api/body"
 import { extractCitations, type RetrievedChunk } from "@/lib/citations"
+import { SOURCES_ARE_DATA, wrapSources } from "@/lib/prompts"
 import { consumeQuota } from "@/lib/quota"
 
 const TOP_K = 8
@@ -18,7 +19,8 @@ const SYSTEM_PROMPT = `Du bist der KI-Assistent eines Notebooks. Beantworte die 
 - Belege jede Aussage direkt dahinter mit der Nummer des Auszugs in eckigen Klammern, z. B. [2]. Mehrere Belege schreibst du als [1][3].
 - Verwende nur Nummern, die in den Auszügen vorkommen, und erfinde keine.
 - Wenn die Antwort nicht aus den Auszügen hervorgeht, sage das offen und erfinde nichts.
-- Antworte auf Deutsch, klar und prägnant.`
+- Antworte auf Deutsch, klar und prägnant.
+${SOURCES_ARE_DATA}`
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
 
@@ -78,7 +80,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const excerpts = retrieved.map((c, i) => `[${i + 1}] ${c.sourceTitle}\n${c.content}`).join("\n\n")
   const contents: Content[] = [
     ...prior.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
-    { role: "user", parts: [{ text: `Quellen-Auszüge:\n\n${excerpts || "(keine)"}\n\n---\n\nFrage: ${message}` }] }
+    { role: "user", parts: [{ text: `Quellen-Auszüge:\n${wrapSources(excerpts || "(keine)")}\n\nFrage: ${message}` }] }
   ]
 
   // Bricht der Client ab (Stop-Button, Tab zu), wird auch die Generierung bei Gemini beendet.

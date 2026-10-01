@@ -4,18 +4,20 @@ import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/db"
 import { messages, notebooks, sourceChunks, sources } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
-import { chatModels, generateText } from "@/lib/gemini"
+import { chatModels, geminiErrorMessage, generateText } from "@/lib/gemini"
 import { pickNotebookEmoji } from "@/lib/notebookIcons"
 import { DEFAULT_NOTEBOOK_TITLE } from "@/lib/notebookTitle"
 import { readJsonBody } from "@/lib/api/body"
-import { checkRateLimit } from "@/lib/quota"
+import { SOURCES_ARE_DATA, wrapSources } from "@/lib/prompts"
+import { consumeQuota } from "@/lib/quota"
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
 
 const SYSTEM_PROMPT = `Du erzeugst einen kurzen, prägnanten Titel für ein Notebook auf Basis seines Inhalts.
 - Antworte NUR mit dem Titel, ohne Anführungszeichen, ohne Punkt am Ende.
 - 2 bis 6 Wörter, auf Deutsch.
-- Beschreibe das übergreifende Thema, nicht eine einzelne Quelle.`
+- Beschreibe das übergreifende Thema, nicht eine einzelne Quelle.
+${SOURCES_ARE_DATA}`
 
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
@@ -55,17 +57,17 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   }
 
   if (parts.length === 0) {
-    return NextResponse.json({ title: notebook.title, generated: false })
+    return NextResponse.json({ title: notebook.title, generated: false, reason: "empty" })
   }
 
-  const rateError = await checkRateLimit(user.id)
-  if (rateError) return NextResponse.json({ error: rateError }, { status: 429 })
+  const quotaError = await consumeQuota(user.id, "assist")
+  if (quotaError) return NextResponse.json({ error: quotaError }, { status: 429 })
 
   try {
     const raw = await generateText({
       models: chatModels(),
       system: SYSTEM_PROMPT,
-      prompt: parts.join("\n\n").slice(0, 6000),
+      prompt: wrapSources(parts.join("\n\n").slice(0, 6000)),
       maxOutputTokens: 200,
       minimalThinking: true
     })
@@ -75,7 +77,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       .trim()
       .slice(0, 100)
 
-    if (!title) return NextResponse.json({ title: notebook.title, generated: false })
+    if (!title) return NextResponse.json({ error: "Die KI hat keinen Titel geliefert. Bitte versuche es erneut." }, { status: 502 })
 
     const emoji = await pickNotebookEmoji(title)
 
@@ -89,6 +91,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ title, emoji, generated: true })
   } catch (err) {
     console.error("Auto-Titel fehlgeschlagen:", err)
-    return NextResponse.json({ title: notebook.title, generated: false })
+    return NextResponse.json({ error: geminiErrorMessage(err) }, { status: 502 })
   }
 }

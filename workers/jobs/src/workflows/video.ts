@@ -5,7 +5,7 @@ import { getDb } from "@/db"
 import { videoOverviews } from "@/db/schema"
 import { generateText, reportModels, synthesizeSpeech } from "@/lib/gemini"
 import { buildContext } from "@/lib/jobs/context"
-import { toErrorMessage } from "@/lib/jobs/errors"
+import { toErrorMessage, toUserErrorMessage } from "@/lib/jobs/errors"
 import type { VideoParams } from "@/lib/jobs/types"
 import { deleteByPrefix, getObject, putObject, videoKey, videoPartsPrefix } from "@/lib/storage"
 import {
@@ -133,7 +133,7 @@ export class VideoWorkflow extends WorkflowEntrypoint<JobsEnv, VideoParams> {
       await step.do("mark-failed", DB_STEP, async () => {
         await getDb()
           .update(videoOverviews)
-          .set({ status: "failed", error: toErrorMessage(err) })
+          .set({ status: "failed", error: toUserErrorMessage(err) })
           .where(eq(videoOverviews.id, job.videoId))
       })
       throw err

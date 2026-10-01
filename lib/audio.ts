@@ -1,3 +1,5 @@
+import { SOURCES_ARE_DATA } from "./prompts"
+
 export type AudioLength = "kurz" | "standard"
 
 export type AudioFormat = {
@@ -92,6 +94,7 @@ export function buildScriptSystemPrompt(format: AudioFormat, length: AudioLength
   return `Du erstellst das Skript für eine vertonte Audio-Übersicht eines Notebooks, ausschließlich auf Basis der bereitgestellten Quellen.
 - Stütze dich ausschließlich auf die Quellen, erfinde nichts und füge kein Allgemeinwissen hinzu.
 - Wenn die Quellen zu wenig hergeben, sage das offen im Skript.
+${SOURCES_ARE_DATA}
 - Schreibe das gesamte Skript (inkl. Titel) in folgender Sprache: ${language}. Verwende natürliche, gesprochene Sprache.
 - Die Sprecher-Labels „${SPEAKER_LABELS[0]}:"/„${SPEAKER_LABELS[1]}:" bleiben unabhängig von der Sprache exakt so stehen.
 - Die ALLERERSTE Zeile lautet exakt „TITEL: <kurzer, konkreter Titel>" – dieser Titel wird NICHT vorgelesen.

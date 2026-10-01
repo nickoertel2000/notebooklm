@@ -1,3 +1,5 @@
+import { SOURCES_ARE_DATA } from "./prompts"
+
 export type ReportType = {
   id: string
   label: string
@@ -47,6 +49,7 @@ export function buildReportSystemPrompt(language?: string): string {
   return `Du bist der KI-Assistent eines Notebooks und erstellst strukturierte Berichte ausschließlich auf Basis der bereitgestellten Quellen-Dokumente.
 - Stütze dich ausschließlich auf die Quellen, erfinde nichts und füge kein Allgemeinwissen hinzu.
 - Wenn die Quellen für den gewünschten Bericht zu wenig hergeben, sage das offen.
+${SOURCES_ARE_DATA}
 ${langLine}
 - Beginne IMMER mit einer einzelnen H1-Überschrift (# ) als Titel des Dokuments im Format "<Bezeichnung des Berichts>: <kurzes, konkretes Thema>". Danach folgt der Inhalt.
 - Formatiere die Ausgabe als einfaches Markdown: Überschriften mit #/##/###, Aufzählungen mit "- ", Nummerierungen mit "1.", Hervorhebungen mit **fett**. Verwende keine Tabellen und keinen Code.`

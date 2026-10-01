@@ -9,7 +9,7 @@ import MindmapView from "@/components/MindmapView/MindmapView"
 import QuizView from "@/components/QuizView/QuizView"
 import { getStudioFormat, parseStudioContent, StudioContent } from "@/lib/studio"
 import styles from "./ReportModal.module.scss"
-import { readJson } from "@/lib/api/client"
+import { errorMessage, readJson, UserError } from "@/lib/api/client"
 
 type ReportViewModalProps = {
   notebookId: string
@@ -30,20 +30,20 @@ export default function ReportViewModal({ notebookId, reportId, title, onClose }
     ;(async () => {
       try {
         const res = await fetch(`/api/notebooks/${notebookId}/reports/${reportId}`)
-        if (!res.ok) throw new Error("Bericht konnte nicht geladen werden")
+        if (!res.ok) throw new UserError("Bericht konnte nicht geladen werden")
         const { report } = await readJson<{ report: { type: string; content: string | null } }>(res)
         const format = getStudioFormat(report.type)
         let next: Loaded
         if (format) {
           const content = parseStudioContent(format.id, report.content ?? "")
-          if (!content) throw new Error("Inhalt konnte nicht gelesen werden")
+          if (!content) throw new UserError("Inhalt konnte nicht gelesen werden")
           next = { kind: "studio", content }
         } else {
           next = { kind: "markdown", content: report.content ?? "" }
         }
         if (!cancelled) setLoaded(next)
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err))
+        if (!cancelled) setError(errorMessage(err, "Bericht konnte nicht geladen werden"))
       }
     })()
     return () => {
