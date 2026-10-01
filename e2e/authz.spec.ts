@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { expect, test, type APIRequestContext, type APIResponse, type Page } from "@playwright/test"
 import postgres from "postgres"
-import { expectHome, gotoPage, register } from "./helpers"
+import { expectHome, gotoPage, signInAsNewUser } from "./helpers"
 import { templateIds } from "./seed-data"
 import { testDatabaseUrl } from "./test-database"
 
@@ -61,7 +61,7 @@ test("Der Test deckt jede Notebook-Route ab", () => {
 })
 
 test("Notebooks anderer Nutzer und ihre Inhalte sind nicht erreichbar", async ({ page }) => {
-  await register(page)
+  await signInAsNewUser(page)
 
   expect((await page.goto(`/notebook/${templateIds.notebook}`))?.status()).toBe(404)
   for (const { route, call } of notebookRoutes) {

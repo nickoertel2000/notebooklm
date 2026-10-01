@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test"
-import { register, waitForHydration } from "./helpers"
+import { signInAsNewUser, waitForHydration } from "./helpers"
 
 test("Notebook anlegen und Text-Quelle hinzufügen", async ({ page }) => {
-  await register(page)
+  await signInAsNewUser(page)
 
   await page.getByRole("button", { name: "Neu erstellen" }).click()
   await expect(page).toHaveURL(/\/notebook\/[0-9a-f-]+$/)
