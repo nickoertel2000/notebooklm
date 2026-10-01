@@ -1,3 +1,5 @@
+import { SOURCES_ARE_DATA } from "./prompts"
+
 // ───────────────────────── Formate ─────────────────────────
 
 export type VideoFormat = {
@@ -98,6 +100,7 @@ export function buildVideoScriptSystemPrompt(format: VideoFormat, language: stri
 
 - Stütze dich ausschließlich auf die Quellen, erfinde nichts und füge kein Allgemeinwissen hinzu.
 - Wenn die Quellen zu wenig hergeben, sage das offen in der Narration.
+${SOURCES_ARE_DATA}
 - Schreibe ALLE Texte (Titel, Folien, Narration) in folgender Sprache: ${language}.
 - ${format.instruction}
 - ${SEGMENT_HINT}${focusLine}

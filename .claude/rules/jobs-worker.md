@@ -46,7 +46,7 @@ PDF über `unpdf` (`mergePages: true`, daher ist `page` immer `null`), sonst `Te
 
 ## Generierung
 
-- Berichte/Audio/Video verwenden keine Vektorsuche: `buildContext` (`lib/jobs/context.ts`) lädt alle Chunks der gewählten Quellen bis 150k Zeichen.
+- Berichte/Audio/Video verwenden keine Vektorsuche: `buildContext` (`lib/jobs/context.ts`) lädt die Chunks der gewählten Quellen bis 150k Zeichen (höchstens 500 Chunks) und liefert sie bereits in `wrapSources()` eingeschlossen.
 - Modelle kommen aus den Worker-`vars` über `chatModels()`/`reportModels()`/`env`. Modell-IDs nie hartcodieren. Text- und TTS-Modelle sind kommagetrennte Fallback-Ketten (`GEMINI_CHAT_MODELS` in der App, `GEMINI_REPORT_MODELS` und `GEMINI_TTS_MODELS` im Jobs-Worker); `GEMINI_EMBEDDING_MODEL` und `IMAGE_MODEL` sind einzelne Modelle.
 - Textgenerierung läuft über `generateText()` (`lib/gemini.ts`). Die Thinking-Tokens von Gemini zählen gegen `maxOutputTokens`: Kleine Budgets brauchen `minimalThinking`, Skript-Budgets großzügig setzen (der Prompt steuert die Länge).
 - Alles läuft im Gemini-Gratis-Tarif. Auf diesem Google-Projekt nie Billing aktivieren: Dadurch wird jeder Aufruf des Projekts kostenpflichtig, in einem bezahlten Projekt gibt es kein Gratis-Kontingent.

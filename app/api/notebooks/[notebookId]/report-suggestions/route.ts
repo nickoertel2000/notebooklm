@@ -4,6 +4,7 @@ import { getDb } from "@/db"
 import { sourceChunks, sources } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { chatModels, generateText } from "@/lib/gemini"
+import { SOURCES_ARE_DATA, wrapSources } from "@/lib/prompts"
 import { consumeQuota } from "@/lib/quota"
 
 export type ReportSuggestion = { title: string; description: string; prompt: string }
@@ -15,7 +16,8 @@ Gib AUSSCHLIESSLICH ein JSON-Array zurück – ohne weiteren Text, ohne Code-Fen
 [{"title": "Kurzer Titel", "description": "Ein kurzer Satz, was der Bericht enthält", "prompt": "Präzise Anweisung an die KI, was der Bericht abdecken soll"}]
 - Genau 4 Vorschläge, möglichst unterschiedlich und spezifisch zum Inhalt.
 - title: 1–3 Wörter. description: ein kurzer Satz auf Deutsch.
-- prompt: konkrete, umsetzbare Anweisung (1–2 Sätze) auf Deutsch.`
+- prompt: konkrete, umsetzbare Anweisung (1–2 Sätze) auf Deutsch.
+${SOURCES_ARE_DATA}`
 
 function parseSuggestions(text: string): ReportSuggestion[] {
   const match = text.match(/\[[\s\S]*\]/)
@@ -59,7 +61,7 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
     const text = await generateText({
       models: chatModels(),
       system: SYSTEM_PROMPT,
-      prompt: `Quellen:\n${titles}\n\nAuszüge:\n${excerpts}`.slice(0, 6000),
+      prompt: wrapSources(`Quellen:\n${titles}\n\nAuszüge:\n${excerpts}`.slice(0, 6000)),
       maxOutputTokens: 800
     })
     return NextResponse.json({ suggestions: parseSuggestions(text) })

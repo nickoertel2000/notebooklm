@@ -8,6 +8,7 @@ import { chatModels, generateText } from "@/lib/gemini"
 import { pickNotebookEmoji } from "@/lib/notebookIcons"
 import { DEFAULT_NOTEBOOK_TITLE } from "@/lib/notebookTitle"
 import { readJsonBody } from "@/lib/api/body"
+import { SOURCES_ARE_DATA, wrapSources } from "@/lib/prompts"
 import { consumeQuota } from "@/lib/quota"
 
 type RouteContext = { params: Promise<{ notebookId: string }> }
@@ -15,7 +16,8 @@ type RouteContext = { params: Promise<{ notebookId: string }> }
 const SYSTEM_PROMPT = `Du erzeugst einen kurzen, prägnanten Titel für ein Notebook auf Basis seines Inhalts.
 - Antworte NUR mit dem Titel, ohne Anführungszeichen, ohne Punkt am Ende.
 - 2 bis 6 Wörter, auf Deutsch.
-- Beschreibe das übergreifende Thema, nicht eine einzelne Quelle.`
+- Beschreibe das übergreifende Thema, nicht eine einzelne Quelle.
+${SOURCES_ARE_DATA}`
 
 export async function POST(req: NextRequest, { params }: RouteContext) {
   const { notebookId } = await params
@@ -65,7 +67,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const raw = await generateText({
       models: chatModels(),
       system: SYSTEM_PROMPT,
-      prompt: parts.join("\n\n").slice(0, 6000),
+      prompt: wrapSources(parts.join("\n\n").slice(0, 6000)),
       maxOutputTokens: 200,
       minimalThinking: true
     })
