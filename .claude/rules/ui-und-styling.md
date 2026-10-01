@@ -2,6 +2,7 @@
 paths:
   - "app/**/*.tsx"
   - "app/**/*.scss"
+  - "app/(app)/notebook/**"
   - "components/**"
   - "styles/**"
   - "lib/useDictation.ts"
@@ -19,15 +20,16 @@ paths:
 - Client Components laden nie Initialdaten und prüfen nie die Authentifizierung; sie rufen `app/api/` (oder die Notebook-CRUD-Server-Actions) auf und pollen den Job-Status (siehe `jobs-worker.md`).
 - `app/(app)/layout.tsx` macht keine Authentifizierung (der Schutz ist `proxy.ts` + Page-Guard), setzt aber `dynamic = "force-dynamic"`: vinext kann `headers()` zur Build-Zeit nicht erkennen, und diese Seiten dürfen nie gecacht werden.
 - Item-Typen, die Seite, API-Routen und Client teilen, stehen in `lib/items.ts` (ohne Server-Imports). Komponenten importieren nie Typen aus Route- oder View-Dateien. Payload-Typen von Modals werden neben dem Modal exportiert (`AudioOptions`, `ReportGeneratePayload`, …).
-- `NotebookView.tsx` ist bereits sehr groß – neue, in sich geschlossene UI in `components/` ablegen, statt die Datei weiter wachsen zu lassen.
+- `NotebookView.tsx` setzt die Ansicht nur zusammen. Logik liegt in Hooks daneben (`useSources`, `useChatStream`, `useStudioJobs` für Bericht, Audio und Video), die Spalten in `SourcesPanel.tsx` und `ChatPanel.tsx`. Ein neuer Studio-Typ ist ein weiterer `useStudioJobs`-Aufruf, kein neuer Polling-Code. Offene Dialoge sind ein einziger `Dialog`-State, nie ein Boolean pro Dialog.
+- Titel und Emoji des Notebooks teilen Header und Ansicht über `NotebookTitleProvider` (`components/NotebookHeader/NotebookTitleContext.tsx`, gesetzt in `page.tsx`), keine `window`-Events.
 
 ## Komponenten
 
 - Ein Ordner pro Komponente in `components/<Name>/` mit `<Name>.tsx` + `<Name>.module.scss` (PascalCase für neue Dateien; einige ältere SCSS-Dateien sind kleingeschrieben, so belassen).
-- Modals liegen gemeinsam in `components/popup/`: `"use client"`, gesteuert über `onClose`-/`onCreate`-Callbacks, `role="dialog" aria-modal="true"`, Klick auf das Overlay schließt, inneres `onClick={(e) => e.stopPropagation()}`.
+- Modals liegen gemeinsam in `components/popup/`, gesteuert über `onClose`-/`onCreate`-Callbacks. Jeder Dialog rendert `components/Modal` (`label`, `className` für die Box): Es liefert Overlay, `role="dialog"`, Schließen per Klick daneben und Escape, eine Fokus-Falle und gibt den Fokus beim Schließen zurück. Kein eigenes Overlay.
 - `lib/useDictation.ts`: Web Speech API (`de-DE`, nur Chrome/Edge); `supported` kommt aus `useSyncExternalStore` mit Server-Snapshot `false` für SSR-Sicherheit.
 - Fehler nie verschlucken. Anzeigbare Meldungen als `UserError` werfen (`throw new UserError(await readError(res, fallback))`, `lib/api/client.ts`) und mit `errorMessage(err, fallback)` lesen: Andere Fehler (TypeError bei Netzfehlern, SyntaxError) tragen englischen Browsertext und werden durch den Fallback ersetzt. In der Notebook-Ansicht erscheinen sie als `components/Toast`, in Modals im eigenen Fehlerfeld. Scheitert das Anlegen eines Studio-Eintrags, verschwindet der Platzhalter, und die Liste wird neu geladen.
-- `eslint-plugin-react-hooks` 7 verbietet synchrones `setState` in Effects (`react-hooks/set-state-in-effect`). State aus geänderten Props wird während des Renderns mit einem gespeicherten Vorgängerwert synchronisiert (siehe `NotebookTitle.tsx`), Browser-Fähigkeiten über `useSyncExternalStore`.
+- `eslint-plugin-react-hooks` 7 verbietet synchrones `setState` in Effects (`react-hooks/set-state-in-effect`). State aus geänderten Props wird während des Renderns mit einem gespeicherten Vorgängerwert synchronisiert, Browser-Fähigkeiten über `useSyncExternalStore`. Callbacks, die ein Effect aufruft, ohne neu zu starten, laufen über `useEffectEvent` (siehe `Toast.tsx`, `Modal.tsx`).
 
 ## Styling
 

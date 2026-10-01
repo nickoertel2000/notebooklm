@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation"
 import NotebookHeader from "@/components/NotebookHeader/NotebookHeader"
+import { NotebookTitleProvider } from "@/components/NotebookHeader/NotebookTitleContext"
 import { getDb } from "@/db"
 import { getSessionUser } from "@/lib/auth/session"
 import { listAudios, listMessages, listReports, listSources, listVideos } from "@/lib/notebookItems"
@@ -25,17 +26,16 @@ export default async function NotebookPage({ params }: { params: Promise<{ noteb
   ])
 
   return (
-    <>
-      <NotebookHeader notebookId={notebookId} title={notebook.title} emoji={notebook.emoji} user={user} />
+    <NotebookTitleProvider initialTitle={notebook.title} initialEmoji={notebook.emoji}>
+      <NotebookHeader notebookId={notebookId} user={user} />
       <NotebookView
         notebookId={notebookId}
-        title={notebook.title}
         initialSources={sources}
         initialMessages={messages}
         initialReports={reports}
         initialAudios={audios}
         initialVideos={videos}
       />
-    </>
+    </NotebookTitleProvider>
   )
 }

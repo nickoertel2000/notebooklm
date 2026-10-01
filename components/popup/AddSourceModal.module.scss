@@ -32,17 +32,6 @@ $enter-duration: 0.35s;
   font-size: 22px;
 }
 
-.overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
-  z-index: 1000;
-  padding: 24px;
-}
-
 .modal {
   position: relative;
   width: 100%;

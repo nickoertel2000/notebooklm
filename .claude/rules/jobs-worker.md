@@ -18,6 +18,7 @@ paths:
   - "app/api/notebooks/*/audio/**"
   - "app/api/notebooks/*/video/**"
   - "components/popup/**"
+  - "app/(app)/notebook/**/use*.ts"
 ---
 
 # Asynchrone Jobs (Cloudflare Workflows)
@@ -30,7 +31,7 @@ Alles Langlaufende (Quellen-Import, Berichte, Audio-Übersicht, Video-Übersicht
 2. Instanz-ID = Zeilen-ID (Berichte/Audio/Video). Quellen bekommen `${sourceId}-${Date.now()}`, weil sie erneut importiert werden können und IDs pro Workflow eindeutig sind.
 3. Jeder Workflow: Steps mit den Retry-Konfigurationen `API_STEP` / `DB_STEP` (`workflows/shared.ts`); der `run()`-Body ist in try/catch gewickelt, der catch führt einen `mark-failed`-Step aus und wirft erneut, sodass die Instanz als errored endet und der Rohfehler im Workflow-Log steht. In die Spalte `error` (die UI zeigt sie an) kommt nur `toUserErrorMessage(err)`: Meldungen aus `USER_ERRORS` (`lib/jobs/errors.ts`), ein erschöpftes KI-Kontingent oder ein allgemeiner Text, nie Postgres- oder Gemini-Rohfehler. Eine neue Meldung für Nutzer kommt in `USER_ERRORS`. Validierungsprobleme werfen `NonRetryableError`.
 4. Das Löschen eines laufenden Berichts/Audios/Videos ruft `cancelJob(kind, id)` auf (terminate, Fehler ignoriert); `deleteNotebook` bricht alle laufenden ab. Gelöschte Quellen erkennt der Import selbst (`assertSourceExists` → `NonRetryableError`).
-5. Der Client pollt den Listen-Endpoint nur, solange ein Element `processing` ist (`NotebookView.tsx`: Quellen 2,5 s, Berichte 3 s, Audio 4 s, Video 5 s).
+5. Der Client pollt den Listen-Endpoint nur, solange ein Element `processing` ist (`app/(app)/notebook/[notebookId]/useSources.ts` und `app/(app)/notebook/[notebookId]/useStudioJobs.ts`: Quellen 2,5 s, Berichte 3 s, Audio 4 s, Video 5 s).
 6. Hängende Jobs (Workflow abgestürzt oder nie gestartet) zeigen die Listen aus `lib/notebookItems.ts` als `failed`, ohne beim Lesen zu schreiben (`STALE_MINUTES`: Quellen 15 min über `updatedAt`, Berichte 10, Audio 15, Video 20 min über `createdAt`). In der DB bleibt die Zeile `processing`. Ein erneuter Import ist auch dafür erlaubt (`sourceRetryable`). Die Schwellen müssen den schlimmsten Fall inklusive Step-Retries übersteigen. Ein neuer Job-Typ braucht dasselbe.
 
 ## Workflow-Regeln
