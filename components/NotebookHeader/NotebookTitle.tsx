@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useLayoutEffect, useRef, useState } from "react"
 import styles from "./notebookHeader.module.scss"
+import { useNotebookTitle } from "./NotebookTitleContext"
 import Toast from "@/components/Toast/Toast"
 import { errorMessage, readError, readJson, UserError } from "@/lib/api/client"
 
@@ -9,40 +10,16 @@ const TITLE_ERROR = "Der Titel konnte nicht erzeugt werden."
 
 type NotebookTitleProps = {
   notebookId: string
-  initialTitle: string
-  initialEmoji: string
   onRename: (notebookId: string, title: string) => Promise<string | null | void>
 }
 
-export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, onRename }: NotebookTitleProps) {
-  const [title, setTitle] = useState(initialTitle)
-  const [emoji, setEmoji] = useState(initialEmoji)
+export default function NotebookTitle({ notebookId, onRename }: NotebookTitleProps) {
+  const { title, emoji, setTitle } = useNotebookTitle()
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(initialTitle)
+  const [draft, setDraft] = useState(title)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-
-  const [prevInitial, setPrevInitial] = useState({ title: initialTitle, emoji: initialEmoji })
-  if (initialTitle !== prevInitial.title || initialEmoji !== prevInitial.emoji) {
-    setPrevInitial({ title: initialTitle, emoji: initialEmoji })
-    if (initialTitle !== prevInitial.title) setTitle(initialTitle)
-    if (initialEmoji !== prevInitial.emoji) setEmoji(initialEmoji)
-  }
-
-  // NotebookView liegt in einem anderen Teilbaum und meldet den Auto-Titel per Event.
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ title?: string; emoji?: string }>).detail
-      if (detail?.title) {
-        setTitle(detail.title)
-        setDraft(detail.title)
-      }
-      if (detail?.emoji) setEmoji(detail.emoji)
-    }
-    window.addEventListener("notebook-title", handler)
-    return () => window.removeEventListener("notebook-title", handler)
-  }, [])
 
   useLayoutEffect(() => {
     if (editing) {
@@ -63,13 +40,14 @@ export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, 
       setDraft(title)
       return
     }
+    const previous = title
     setTitle(next)
     try {
       const nextEmoji = await onRename(notebookId, next)
-      if (typeof nextEmoji === "string" && nextEmoji) setEmoji(nextEmoji)
+      if (typeof nextEmoji === "string" && nextEmoji) setTitle(next, nextEmoji)
     } catch {
-      setTitle(title)
-      setDraft(title)
+      setTitle(previous)
+      setDraft(previous)
     }
   }
 
@@ -91,9 +69,8 @@ export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, 
       const data = await readJson<{ title?: string; emoji?: string | null; generated: boolean; reason?: "empty" }>(res)
       if (data.reason === "empty") throw new UserError("Für einen Titelvorschlag braucht das Notebook erst Quellen oder Fragen.")
       if (!data.generated || !data.title) throw new UserError(TITLE_ERROR)
-      setTitle(data.title)
+      setTitle(data.title, data.emoji)
       setDraft(data.title)
-      if (data.emoji) setEmoji(data.emoji)
       setEditing(false)
     } catch (err) {
       setError(errorMessage(err, TITLE_ERROR))

@@ -7,6 +7,7 @@ import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
 import { embedQuery } from "@/lib/embeddings"
 import { chatModels, geminiErrorMessage, getGemini, withFallback } from "@/lib/gemini"
 import { MAX_LENGTH, parseSourceIds, readJsonBody } from "@/lib/api/body"
+import type { ChatStreamEvent } from "@/lib/chatStream"
 import { extractCitations, type RetrievedChunk } from "@/lib/citations"
 import { SOURCES_ARE_DATA, wrapSources } from "@/lib/prompts"
 import { consumeQuota } from "@/lib/quota"
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const encoder = new TextEncoder()
   const readable = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const send = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"))
+      const send = (event: ChatStreamEvent) => controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"))
       let fullText = ""
 
       try {

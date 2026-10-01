@@ -51,7 +51,7 @@ Die Gratis-Tarife von Gemini und Tavily werden von allen Besuchern geteilt. Jede
 
 ## Chat (RAG, Streaming)
 
-- NDJSON-Stream (`application/x-ndjson; charset=utf-8`, `Cache-Control: no-store`) mit den Events `{type:"text"}`, `{type:"done", messageId, citations}`, `{type:"error"}`; der Stream wird in `finally` geschlossen. Der Client-Parser in `NotebookView.tsx` hängt genau von diesem Format ab.
+- NDJSON-Stream (`application/x-ndjson; charset=utf-8`, `Cache-Control: no-store`) mit den Events `{type:"text"}`, `{type:"done", messageId, citations}`, `{type:"error"}`; der Stream wird in `finally` geschlossen. Das Format ist `ChatStreamEvent` (`lib/chatStream.ts`): Die Route sendet nur diesen Typ, der Client liest ihn mit `readChatEvents` (`app/(app)/notebook/[notebookId]/useChatStream.ts`). Ein neues Event kommt zuerst dorthin.
 - Retrieval: Frage einbetten (`embedQuery`) → `cosineDistance` Top-8 auf `source_chunks`, gejoint mit `sources` mit `status = "ready"`. Exakte Suche, kein Vektorindex (siehe `datenbank.md`). Retrieval und Verlauf laufen, bevor der Stream geöffnet wird; ihre Fehler liefern JSON (503 mit `geminiErrorMessage`), und der Client prüft `res.ok`, bevor er NDJSON liest.
 - Nur die letzten `HISTORY_MESSAGES` Nachrichten gehen in den Prompt. Der Client kann abbrechen (Stop-Button); `cancel()` des Streams bricht die Gemini-Anfrage ab, eine abgebrochene Antwort wird nicht gespeichert.
 - Die Nutzernachricht wird nur zusammen mit der fertigen Antwort gespeichert (zwei getrennte Inserts, damit `created_at` die Reihenfolge behält). Ein fehlgeschlagener Versuch darf nichts im Verlauf hinterlassen, sonst fügt jeder Retry eine weitere unbeantwortete Frage hinzu.
