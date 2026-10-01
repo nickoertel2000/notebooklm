@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import "material-symbols"
 import { REPORT_TYPES } from "@/lib/reports"
 import styles from "./ReportModal.module.scss"
-import { errorMessage, readError, readJson } from "@/lib/api/client"
+import { errorMessage, readError, readJson, UserError } from "@/lib/api/client"
 
 export type ReportGeneratePayload = {
   type?: string
@@ -37,7 +37,7 @@ export default function ReportModal({ notebookId, onClose, onGenerate }: ReportM
         const res = await fetch(`/api/notebooks/${notebookId}/report-suggestions`, {
           method: "POST"
         })
-        if (!res.ok) throw new Error(await readError(res, ""))
+        if (!res.ok) throw new UserError(await readError(res, ""))
         const data = await readJson<{ suggestions?: ReportSuggestion[] }>(res)
         if (!cancelled) setSuggestions(data.suggestions ?? [])
       } catch (err) {

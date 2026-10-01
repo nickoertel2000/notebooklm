@@ -13,6 +13,7 @@ import StudioOptionsModal from "@/components/popup/StudioOptionsModal"
 import Toast from "@/components/Toast/Toast"
 import VideoModal, { VideoOptions } from "@/components/popup/VideoModal"
 import { DEFAULT_NOTEBOOK_TITLE } from "@/lib/notebookTitle"
+import { replacePlaceholder } from "@/lib/placeholders"
 import { getReportType } from "@/lib/reports"
 import { getStudioFormat, StudioFormat, StudioOptions } from "@/lib/studio"
 import { hostOf } from "@/lib/url"
@@ -21,7 +22,7 @@ import "material-symbols"
 import Image from "next/image"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import styles from "../notebook.module.scss"
-import { errorMessage, readError, readJson } from "@/lib/api/client"
+import { errorMessage, readError, readJson, UserError } from "@/lib/api/client"
 
 export type Citation = {
   marker: number
@@ -144,8 +145,8 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   }
 
   const refreshSources = useCallback(async () => {
-    const res = await fetch(`/api/notebooks/${notebookId}/sources`)
-    if (res.ok) {
+    const res = await fetch(`/api/notebooks/${notebookId}/sources`).catch(() => null)
+    if (res?.ok) {
       const data = await readJson<{ sources: SourceItem[] }>(res)
       setSources(data.sources)
     }
@@ -158,8 +159,8 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   }, [sources, refreshSources])
 
   const refreshReports = useCallback(async () => {
-    const res = await fetch(`/api/notebooks/${notebookId}/reports`)
-    if (!res.ok) return
+    const res = await fetch(`/api/notebooks/${notebookId}/reports`).catch(() => null)
+    if (!res?.ok) return
     const data = await readJson<{ reports: ReportItem[] }>(res)
     // temp-Platzhalter gehören zu noch laufenden Anfragen und fehlen im Server-Stand.
     setReports((prev) => [...prev.filter((r) => r.id.startsWith("temp-")), ...data.reports])
@@ -172,8 +173,8 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   }, [reports, refreshReports])
 
   const refreshAudios = useCallback(async () => {
-    const res = await fetch(`/api/notebooks/${notebookId}/audio`)
-    if (!res.ok) return
+    const res = await fetch(`/api/notebooks/${notebookId}/audio`).catch(() => null)
+    if (!res?.ok) return
     const data = await readJson<{ audios: AudioItem[] }>(res)
     setAudios((prev) => [...prev.filter((a) => a.id.startsWith("temp-")), ...data.audios])
   }, [notebookId])
@@ -185,8 +186,8 @@ export default function NotebookView({ notebookId, title, initialSources, initia
   }, [audios, refreshAudios])
 
   const refreshVideos = useCallback(async () => {
-    const res = await fetch(`/api/notebooks/${notebookId}/video`)
-    if (!res.ok) return
+    const res = await fetch(`/api/notebooks/${notebookId}/video`).catch(() => null)
+    if (!res?.ok) return
     const data = await readJson<{ videos: VideoItem[] }>(res)
     setVideos((prev) => [...prev.filter((v) => v.id.startsWith("temp-")), ...data.videos])
   }, [notebookId])
@@ -231,7 +232,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "pdf", filename: payload.file.name })
       })
-      if (!res.ok) throw new Error(await readError(res, "Anlegen fehlgeschlagen"))
+      if (!res.ok) throw new UserError(await readError(res, "Anlegen fehlgeschlagen"))
       const { sourceId } = await readJson<{ sourceId: string }>(res)
       newId = sourceId
       const put = await fetch(`${base}/${sourceId}/file`, {
@@ -239,14 +240,14 @@ export default function NotebookView({ notebookId, title, initialSources, initia
         body: payload.file,
         headers: { "Content-Type": "application/pdf" }
       })
-      if (!put.ok) throw new Error(await readError(put, "Upload fehlgeschlagen"))
+      if (!put.ok) throw new UserError(await readError(put, "Upload fehlgeschlagen"))
     } else if (payload.type === "url") {
       const res = await fetch(base, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "url", url: payload.url })
       })
-      if (!res.ok) throw new Error(await readError(res, "URL fehlgeschlagen"))
+      if (!res.ok) throw new UserError(await readError(res, "URL fehlgeschlagen"))
       newId = (await readJson<{ sourceId: string }>(res)).sourceId
     } else {
       const res = await fetch(base, {
@@ -254,7 +255,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "text", title: payload.title, text: payload.text })
       })
-      if (!res.ok) throw new Error(await readError(res, "Text fehlgeschlagen"))
+      if (!res.ok) throw new UserError(await readError(res, "Text fehlgeschlagen"))
       newId = (await readJson<{ sourceId: string }>(res)).sourceId
     }
     if (newId) setSelectedIds((prev) => new Set(prev).add(newId!))
@@ -273,7 +274,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "url", url })
         })
-        if (!res.ok) throw new Error(await readError(res, "Import fehlgeschlagen"))
+        if (!res.ok) throw new UserError(await readError(res, "Import fehlgeschlagen"))
         const { sourceId } = await readJson<{ sourceId: string }>(res)
         newIds.push(sourceId)
       } catch (err) {
@@ -296,7 +297,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
     setSources((prev) => prev.map((s) => (s.id === sourceId ? { ...s, status: "processing", error: null } : s)))
     try {
       const res = await fetch(`/api/notebooks/${notebookId}/sources/${sourceId}`, { method: "POST" })
-      if (!res.ok) throw new Error(await readError(res, "Der Import konnte nicht neu gestartet werden."))
+      if (!res.ok) throw new UserError(await readError(res, "Der Import konnte nicht neu gestartet werden."))
     } catch (err) {
       setSources((prev) => prev.map((s) => (s.id === sourceId ? { ...s, status: "failed" } : s)))
       showError(errorMessage(err, "Der Import konnte nicht neu gestartet werden."))
@@ -348,12 +349,14 @@ export default function NotebookView({ notebookId, title, initialSources, initia
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...body, sourceIds: selectedReadyIds })
       })
-      if (!res.ok) throw new Error(await readError(res, "Bericht fehlgeschlagen"))
+      if (!res.ok) throw new UserError(await readError(res, "Bericht fehlgeschlagen"))
       const { report } = await readJson<{ report: ReportItem }>(res)
-      setReports((prev) => prev.map((r) => (r.id === tempId ? report : r)))
+      setReports((prev) => replacePlaceholder(prev, tempId, report))
     } catch (err) {
       setReports((prev) => prev.filter((r) => r.id !== tempId))
       showError(errorMessage(err, "Bericht fehlgeschlagen"))
+      // Scheitert erst der Start des Workflows, steht die Zeile schon als failed in der DB.
+      await refreshReports()
     }
   }
 
@@ -390,12 +393,13 @@ export default function NotebookView({ notebookId, title, initialSources, initia
           sourceIds: selectedReadyIds
         })
       })
-      if (!res.ok) throw new Error(await readError(res, "Audio fehlgeschlagen"))
+      if (!res.ok) throw new UserError(await readError(res, "Audio fehlgeschlagen"))
       const { audio } = await readJson<{ audio: AudioItem }>(res)
-      setAudios((prev) => prev.map((a) => (a.id === tempId ? audio : a)))
+      setAudios((prev) => replacePlaceholder(prev, tempId, audio))
     } catch (err) {
       setAudios((prev) => prev.filter((a) => a.id !== tempId))
       showError(errorMessage(err, "Audio fehlgeschlagen"))
+      await refreshAudios()
     }
   }
 
@@ -450,12 +454,13 @@ export default function NotebookView({ notebookId, title, initialSources, initia
           sourceIds: selectedReadyIds
         })
       })
-      if (!res.ok) throw new Error(await readError(res, "Video fehlgeschlagen"))
+      if (!res.ok) throw new UserError(await readError(res, "Video fehlgeschlagen"))
       const { video } = await readJson<{ video: VideoItem }>(res)
-      setVideos((prev) => prev.map((v) => (v.id === tempId ? video : v)))
+      setVideos((prev) => replacePlaceholder(prev, tempId, video))
     } catch (err) {
       setVideos((prev) => prev.filter((v) => v.id !== tempId))
       showError(errorMessage(err, "Video fehlgeschlagen"))
+      await refreshVideos()
     }
   }
 
@@ -534,8 +539,8 @@ export default function NotebookView({ notebookId, title, initialSources, initia
         body: JSON.stringify({ message: trimmed, sourceIds: selectedReadyIds }),
         signal: controller.signal
       })
-      if (!res.ok) throw new Error(await readError(res, "Die Frage konnte nicht gesendet werden."))
-      if (!res.body) throw new Error("Die Antwort konnte nicht gelesen werden.")
+      if (!res.ok) throw new UserError(await readError(res, "Die Frage konnte nicht gesendet werden."))
+      if (!res.body) throw new UserError("Die Antwort konnte nicht gelesen werden.")
 
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
@@ -561,7 +566,7 @@ export default function NotebookView({ notebookId, title, initialSources, initia
       }
     } catch (err) {
       if (controller.signal.aborted) appendToAnswer("[Abgebrochen]")
-      else appendToAnswer(`[Fehler: ${err instanceof Error ? err.message : String(err)}]`)
+      else appendToAnswer(`[Fehler: ${errorMessage(err, "Die Antwort ist abgebrochen. Bitte versuche es erneut.")}]`)
     } finally {
       chatAbortRef.current = null
       setStreaming(false)

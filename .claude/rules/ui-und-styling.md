@@ -22,6 +22,7 @@ paths:
 - Ein Ordner pro Komponente in `components/<Name>/` mit `<Name>.tsx` + `<Name>.module.scss` (PascalCase für neue Dateien; einige ältere SCSS-Dateien sind kleingeschrieben, so belassen).
 - Modals liegen gemeinsam in `components/popup/`: `"use client"`, gesteuert über `onClose`-/`onCreate`-Callbacks, `role="dialog" aria-modal="true"`, Klick auf das Overlay schließt, inneres `onClick={(e) => e.stopPropagation()}`.
 - `lib/useDictation.ts`: Web Speech API (`de-DE`, nur Chrome/Edge); `supported` kommt aus `useSyncExternalStore` mit Server-Snapshot `false` für SSR-Sicherheit.
+- Fehler nie verschlucken. Anzeigbare Meldungen als `UserError` werfen (`throw new UserError(await readError(res, fallback))`, `lib/api/client.ts`) und mit `errorMessage(err, fallback)` lesen: Andere Fehler (TypeError bei Netzfehlern, SyntaxError) tragen englischen Browsertext und werden durch den Fallback ersetzt. In der Notebook-Ansicht erscheinen sie als `components/Toast`, in Modals im eigenen Fehlerfeld. Scheitert das Anlegen eines Studio-Eintrags, verschwindet der Platzhalter, und die Liste wird neu geladen.
 - `eslint-plugin-react-hooks` 7 verbietet synchrones `setState` in Effects (`react-hooks/set-state-in-effect`). State aus geänderten Props wird während des Renderns mit einem gespeicherten Vorgängerwert synchronisiert (siehe `NotebookTitle.tsx`), Browser-Fähigkeiten über `useSyncExternalStore`.
 
 ## Styling

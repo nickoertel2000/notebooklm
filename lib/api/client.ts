@@ -8,7 +8,10 @@ export async function readError(res: Response, fallback: string): Promise<string
   return data?.error || fallback
 }
 
-// fetch wirft bei Netzwerkfehlern einen TypeError mit englischem Browsertext, der nicht in die UI gehört.
+// Für Meldungen, die in die UI dürfen: vom Server (readError) oder selbst formuliert.
+export class UserError extends Error {}
+
+// Alles andere (TypeError bei Netzfehlern, SyntaxError bei kaputtem JSON) trägt englischen Browsertext.
 export function errorMessage(err: unknown, fallback: string): string {
-  return err instanceof Error && !(err instanceof TypeError) && err.message ? err.message : fallback
+  return err instanceof UserError && err.message ? err.message : fallback
 }

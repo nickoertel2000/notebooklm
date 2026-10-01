@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/db"
 import { messages, notebooks, sourceChunks, sources } from "@/db/schema"
 import { authorizeNotebook } from "@/lib/auth/authorizeNotebook"
-import { chatModels, generateText } from "@/lib/gemini"
+import { chatModels, geminiErrorMessage, generateText } from "@/lib/gemini"
 import { pickNotebookEmoji } from "@/lib/notebookIcons"
 import { DEFAULT_NOTEBOOK_TITLE } from "@/lib/notebookTitle"
 import { readJsonBody } from "@/lib/api/body"
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   }
 
   if (parts.length === 0) {
-    return NextResponse.json({ title: notebook.title, generated: false })
+    return NextResponse.json({ title: notebook.title, generated: false, reason: "empty" })
   }
 
   const quotaError = await consumeQuota(user.id, "assist")
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       .trim()
       .slice(0, 100)
 
-    if (!title) return NextResponse.json({ title: notebook.title, generated: false })
+    if (!title) return NextResponse.json({ error: "Die KI hat keinen Titel geliefert. Bitte versuche es erneut." }, { status: 502 })
 
     const emoji = await pickNotebookEmoji(title)
 
@@ -91,6 +91,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ title, emoji, generated: true })
   } catch (err) {
     console.error("Auto-Titel fehlgeschlagen:", err)
-    return NextResponse.json({ title: notebook.title, generated: false })
+    return NextResponse.json({ error: geminiErrorMessage(err) }, { status: 502 })
   }
 }

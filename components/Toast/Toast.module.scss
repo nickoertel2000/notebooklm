@@ -2,7 +2,6 @@
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 24px;
   z-index: 1100;
   transform: translateX(-50%);
   display: flex;
@@ -15,6 +14,14 @@
   background: var(--surface, #2a2b2d);
   color: var(--text, #e3e3e3);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.bottom {
+  bottom: 24px;
+}
+
+.top {
+  top: 76px;
 }
 
 .icon {

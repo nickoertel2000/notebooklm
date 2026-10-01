@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import styles from "./notebookHeader.module.scss"
 import Toast from "@/components/Toast/Toast"
-import { errorMessage, readError, readJson } from "@/lib/api/client"
+import { errorMessage, readError, readJson, UserError } from "@/lib/api/client"
 
 const TITLE_ERROR = "Der Titel konnte nicht erzeugt werden."
 
@@ -87,9 +87,10 @@ export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ force: true })
       })
-      if (!res.ok) throw new Error(await readError(res, TITLE_ERROR))
-      const data = await readJson<{ title?: string; emoji?: string | null; generated: boolean }>(res)
-      if (!data.generated || !data.title) throw new Error("Für einen Titelvorschlag braucht das Notebook erst Quellen oder Fragen.")
+      if (!res.ok) throw new UserError(await readError(res, TITLE_ERROR))
+      const data = await readJson<{ title?: string; emoji?: string | null; generated: boolean; reason?: "empty" }>(res)
+      if (data.reason === "empty") throw new UserError("Für einen Titelvorschlag braucht das Notebook erst Quellen oder Fragen.")
+      if (!data.generated || !data.title) throw new UserError(TITLE_ERROR)
       setTitle(data.title)
       setDraft(data.title)
       if (data.emoji) setEmoji(data.emoji)
@@ -101,7 +102,7 @@ export default function NotebookTitle({ notebookId, initialTitle, initialEmoji, 
     }
   }
 
-  const toast = error && <Toast message={error} onClose={() => setError(null)} />
+  const toast = error && <Toast message={error} placement="top" onClose={() => setError(null)} />
 
   if (editing) {
     return (
