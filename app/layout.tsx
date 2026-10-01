@@ -9,9 +9,21 @@ const googleSans = localFont({
   display: "swap"
 })
 
+const description = "Demo-Projekt: Nachbau von Google NotebookLM mit RAG-Chat, Zitaten sowie Audio- und Video-Übersichten."
+
 export const metadata: Metadata = {
+  // Ohne metadataBase wäre die URL von opengraph-image.png relativ, und Link-Vorschauen bleiben leer.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   title: "NotebookLM Klon",
-  description: "Demo-Projekt: Nachbau von Google NotebookLM mit RAG-Chat, Zitaten sowie Audio- und Video-Übersichten.",
+  description,
+  openGraph: {
+    title: "NotebookLM-Klon: KI-Recherche-Assistent mit RAG",
+    description,
+    siteName: "NotebookLM Klon",
+    locale: "de_DE",
+    type: "website"
+  },
+  twitter: { card: "summary_large_image" },
   icons: {
     icon: [
       { url: "/favicon/favicon-16x16.png", sizes: "16x16", type: "image/png" },
