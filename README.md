@@ -60,7 +60,7 @@ Einstieg in den Code: [`chat/route.ts`](app/api/notebooks/%5BnotebookId%5D/chat/
 ## Sicherheit und Qualität
 
 - **Mandantentrennung:** Jede Route prüft Session und Notebook-Besitz (`authorizeNotebook`). Kind-Datensätze werden zusätzlich über die Notebook-ID gefiltert. Ein E2E-Test ruft jede Notebook-Route als fremder Nutzer auf, erwartet `404` und prüft in der Datenbank, dass nichts verändert wurde. Ein zweiter Test schlägt fehl, sobald eine neue Route in dieser Liste fehlt.
-- **Missbrauchsschutz:** Cloudflare Turnstile vor Registrierung und Demo-Zugang, Rate-Limits pro Nutzer und pro IP, Tageslimits pro Konto und für die ganze Demo, Längenlimits für alle Eingaben.
+- **Missbrauchsschutz:** Konten entstehen nur über den Demo-Zugang hinter Cloudflare Turnstile, die Registrierung ist auch per API gesperrt. Dazu Rate-Limits pro Nutzer und pro IP, Tageslimits pro Konto und für die ganze Demo, Längenlimits für alle Eingaben.
 - **URL-Import:** nur öffentliche http(s)-Adressen, jede Weiterleitung einzeln geprüft, Timeout und Größenlimit.
 - **Prompt-Injection:** Quellen stehen im Prompt zwischen festen Markern, die ein Dokument nicht selbst schließen kann, und der System-Prompt erklärt sie zu Daten. Die Wirkung ist ohnehin begrenzt: Das Modell hat keine Tools, und die Antwort wird nur als Text gerendert.
 - **Fehlermeldungen:** Die UI zeigt Fehler vom Server an, etwa ein erreichtes Tageslimit. Workflows speichern nur freigegebene Meldungen, Rohfehler bleiben im Log.

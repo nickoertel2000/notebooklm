@@ -11,8 +11,6 @@ import "material-symbols"
 import { useRef, useState } from "react"
 import styles from "./login.module.scss"
 
-type Mode = "signin" | "signup"
-
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 // Tippt den Wert sichtbar ein, damit erkennbar ist, dass der normale Login genutzt wird.
@@ -24,8 +22,6 @@ async function typeInto(setValue: (value: string) => void, value: string) {
 }
 
 export default function LoginForm() {
-  const [mode, setMode] = useState<Mode>("signin")
-  const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -35,9 +31,7 @@ export default function LoginForm() {
   const [filledDemo, setFilledDemo] = useState<DemoAccount | null>(null)
   const storedDemo = useDemoAccount()
   const [demoToken, setDemoToken] = useState<string | null>(null)
-  const [signupToken, setSignupToken] = useState<string | null>(null)
   const demoTurnstile = useRef<TurnstileHandle>(null)
-  const signupTurnstile = useRef<TurnstileHandle>(null)
 
   async function handleDemo() {
     setError(null)
@@ -54,7 +48,6 @@ export default function LoginForm() {
         account = await readJson<DemoAccount>(res)
         saveDemoAccount(account)
       }
-      setMode("signin")
       await typeInto(setEmail, account.email)
       await typeInto(setPassword, account.password)
       setFilledDemo(account)
@@ -72,11 +65,7 @@ export default function LoginForm() {
     setLoading(true)
 
     try {
-      const { error: authError } =
-        mode === "signup"
-          ? await authClient.signUp.email({ name, email, password, fetchOptions: { headers: { [TURNSTILE_HEADER]: signupToken ?? "" } } })
-          : await authClient.signIn.email({ email, password })
-      if (mode === "signup") signupTurnstile.current?.reset()
+      const { error: authError } = await authClient.signIn.email({ email, password })
 
       if (authError) {
         if (authError.status === 429) {
@@ -84,17 +73,13 @@ export default function LoginForm() {
           return
         }
         // Scheitert der Login mit dem gespeicherten Demo-Konto, wurde es nach Inaktivität gelöscht.
-        if (mode === "signin" && storedDemo && email === storedDemo.email) {
+        if (storedDemo && email === storedDemo.email) {
           saveDemoAccount(null)
           setFilledDemo(null)
           setError("Dein Demo-Konto ist abgelaufen. Starte einfach eine neue Demo.")
           return
         }
-        setError(
-          mode === "signup"
-            ? "Registrierung fehlgeschlagen. E-Mail evtl. bereits vergeben oder Passwort zu kurz (mind. 8 Zeichen)."
-            : "Anmeldung fehlgeschlagen. Bitte E-Mail und Passwort prüfen."
-        )
+        setError("Anmeldung fehlgeschlagen. Bitte E-Mail und Passwort prüfen.")
         return
       }
 
@@ -106,12 +91,6 @@ export default function LoginForm() {
     } finally {
       setLoading(false)
     }
-  }
-
-  function toggleMode() {
-    setMode((prev) => (prev === "signin" ? "signup" : "signin"))
-    setError(null)
-    setFilledDemo(null)
   }
 
   return (
@@ -135,17 +114,6 @@ export default function LoginForm() {
         </section>
 
         <form className={styles.form} onSubmit={handleSubmit}>
-          {mode === "signup" && (
-            <input
-              className={styles.input}
-              type="text"
-              placeholder="Nutzername"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoComplete="name"
-              required
-            />
-          )}
           <input className={styles.input} type="email" placeholder="E-Mail" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
           <div className={styles.passwordField}>
             <input
@@ -154,7 +122,7 @@ export default function LoginForm() {
               placeholder="Passwort"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              autoComplete="current-password"
               minLength={8}
               required
             />
@@ -178,36 +146,10 @@ export default function LoginForm() {
           )}
           {error && <p className={styles.error}>{error}</p>}
 
-          {mode === "signup" && <Turnstile ref={signupTurnstile} action="signup" onToken={setSignupToken} onError={setError} />}
-          <button type="submit" className={styles.submitBtn} disabled={loading || demoLoading || (mode === "signup" && !signupToken)}>
-            {loading ? "Bitte warten …" : mode === "signup" ? "Konto erstellen" : "Anmelden"}
+          <button type="submit" className={styles.submitBtn} disabled={loading || demoLoading}>
+            {loading ? "Bitte warten …" : "Anmelden"}
           </button>
         </form>
-
-        <button type="button" className={styles.toggle} onClick={toggleMode}>
-          {mode === "signup" ? "Schon registriert? Anmelden" : "Noch kein Konto? Registrieren"}
-        </button>
-
-        <div className={styles.divider}>
-          <span>oder</span>
-        </div>
-
-        <button type="button" className={styles.googleBtn} disabled title="Die Anmeldung mit Google ist in dieser Demo deaktiviert">
-          <span className={styles.disabledBadge}>In Demo deaktiviert</span>
-          <svg className={styles.googleLogo} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-            <path
-              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              fill="#34A853"
-            />
-            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
-            <path
-              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-              fill="#EA4335"
-            />
-          </svg>
-          Mit Google anmelden
-        </button>
 
         <p className={styles.disclaimer}>
           Demo-Projekt: ein Nachbau von Google NotebookLM, kein Google-Produkt.{" "}
