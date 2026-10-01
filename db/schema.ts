@@ -1,4 +1,5 @@
 import { boolean, index, integer, jsonb, pgTable, text, timestamp, uuid, vector } from "drizzle-orm/pg-core"
+import type { Citation, JobStatus, MessageRole, SourceType } from "../lib/items"
 
 // ── Better Auth Tabellen ──────────────────────────────────────────────────────
 
@@ -86,13 +87,11 @@ export const sources = pgTable(
     notebookId: uuid("notebook_id")
       .notNull()
       .references(() => notebooks.id, { onDelete: "cascade" }),
-    // 'pdf' | 'url' | 'text'
-    type: text("type").notNull(),
+    type: text("type").$type<SourceType>().notNull(),
     title: text("title").notNull(),
     storageKey: text("storage_key"),
     sourceUrl: text("source_url"),
-    // 'processing' | 'ready' | 'failed'
-    status: text("status").notNull().default("processing"),
+    status: text("status").$type<JobStatus>().notNull().default("processing"),
     error: text("error"),
     charCount: integer("char_count"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -130,15 +129,7 @@ export const sourceChunks = pgTable(
 
 // ── Chat-Nachrichten ──────────────────────────────────────────────────────────
 
-export type MessageCitation = {
-  marker: number
-  sourceId: string
-  chunkId: string
-  snippet: string
-  page: number | null
-  charStart: number | null
-  charEnd: number | null
-}
+export type MessageCitation = Citation
 
 export const messages = pgTable(
   "messages",
@@ -147,8 +138,7 @@ export const messages = pgTable(
     notebookId: uuid("notebook_id")
       .notNull()
       .references(() => notebooks.id, { onDelete: "cascade" }),
-    // 'user' | 'assistant'
-    role: text("role").notNull(),
+    role: text("role").$type<MessageRole>().notNull(),
     content: text("content").notNull(),
     citations: jsonb("citations").$type<MessageCitation[]>(),
     createdAt: timestamp("created_at").defaultNow().notNull()
@@ -171,8 +161,7 @@ export const reports = pgTable(
     title: text("title").notNull().default("Bericht"),
     content: text("content"),
     sourceCount: integer("source_count").notNull().default(0),
-    // 'processing' | 'ready' | 'failed'
-    status: text("status").notNull().default("processing"),
+    status: text("status").$type<JobStatus>().notNull().default("processing"),
     error: text("error"),
     createdAt: timestamp("created_at").defaultNow().notNull()
   },
@@ -198,8 +187,7 @@ export const audioOverviews = pgTable(
     language: text("language").notNull().default("de"),
     focus: text("focus"),
     sourceCount: integer("source_count").notNull().default(0),
-    // 'processing' | 'ready' | 'failed'
-    status: text("status").notNull().default("processing"),
+    status: text("status").$type<JobStatus>().notNull().default("processing"),
     error: text("error"),
     createdAt: timestamp("created_at").defaultNow().notNull()
   },
@@ -226,8 +214,7 @@ export const videoOverviews = pgTable(
     language: text("language").notNull().default("de"),
     focus: text("focus"),
     sourceCount: integer("source_count").notNull().default(0),
-    // 'processing' | 'ready' | 'failed'
-    status: text("status").notNull().default("processing"),
+    status: text("status").$type<JobStatus>().notNull().default("processing"),
     error: text("error"),
     createdAt: timestamp("created_at").defaultNow().notNull()
   },

@@ -14,7 +14,7 @@ paths:
 - Seiten sind asynchrone Server Components: `getSessionUser()` → `redirect("/login")`, Besitzprüfung über `getNotebookForUser` → `notFound()`, Daten laden, Datumswerte in ISO-Strings serialisieren, als `initialX`-Props an eine Client Component übergeben. Referenz: `app/(app)/notebook/[notebookId]/page.tsx` + `NotebookView.tsx`.
 - Client Components laden nie Initialdaten und prüfen nie die Authentifizierung; sie rufen `app/api/` (oder die Notebook-CRUD-Server-Actions) auf und pollen den Job-Status (siehe `jobs-worker.md`).
 - `app/(app)/layout.tsx` macht keine Authentifizierung (der Schutz ist `proxy.ts` + Page-Guard), setzt aber `dynamic = "force-dynamic"`: vinext kann `headers()` zur Build-Zeit nicht erkennen, und diese Seiten dürfen nie gecacht werden.
-- Item-Typen, die sich Seite und View teilen, werden aus der View exportiert (`NotebookView.tsx`); Payload-Typen von Modals werden neben dem Modal exportiert (`AudioOptions`, `ReportGeneratePayload`, …).
+- Item-Typen, die Seite, API-Routen und Client teilen, stehen in `lib/items.ts` (ohne Server-Imports). Komponenten importieren nie Typen aus Route- oder View-Dateien. Payload-Typen von Modals werden neben dem Modal exportiert (`AudioOptions`, `ReportGeneratePayload`, …).
 - `NotebookView.tsx` ist bereits sehr groß – neue, in sich geschlossene UI in `components/` ablegen, statt die Datei weiter wachsen zu lassen.
 
 ## Komponenten
