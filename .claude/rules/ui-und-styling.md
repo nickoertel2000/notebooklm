@@ -5,6 +5,10 @@ paths:
   - "components/**"
   - "styles/**"
   - "lib/useDictation.ts"
+  - "lib/items.ts"
+  - "lib/api/client.ts"
+  - "lib/placeholders.ts"
+  - "lib/languages.ts"
 ---
 
 # Seiten, Komponenten & Styling

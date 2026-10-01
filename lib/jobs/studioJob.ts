@@ -12,7 +12,6 @@ type StudioJob<Row> = {
   userId: string
   notebookId: string
   sourceIds: unknown
-  // Für das Log, z. B. "Audio".
   label: string
   // Legt die Zeile mit status "processing" an.
   insert: (sourceCount: number) => Promise<Row>

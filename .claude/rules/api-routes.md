@@ -2,6 +2,10 @@
 paths:
   - "app/api/**"
   - "app/(app)/actions.ts"
+  - "lib/jobs/studioJob.ts"
+  - "lib/languages.ts"
+  - "lib/prompts.ts"
+  - "lib/quota.ts"
 ---
 
 # API Route Handlers & Server Actions

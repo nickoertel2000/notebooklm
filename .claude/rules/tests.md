@@ -26,6 +26,7 @@ paths:
 - Der Dev-Server kompiliert Client-Code bei der ersten Anfrage: Klicks vor der Hydration gehen stillschweigend verloren (Buttons tun nichts, Formulare werden nativ abgeschickt, `Link` lädt komplett neu). Nach jedem vollständigen Seitenaufruf `gotoPage()` / `waitForHydration()` / `expectHome()` aus `e2e/helpers.ts` aufrufen. Reine CSS-Effekte (Tooltips bei Hover) funktionieren ohne Hydration und beweisen nichts.
 - Turnstile läuft in den Tests mit Cloudflares Test-Keys, die jedes Token bestätigen. Negativtests prüfen deshalb nur fehlende Tokens.
 - `e2e/quota.spec.ts` prüft das Tageslimit über `discover` (das Kontingent wird vor dem Tavily-Aufruf gebucht, der mit dem Platzhalter-Key scheitert) und die Obergrenze für Notebooks, deren Notebooks der Test per SQL anlegt.
+- `e2e/jobs.spec.ts` legt hängende Jobs per SQL an und prüft, dass die Listen sie als `failed` zeigen, die DB-Zeile aber `processing` bleibt.
 - `e2e/authz.spec.ts` ruft jede Notebook-Route als zweiter Nutzer auf und erwartet 404; ein eigener Test vergleicht die Liste mit allen exportierten Handlern unter `app/api/notebooks/[notebookId]/`. Eine neue Route unter `app/api/notebooks/[notebookId]/` bekommt dort einen Eintrag in `notebookRoutes`.
 - Ein leeres Notebook öffnet den Dialog zum Hinzufügen von Quellen von selbst; dort nicht auf "Quellen hinzufügen" klicken.
 - Locators verwenden sichtbare deutsche Texte und `aria-label`s; CSS-Modul-Klassen nur über den Originalnamen (`toHaveClass(/sourceItemActive/)`, gescopte Namen behalten ihn).

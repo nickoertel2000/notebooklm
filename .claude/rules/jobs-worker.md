@@ -11,6 +11,8 @@ paths:
   - "lib/embeddings.ts"
   - "lib/chunk.ts"
   - "lib/extract.ts"
+  - "lib/notebookItems.ts"
+  - "lib/prompts.ts"
   - "app/api/notebooks/*/sources/**"
   - "app/api/notebooks/*/reports/**"
   - "app/api/notebooks/*/audio/**"
